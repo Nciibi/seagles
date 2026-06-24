@@ -1,0 +1,66 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ironmesh
+      POSTGRES_USER: ironmesh
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ironmesh"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://ironmesh:${DB_PASSWORD}@postgres:5432/ironmesh?sslmode=disable
+      PORT: 8080
+      NETWORK_CIDR: ${NETWORK_CIDR:-192.168.1.0/24}
+      NVD_API_KEY: ${NVD_API_KEY:-}
+      FIRMWARE_ANALYZER_URL: http://firmware-analyzer:8001
+    ports:
+      - "8080:8080"
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./data:/app/data
+
+  firmware-analyzer:
+    build: ./firmware-analyzer
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://ironmesh:${DB_PASSWORD}@postgres:5432/ironmesh?sslmode=disable
+      NVD_API_KEY: ${NVD_API_KEY:-}
+    volumes:
+      - firmware_data:/firmware
+    ports:
+      - "8001:8001"
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    environment:
+      REACT_APP_API_URL: /api/v1
+
+volumes:
+  postgres_data:
+  firmware_data:

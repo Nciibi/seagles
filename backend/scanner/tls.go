@@ -2,9 +2,9 @@ package scanner
 
 import (
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"log"
+	"net"
 	"strings"
 	"time"
 )
@@ -50,11 +50,7 @@ func CheckTLS(host string, port int) TLSResult {
 			MaxVersion:         v.version,
 		}
 
-		dialer := &tls.Dialer{
-			Config: cfg,
-		}
-
-		conn, err := dialer.DialContext(nil, "tcp", addr)
+		conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 5 * time.Second}, "tcp", addr, cfg)
 		if conn != nil {
 			conn.Close()
 		}
@@ -80,7 +76,7 @@ func CheckTLS(host string, port int) TLSResult {
 		InsecureSkipVerify: true,
 	}
 
-	conn, err := tls.DialWithDialer(&net_Dialer{Timeout: 5 * time.Second}, "tcp", addr, cfg)
+	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 5 * time.Second}, "tcp", addr, cfg)
 	if err != nil {
 		return result
 	}

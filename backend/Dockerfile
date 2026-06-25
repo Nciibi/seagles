@@ -1,6 +1,6 @@
 FROM golang:1.22-alpine AS builder
 
-RUN apk add --no-cache nmap git
+RUN apk add --no-cache nmap git libpcap-dev gcc musl-dev
 
 WORKDIR /app
 COPY go.mod go.sum ./
@@ -10,7 +10,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o ironmesh .
 
 FROM alpine:3.19
-RUN apk add --no-cache nmap ca-certificates tzdata
+RUN apk add --no-cache nmap ca-certificates tzdata libpcap
 
 WORKDIR /app
 COPY --from=builder /app/ironmesh .

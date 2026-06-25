@@ -122,6 +122,13 @@ func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, d
 		}
 	}()
 
+	// Check if IP is safelisted before scanning
+	if IsSafelisted(db, ip) {
+		log.Printf("Scan skipped: IP %s is safelisted", ip)
+		db.Exec(`UPDATE scans SET status='skipped', scan_output='Device is safelisted', completed_at=NOW() WHERE id=$1`, scanID)
+		return
+	}
+
 	// Step 1: Deep scan
 	result, err := scanner.DeepScan(ip)
 	if err != nil {
@@ -296,6 +303,11 @@ func NetworkScanHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 
 			discovered := 0
 			for _, ip := range hosts {
+				if IsSafelisted(db, ip) {
+					log.Printf("Skipping safelisted IP during network scan: %s", ip)
+					continue
+				}
+
 				var deviceID string
 				var isNew bool
 

@@ -35,14 +35,14 @@ export default function Login() {
       justifyContent: 'center',
       background: 'linear-gradient(135deg, #0f1117 0%, #1a1d2e 50%, #0f1117 100%)',
     }}>
-      <div style={{
+      <div className="animate-fade-in" style={{
         width: '100%',
         maxWidth: '420px',
         padding: '40px',
       }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <div style={{
+          <div className="animate-float" style={{
             width: '72px',
             height: '72px',
             borderRadius: '20px',

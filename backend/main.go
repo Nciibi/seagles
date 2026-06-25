@@ -9,6 +9,7 @@ import (
 	"github.com/yourusername/seagles/config"
 	"github.com/yourusername/seagles/db"
 	"github.com/yourusername/seagles/kev"
+	"github.com/yourusername/seagles/scanner"
 )
 
 func main() {
@@ -35,6 +36,11 @@ func main() {
 
 	// Start alert monitor (background checks every 60s)
 	go alerts.StartAlertMonitor(database)
+
+	// Start passive traffic monitor
+	// Note: Requires libpcap-dev and privileges. It will gracefully skip if unavailable.
+	passiveMonitor := scanner.NewPassiveMonitor(database, "")
+	go passiveMonitor.Start()
 
 	// Create and start the API server
 	router := api.NewRouter(database, cfg, kevCatalog)

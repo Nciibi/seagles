@@ -1,0 +1,86 @@
+# This manifest demonstrates how to securely deploy the Seagles Backend in a locked-down 
+# Kubernetes environment, specifically adhering to strict Pod Security Standards.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: seagles-backend
+  namespace: security-tools
+  labels:
+    app: seagles-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: seagles-backend
+  template:
+    metadata:
+      labels:
+        app: seagles-backend
+    spec:
+      serviceAccountName: seagles-sa
+      # Best practice: Do not run as root.
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: seagles-backend
+        image: your-registry.com/seagles-backend:v2.0.0
+        ports:
+        - containerPort: 8080
+          name: http
+        
+        # Security Context designed for the passive monitor (gopacket)
+        securityContext:
+          # Prevent privilege escalation
+          allowPrivilegeEscalation: false
+          # Drop ALL default capabilities (highly restricted)
+          capabilities:
+            drop:
+              - ALL
+            # Add ONLY the capabilities strictly required by libpcap for passive monitoring
+            add:
+              - NET_RAW
+              - NET_ADMIN
+          # Run filesystem in read-only mode to prevent host tampering
+          readOnlyRootFilesystem: true
+
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: seagles-db-secrets
+              key: connection-string
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: seagles-jwt-secret
+              key: secret
+        - name: S3_ENDPOINT
+          value: "minio-service.storage.svc.cluster.local:9000"
+        - name: S3_BUCKET
+          value: "ironmesh-firmware"
+        - name: S3_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: seagles-s3-secrets
+              key: access-key
+        - name: S3_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: seagles-s3-secrets
+              key: secret-key
+
+        volumeMounts:
+        - name: tmp-volume
+          mountPath: /tmp
+        - name: data-volume
+          mountPath: /app/data
+
+      volumes:
+      - name: tmp-volume
+        emptyDir: {}
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: seagles-data-pvc

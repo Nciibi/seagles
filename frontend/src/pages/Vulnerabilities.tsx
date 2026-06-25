@@ -10,12 +10,20 @@ const timeAgo = (dateStr: string) => {
   return `${Math.floor(hours / 24)}d ago`
 }
 
+const epssColor = (score: number | null) => {
+  if (!score) return 'var(--text-muted)'
+  if (score >= 0.5) return '#e03131'
+  if (score >= 0.1) return '#f08c00'
+  return '#2f9e44'
+}
+
 export default function Vulnerabilities() {
   const [vulns, setVulns] = useState<Vulnerability[]>([])
   const [severity, setSeverity] = useState('')
   const [kevOnly, setKevOnly] = useState(false)
   const [unresolvedOnly, setUnresolvedOnly] = useState(true)
   const [searchCVE, setSearchCVE] = useState('')
+  const [sortByEPSS, setSortByEPSS] = useState(false)
 
   const fetchVulns = async () => {
     try {
@@ -36,11 +44,16 @@ export default function Vulnerabilities() {
     try { await resolveVuln(id); fetchVulns() } catch (e) { console.error(e) }
   }
 
-  const filtered = vulns.filter((v) => {
+  let filtered = vulns.filter((v) => {
     if (searchCVE && v.cve_id && !v.cve_id.toLowerCase().includes(searchCVE.toLowerCase())) return false
     if (searchCVE && !v.cve_id) return false
     return true
   })
+
+  // Sort by EPSS if toggled
+  if (sortByEPSS) {
+    filtered = [...filtered].sort((a, b) => (b.epss_score || 0) - (a.epss_score || 0))
+  }
 
   return (
     <div>
@@ -64,6 +77,10 @@ export default function Vulnerabilities() {
           <input type="checkbox" checked={unresolvedOnly} onChange={(e) => setUnresolvedOnly(e.target.checked)} />
           Unresolved Only
         </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: 'var(--accent)', cursor: 'pointer' }}>
+          <input type="checkbox" checked={sortByEPSS} onChange={(e) => setSortByEPSS(e.target.checked)} />
+          Sort by EPSS
+        </label>
         <div style={{ marginLeft: 'auto', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
           {filtered.length} vulnerabilities
         </div>
@@ -78,6 +95,7 @@ export default function Vulnerabilities() {
               <th>CVE ID</th>
               <th>Title</th>
               <th>CVSS</th>
+              <th>EPSS</th>
               <th>KEV</th>
               <th>Status</th>
               <th>Discovered</th>
@@ -86,7 +104,7 @@ export default function Vulnerabilities() {
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>No vulnerabilities found</td></tr>
+              <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>No vulnerabilities found</td></tr>
             ) : filtered.map((v) => (
               <tr key={v.id} style={{ cursor: 'default' }}>
                 <td><span className={`badge badge-${v.severity}`}>{v.severity}</span></td>
@@ -99,6 +117,19 @@ export default function Vulnerabilities() {
                 </td>
                 <td style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title}</td>
                 <td style={{ fontWeight: 600 }}>{v.cvss_score?.toFixed(1) || '—'}</td>
+                <td>
+                  {v.epss_score != null ? (
+                    <span style={{
+                      fontWeight: 600,
+                      color: epssColor(v.epss_score),
+                      fontSize: '0.8rem',
+                    }}
+                    title={`EPSS: ${(v.epss_score * 100).toFixed(2)}% probability of exploitation in next 30 days (${v.epss_percentile ? `${(v.epss_percentile * 100).toFixed(0)}th` : '—'} percentile)`}
+                    >
+                      {(v.epss_score * 100).toFixed(1)}%
+                    </span>
+                  ) : <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>—</span>}
+                </td>
                 <td>{v.is_kev ? <span className="badge badge-kev">KEV</span> : '—'}</td>
                 <td>{v.is_resolved ? <span style={{ color: '#2f9e44' }}>✓ Resolved</span> : <span style={{ color: '#ff6b6b' }}>Open</span>}</td>
                 <td style={{ color: 'var(--text-secondary)' }}>{timeAgo(v.discovered_at)}</td>

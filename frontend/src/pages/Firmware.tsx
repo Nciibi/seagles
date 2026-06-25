@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getFirmware, analyzeFirmware, type Firmware } from '../api/client'
+import { getFirmware, analyzeFirmware, uploadFirmware, type Firmware } from '../api/client'
 
 const entropyColor = (score: number) => {
   if (score > 7.2) return '#e03131'
@@ -16,6 +16,8 @@ const entropyLabel = (score: number) => {
 export default function FirmwarePage() {
   const [firmware, setFirmware] = useState<Firmware[]>([])
   const [analyzingId, setAnalyzingId] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadMsg, setUploadMsg] = useState('')
 
   const fetchFirmware = async () => {
     try {
@@ -34,13 +36,71 @@ export default function FirmwarePage() {
     setTimeout(() => { setAnalyzingId(null); fetchFirmware() }, 5000)
   }
 
+  const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    const file = formData.get('firmware') as File
+    if (!file || file.size === 0) return
+
+    setUploading(true)
+    setUploadMsg('')
+    try {
+      const res = await uploadFirmware(formData)
+      const data = res.data as any
+      setUploadMsg(`✓ Uploaded ${data.filename} (${(data.size_bytes / 1024 / 1024).toFixed(1)} MB)`)
+      fetchFirmware()
+      ;(e.target as HTMLFormElement).reset()
+    } catch (err: any) {
+      setUploadMsg('✗ Upload failed: ' + (err?.message || 'Unknown error'))
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const user = JSON.parse(localStorage.getItem('ironmesh_user') || '{}')
+  const isAdmin = user.role === 'admin'
+
   return (
     <div>
       <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '20px' }}>Firmware Analysis</h1>
 
+      {/* Upload Section */}
+      {isAdmin && (
+        <div className="card" style={{ padding: '20px', marginBottom: '20px' }}>
+          <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '12px' }}>📤 Upload Firmware Binary</h2>
+          <form onSubmit={handleUpload} style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '250px' }}>
+              <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Firmware File (max 256MB)</label>
+              <input className="input" type="file" name="firmware" accept=".bin,.img,.fw,.hex,.elf,.rom" required />
+            </div>
+            <div style={{ minWidth: '150px' }}>
+              <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Vendor</label>
+              <input className="input" name="vendor" placeholder="e.g. TP-Link" />
+            </div>
+            <div style={{ minWidth: '120px' }}>
+              <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Version</label>
+              <input className="input" name="version" placeholder="e.g. 3.2.1" />
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={uploading}>
+              {uploading ? <><span className="spinner" /> Uploading...</> : '📤 Upload'}
+            </button>
+          </form>
+          {uploadMsg && (
+            <div style={{
+              marginTop: '12px', padding: '8px 14px', borderRadius: '8px', fontSize: '0.8rem',
+              background: uploadMsg.startsWith('✓') ? 'rgba(47, 158, 68, 0.12)' : 'rgba(224, 49, 49, 0.12)',
+              color: uploadMsg.startsWith('✓') ? '#69db7c' : '#ff6b6b',
+              border: `1px solid ${uploadMsg.startsWith('✓') ? 'rgba(47, 158, 68, 0.3)' : 'rgba(224, 49, 49, 0.3)'}`,
+            }}>
+              {uploadMsg}
+            </div>
+          )}
+        </div>
+      )}
+
       {firmware.length === 0 ? (
         <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-          No firmware records found. Firmware entries are created when devices with known firmware versions are scanned.
+          No firmware records found. Upload firmware binaries above or scan devices with known firmware versions.
         </div>
       ) : (
         <div style={{ display: 'grid', gap: '16px' }}>

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/yourusername/seagles/auth"
 	"github.com/yourusername/seagles/config"
 	"github.com/yourusername/seagles/kev"
 )
@@ -26,6 +27,16 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 
 	r := gin.Default()
 
+	// Security headers middleware
+	r.Use(func(c *gin.Context) {
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("X-Frame-Options", "DENY")
+		c.Header("X-XSS-Protection", "1; mode=block")
+		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+		c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		c.Next()
+	})
+
 	// CORS middleware
 	r.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
@@ -38,37 +49,83 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 		c.Next()
 	})
 
+	// Request ID middleware
+	r.Use(func(c *gin.Context) {
+		c.Set("request_id", c.GetHeader("X-Request-ID"))
+		c.Next()
+	})
+
 	v1 := r.Group("/api/v1")
 	{
-		// Stats
-		v1.GET("/stats", StatsHandler(db))
+		// Public routes (no auth required)
+		v1.POST("/auth/login", auth.LoginHandler(db))
 
-		// Devices
-		v1.GET("/devices", ListDevicesHandler(db))
-		v1.GET("/devices/:id", GetDeviceHandler(db))
-		v1.DELETE("/devices/:id", DeleteDeviceHandler(db))
-		v1.POST("/devices/:id/scan", TriggerDeviceScanHandler(db, cfg, kevCatalog))
-		v1.GET("/devices/:id/risk-breakdown", RiskBreakdownHandler(db))
+		// Health check (public)
+		v1.GET("/health", func(c *gin.Context) {
+			c.JSON(200, gin.H{"status": "ok", "service": "ironmesh-api", "version": "2.0.0"})
+		})
 
-		// Scans
-		v1.GET("/scans", ListScansHandler(db))
-		v1.GET("/scans/:id", GetScanHandler(db))
-		v1.POST("/scan/network", NetworkScanHandler(db, cfg))
+		// Protected routes (auth required)
+		protected := v1.Group("")
+		protected.Use(auth.AuthMiddleware())
+		{
+			// Auth
+			protected.GET("/auth/me", auth.MeHandler())
 
-		// Vulnerabilities
-		v1.GET("/vulnerabilities", ListVulnerabilitiesHandler(db))
-		v1.PATCH("/vulnerabilities/:id/resolve", ResolveVulnerabilityHandler(db))
+			// Stats
+			protected.GET("/stats", StatsHandler(db))
 
-		// Firmware
-		v1.GET("/firmware", ListFirmwareHandler(db))
-		v1.POST("/firmware/:id/analyze", AnalyzeFirmwareHandler(db, cfg))
+			// Devices
+			protected.GET("/devices", ListDevicesHandler(db))
+			protected.GET("/devices/:id", GetDeviceHandler(db))
+			protected.DELETE("/devices/:id", auth.AdminOnly(), DeleteDeviceHandler(db))
+			protected.POST("/devices/:id/scan", auth.AdminOnly(), TriggerDeviceScanHandler(db, cfg, kevCatalog))
+			protected.GET("/devices/:id/risk-breakdown", RiskBreakdownHandler(db))
 
-		// Alerts
-		v1.GET("/alerts", ListAlertsHandler(db))
-		v1.POST("/alerts/:id/ack", AckAlertHandler(db))
+			// Scans
+			protected.GET("/scans", ListScansHandler(db))
+			protected.GET("/scans/:id", GetScanHandler(db))
+			protected.POST("/scan/network", auth.AdminOnly(), NetworkScanHandler(db, cfg))
 
-		// KEV
-		v1.GET("/kev/status", KEVStatusHandler(kevCatalog))
+			// Vulnerabilities
+			protected.GET("/vulnerabilities", ListVulnerabilitiesHandler(db))
+			protected.PATCH("/vulnerabilities/:id/resolve", auth.AdminOnly(), ResolveVulnerabilityHandler(db))
+
+			// Firmware
+			protected.GET("/firmware", ListFirmwareHandler(db))
+			protected.POST("/firmware/:id/analyze", auth.AdminOnly(), AnalyzeFirmwareHandler(db, cfg))
+			protected.POST("/firmware/upload", auth.AdminOnly(), UploadFirmwareHandler(db, cfg))
+
+			// Alerts
+			protected.GET("/alerts", ListAlertsHandler(db))
+			protected.POST("/alerts/:id/ack", AckAlertHandler(db))
+
+			// KEV
+			protected.GET("/kev/status", KEVStatusHandler(kevCatalog))
+
+			// Safelists (admin only)
+			protected.GET("/safelists", ListSafelistHandler(db))
+			protected.POST("/safelists", auth.AdminOnly(), CreateSafelistHandler(db))
+			protected.DELETE("/safelists/:id", auth.AdminOnly(), DeleteSafelistHandler(db))
+
+			// Scan Profiles
+			protected.GET("/scan-profiles", ListScanProfilesHandler(db))
+
+			// Scan Scopes (admin only)
+			protected.GET("/scan-scopes", ListScanScopesHandler(db))
+			protected.POST("/scan-scopes", auth.AdminOnly(), CreateScanScopeHandler(db))
+			protected.DELETE("/scan-scopes/:id", auth.AdminOnly(), DeleteScanScopeHandler(db))
+
+			// Webhooks (admin only)
+			protected.GET("/webhooks", auth.AdminOnly(), ListWebhooksHandler(db))
+			protected.POST("/webhooks", auth.AdminOnly(), CreateWebhookHandler(db))
+			protected.DELETE("/webhooks/:id", auth.AdminOnly(), DeleteWebhookHandler(db))
+			protected.POST("/webhooks/:id/test", auth.AdminOnly(), TestWebhookHandler(db))
+
+			// Users (admin only)
+			protected.GET("/users", auth.AdminOnly(), auth.ListUsersHandler(db))
+			protected.POST("/users", auth.AdminOnly(), auth.RegisterHandler(db))
+		}
 	}
 
 	return r

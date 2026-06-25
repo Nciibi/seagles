@@ -7,7 +7,16 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-// Response interceptor: unwrap {data, error} envelope
+// Request interceptor: attach JWT token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('ironmesh_token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+// Response interceptor: unwrap {data, error} envelope + handle 401
 api.interceptors.response.use(
   (response) => {
     if (response.data?.error) {
@@ -16,6 +25,14 @@ api.interceptors.response.use(
     return response.data?.data !== undefined ? { ...response, data: response.data.data } : response
   },
   (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('ironmesh_token')
+      localStorage.removeItem('ironmesh_user')
+      // Redirect to login if not already there
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login'
+      }
+    }
     console.error('API Error:', error)
     return Promise.reject(error)
   }
@@ -53,6 +70,8 @@ export interface Vulnerability {
   discovered_at: string
   resolved_at: string | null
   is_resolved: boolean
+  epss_score: number | null
+  epss_percentile: number | null
 }
 
 export interface Alert {
@@ -115,22 +134,111 @@ export interface RiskBreakdown {
   score_breakdown: Record<string, number>
 }
 
-// API functions
+export interface AuthUser {
+  id: string
+  username: string
+  email: string
+  role: string
+}
+
+export interface SafelistEntry {
+  id: string
+  entry_type: string
+  value: string
+  reason: string | null
+  created_at: string
+  is_active: boolean
+}
+
+export interface Webhook {
+  id: string
+  name: string
+  url: string
+  webhook_type: string
+  min_severity: string
+  is_active: boolean
+  last_triggered: string | null
+}
+
+export interface ScanProfile {
+  id: string
+  name: string
+  description: string
+  skip_credential_test: boolean
+  skip_protocol_probe: boolean
+  max_port_count: number
+  timeout_seconds: number
+  is_default: boolean
+}
+
+export interface ScanScope {
+  id: string
+  cidr: string
+  label: string
+  is_active: boolean
+}
+
+// --- Auth ---
+export const login = (username: string, password: string) =>
+  api.post('/auth/login', { username, password })
+export const getMe = () => api.get<AuthUser>('/auth/me')
+
+// --- Stats ---
 export const getStats = () => api.get<Stats>('/stats')
+
+// --- Devices ---
 export const getDevices = (params?: Record<string, string>) => api.get<Device[]>('/devices', { params })
 export const getDevice = (id: string) => api.get<{ device: Device; latest_scan: Scan | null; open_vulnerabilities: number }>(`/devices/${id}`)
 export const deleteDevice = (id: string) => api.delete(`/devices/${id}`)
 export const getRiskBreakdown = (id: string) => api.get<RiskBreakdown>(`/devices/${id}/risk-breakdown`)
 export const triggerScan = (deviceId: string) => api.post(`/devices/${deviceId}/scan`)
 export const triggerNetworkScan = () => api.post('/scan/network')
+
+// --- Scans ---
 export const getScans = () => api.get<Scan[]>('/scans')
 export const getScan = (id: string) => api.get(`/scans/${id}`)
+
+// --- Vulnerabilities ---
 export const getVulnerabilities = (params?: Record<string, string>) => api.get<Vulnerability[]>('/vulnerabilities', { params })
 export const resolveVuln = (id: string) => api.patch(`/vulnerabilities/${id}/resolve`)
+
+// --- Alerts ---
 export const getAlerts = (params?: Record<string, string>) => api.get<Alert[]>('/alerts', { params })
 export const ackAlert = (id: string) => api.post(`/alerts/${id}/ack`)
+
+// --- Firmware ---
 export const getFirmware = () => api.get<Firmware[]>('/firmware')
 export const analyzeFirmware = (id: string) => api.post(`/firmware/${id}/analyze`)
+export const uploadFirmware = (formData: FormData) =>
+  api.post('/firmware/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+
+// --- KEV ---
 export const getKEVStatus = () => api.get('/kev/status')
+
+// --- Safelists ---
+export const getSafelists = () => api.get<SafelistEntry[]>('/safelists')
+export const createSafelist = (entry: { entry_type: string; value: string; reason?: string }) =>
+  api.post('/safelists', entry)
+export const deleteSafelist = (id: string) => api.delete(`/safelists/${id}`)
+
+// --- Scan Profiles ---
+export const getScanProfiles = () => api.get<ScanProfile[]>('/scan-profiles')
+
+// --- Scan Scopes ---
+export const getScanScopes = () => api.get<ScanScope[]>('/scan-scopes')
+export const createScanScope = (scope: { cidr: string; label?: string }) => api.post('/scan-scopes', scope)
+export const deleteScanScope = (id: string) => api.delete(`/scan-scopes/${id}`)
+
+// --- Webhooks ---
+export const getWebhooks = () => api.get<Webhook[]>('/webhooks')
+export const createWebhook = (wh: { name: string; url: string; webhook_type: string; min_severity?: string }) =>
+  api.post('/webhooks', wh)
+export const deleteWebhook = (id: string) => api.delete(`/webhooks/${id}`)
+export const testWebhook = (id: string) => api.post(`/webhooks/${id}/test`)
+
+// --- Users ---
+export const getUsers = () => api.get('/users')
+export const createUser = (user: { username: string; email: string; password: string; role?: string }) =>
+  api.post('/users', user)
 
 export default api

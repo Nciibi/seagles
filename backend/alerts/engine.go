@@ -35,7 +35,7 @@ type AlertRequest struct {
 	Metadata    json.RawMessage `json:"metadata,omitempty"`
 }
 
-// CreateAlert creates an alert with 24-hour deduplication.
+// CreateAlert creates an alert with 24-hour deduplication and dispatches webhooks.
 func CreateAlert(db *sql.DB, req AlertRequest) error {
 	// Deduplication check: same type + device + unacknowledged within 24 hours
 	var existing int
@@ -54,15 +54,20 @@ func CreateAlert(db *sql.DB, req AlertRequest) error {
 		metadata = json.RawMessage(`{}`)
 	}
 
-	_, err = db.Exec(`INSERT INTO alerts (device_id, severity, alert_type, title, description, metadata)
-		VALUES ($1, $2, $3, $4, $5, $6)`,
-		req.DeviceID, req.Severity, req.AlertType, req.Title, req.Description, metadata)
+	var alertID string
+	err = db.QueryRow(`INSERT INTO alerts (device_id, severity, alert_type, title, description, metadata)
+		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+		req.DeviceID, req.Severity, req.AlertType, req.Title, req.Description, metadata).Scan(&alertID)
 	if err != nil {
 		log.Printf("Failed to create alert: %v", err)
 		return err
 	}
 
 	log.Printf("[ALERT] %s | %s | %s | device: %s", req.Severity, req.AlertType, req.Title, req.DeviceID)
+
+	// Dispatch webhooks asynchronously
+	go DispatchWebhooks(db, alertID, req.Severity, req.Title, req.Description, req.DeviceID)
+
 	return nil
 }
 

@@ -1,0 +1,30 @@
+# OS & IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Go
+backend/ironmesh
+backend/seagles
+backend/data/cisa-kev.json
+
+# Node & Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.npm/
+
+# Python
+firmware-analyzer/__pycache__/
+firmware-analyzer/*.pyc
+firmware-analyzer/.pytest_cache/
+
+# Docker & Env
+.env
+data/
+firmware_data/
+postgres_data/
+
+# Logs
+*.log

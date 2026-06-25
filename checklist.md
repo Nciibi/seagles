@@ -23,57 +23,53 @@
   - [x] Firmware API (`api/firmware.go`)
   - [x] KEV Status API (`api/kev.go`)
 
-## Partially Completed
-
 - [x] **PROMPT 004 — Network Discovery Scanner**
   - [x] Nmap XML parsing and execution (`scanner/nmap.go`)
-  - [ ] Protocol detection (`scanner/protocols.go`)
-  - [ ] TLS analysis (`scanner/tls.go`)
+  - [x] Protocol detection (`scanner/protocols.go`)
+  - [x] TLS analysis (`scanner/tls.go`)
 
-## Left to be Done
+- [x] **PROMPT 005 — Default Credential Scanner**
+  - [x] Credentials loader
+  - [x] SSH credential tester
+  - [x] HTTP Basic Auth tester
+  - [x] Telnet credential tester
 
-- [ ] **PROMPT 005 — Default Credential Scanner**
-  - [ ] Credentials loader
-  - [ ] SSH credential tester
-  - [ ] HTTP Basic Auth tester
-  - [ ] Telnet credential tester
+- [x] **PROMPT 006 — CISA KEV Integration**
+  - [x] KEV struct models
+  - [x] Downloader and cache loader
+  - [x] Check/flag KEV utility function
+  - [x] Updater goroutine
 
-- [ ] **PROMPT 006 — CISA KEV Integration**
-  - [ ] KEV struct models
-  - [ ] Downloader and cache loader
-  - [ ] Check/flag KEV utility function
-  - [ ] Updater goroutine
+- [x] **PROMPT 007 — Risk Scoring Engine**
+  - [x] Risk factor calculation (`risk/scorer.go`)
+  - [x] Database risk updates (`risk/updater.go`)
 
-- [ ] **PROMPT 007 — Risk Scoring Engine**
-  - [ ] Risk factor calculation (`risk/scorer.go`)
-  - [ ] Database risk updates (`risk/updater.go`)
+- [x] **PROMPT 008 — Alerting Engine**
+  - [x] Alert deduplication and insertion (`alerts/engine.go`)
+  - [x] Alert type constants (`alerts/types.go`)
+  - [x] Alert monitor background goroutine
 
-- [ ] **PROMPT 008 — Alerting Engine**
-  - [ ] Alert deduplication and insertion (`alerts/engine.go`)
-  - [ ] Alert type constants (`alerts/types.go`)
-  - [ ] Alert monitor background goroutine
+- [x] **PROMPT 009 — Firmware Analyzer (Python Microservice)**
+  - [x] Entropy analysis (`entropy.py`)
+  - [x] Binwalk runner (`binwalk_runner.py`)
+  - [x] CVE lookup (`cve_lookup.py`)
+  - [x] FastAPI main application (`main.py`)
+  - [x] Dockerfile and dependencies
 
-- [ ] **PROMPT 009 — Firmware Analyzer (Python Microservice)**
-  - [ ] Entropy analysis (`entropy.py`)
-  - [ ] Binwalk runner (`binwalk_runner.py`)
-  - [ ] CVE lookup (`cve_lookup.py`)
-  - [ ] FastAPI main application (`main.py`)
-  - [ ] Dockerfile and dependencies
+- [x] **PROMPT 010 — React Frontend**
+  - [x] API Client (`src/api/client.ts`)
+  - [x] Dashboard Page (`src/pages/Dashboard.tsx`)
+  - [x] Devices and Device Detail Pages
+  - [x] Vulnerabilities Page
+  - [x] UI Components (AlertFeed, RiskScore, etc.)
+  - [x] Nginx configuration and Dockerfile
 
-- [ ] **PROMPT 010 — React Frontend**
-  - [ ] API Client (`src/api/client.ts`)
-  - [ ] Dashboard Page (`src/pages/Dashboard.tsx`)
-  - [ ] Devices and Device Detail Pages
-  - [ ] Vulnerabilities Page
-  - [ ] UI Components (AlertFeed, RiskScore, etc.)
-  - [ ] Nginx configuration and Dockerfile
+- [x] **PROMPT 011 — Docker Compose & Final Wiring**
+  - [x] `docker-compose.yml` with postgres, backend, firmware-analyzer, frontend
+  - [x] Backend Dockerfile
+  - [x] Makefile shortcuts
 
-- [ ] **PROMPT 011 — Docker Compose & Final Wiring**
-  - [ ] `docker-compose.yml` with postgres, backend, firmware-analyzer, frontend
-  - [ ] Backend Dockerfile
-  - [ ] Makefile shortcuts
-
-- [ ] **PROMPT 012 — README & Threat Model**
-  - [ ] `README.md`
-  - [ ] `THREAT_MODEL.md`
-  - [ ] `CONTRIBUTING.md`
+- [x] **PROMPT 012 — README & Threat Model**
+  - [x] `README.md`
+  - [x] `THREAT_MODEL.md`
+  - [x] `CONTRIBUTING.md`

@@ -1,4 +1,4 @@
-# 🛡️ IronMesh
+# 🛡️ Seagles
 
 **Open-source IoT security platform. Find vulnerable devices before attackers do.**
 
@@ -12,15 +12,15 @@
 
 820,000 IoT attacks happen every day. Most are through default credentials that nobody changed. Most companies have no idea what IoT devices are on their network, let alone whether they're secure.
 
-IronMesh discovers every IoT device on your network, scans them for real CVEs, tests for default credentials (admin/admin, root/root — the ones botnets use), analyzes firmware for malware indicators, and scores each device's risk from 0 to 10. When something is wrong, you know immediately.
+Seagles discovers every IoT device on your network, scans them for real CVEs, tests for default credentials (admin/admin, root/root — the ones botnets use), analyzes firmware for malware indicators, and scores each device's risk from 0 to 10. When something is wrong, you know immediately.
 
 ---
 
 ## Setup in 5 minutes
 
 ```bash
-git clone https://github.com/yourusername/ironmesh
-cd ironmesh
+git clone https://github.com/yourusername/seagles
+cd seagles
 cp .env.example .env
 # Edit .env: set your network CIDR (e.g. 192.168.1.0/24)
 docker compose up -d
@@ -36,7 +36,7 @@ curl -X POST http://localhost:8080/api/v1/scan/network
 
 ## What it detects
 
-| Threat | Real-world Example | How IronMesh Catches It |
+| Threat | Real-world Example | How Seagles Catches It |
 |---|---|---|
 | **Default credentials** | Mirai botnet (820K attacks/day) | Tests top-100 credential pairs per device, scores 9.5 CVSS if found |
 | **Telnet exposure** | Aisuru botnet (20+ Tbps DDoS) | Detects open port 23, creates Critical alert immediately |
@@ -65,8 +65,8 @@ curl -X POST http://localhost:8080/api/v1/scan/network
        │              │               │            │
 ┌──────▼──────┐ ┌─────▼──────┐ ┌─────▼────┐ ┌────▼────────┐
 │   Scanner   │ │  Firmware  │ │  Risk    │ │  Alerting   │
-│   Engine    │ │  Analyzer  │ │  Scorer  │ │  Engine     │
-│ (nmap+Go)   │ │  (Python)  │ │  (Go)    │ │  (Go)       │
+│   Engine    │ │  Analyzer  │ │  (Go)    │ │  Engine     │
+│ (nmap+Go)   │ │  (Python)  │ │          │ │  (Go)       │
 └──────┬──────┘ └─────┬──────┘ └─────┬────┘ └────┬────────┘
        │              │               │            │
 ┌──────▼──────────────▼───────────────▼────────────▼──────────┐
@@ -135,7 +135,7 @@ Every device gets a 0–10 risk score. The scoring is additive:
 
 ## Responsible Use
 
-⚠️ **IronMesh performs active network scanning and credential testing.** Only use it on networks you own or have explicit written permission to test. Unauthorized scanning may be illegal in your jurisdiction.
+⚠️ **Seagles performs active network scanning and credential testing.** Only use it on networks you own or have explicit written permission to test. Unauthorized scanning may be illegal in your jurisdiction.
 
 Built-in safety measures:
 - 500ms delay between credential attempts
@@ -151,4 +151,4 @@ MIT — see [LICENSE](LICENSE) for details.
 
 ---
 
-*IronMesh — built to be real, built to find threats before attackers do.*
+*Seagles — built to be real, built to find threats before attackers do.*

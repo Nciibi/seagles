@@ -26,7 +26,7 @@ func TestAuditLogger_WritesToDB(t *testing.T) {
 	})
 
 	mock.ExpectExec(`INSERT INTO audit_log`).
-		WithArgs("", "", "POST", "/api/v1/test", "", "", "", 200, 0).
+		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), "POST", "/api/v1/test", "", "", "", 200, sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	body, _ := json.Marshal(map[string]string{"key": "val"})

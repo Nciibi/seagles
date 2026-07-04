@@ -45,6 +45,11 @@ type Claims struct {
 	Exp       int64     `json:"exp"`
 }
 
+type SignedToken struct {
+	Token  string
+	Claims *Claims
+}
+
 var (
 	globalKeyPair   *KeyPair
 	globalKeyPairMu sync.RWMutex
@@ -223,7 +228,7 @@ func ValidateAccessToken(tokenStr string) (*User, error) {
 		return nil, errors.New("not an access token")
 	}
 
-	if IsTokenBlacklisted(claims.JTI) {
+	if cache.IsTokenBlacklisted(claims.JTI) {
 		return nil, errors.New("token has been revoked")
 	}
 

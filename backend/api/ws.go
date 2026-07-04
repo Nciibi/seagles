@@ -11,12 +11,25 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
+func newUpgrader(allowedOrigins []string) websocket.Upgrader {
+	originMap := make(map[string]bool, len(allowedOrigins))
+	for _, o := range allowedOrigins {
+		originMap[o] = true
+	}
+	return websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin: func(r *http.Request) bool {
+			if len(originMap) == 0 {
+				return false
+			}
+			origin := r.Header.Get("Origin")
+			if origin == "" {
+				return false
+			}
+			return originMap[origin]
+		},
+	}
 }
 
 type WSHub struct {
@@ -82,8 +95,8 @@ func (h *WSHub) Broadcast(eventType string, data interface{}) {
 		return
 	}
 
-	h.mu.RLock()
-	defer h.mu.RUnlock()
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	for client := range h.clients {
 		select {
 		case client.send <- msg:
@@ -142,7 +155,8 @@ func (c *WSClient) writePump() {
 	}
 }
 
-func WSHandler() gin.HandlerFunc {
+func WSHandler(allowedOrigins []string) gin.HandlerFunc {
+	upgrader := newUpgrader(allowedOrigins)
 	return func(c *gin.Context) {
 		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
@@ -150,10 +164,10 @@ func WSHandler() gin.HandlerFunc {
 			return
 		}
 
-		user, _ := c.Get("user_id")
+		userIDVal, exists := c.Get("user_id")
 		userStr := ""
-		if user != nil {
-			userStr = user.(string)
+		if exists {
+			userStr, _ = userIDVal.(string)
 		}
 
 		client := &WSClient{

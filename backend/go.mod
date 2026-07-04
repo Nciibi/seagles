@@ -1,4 +1,4 @@
-module github.com/yourusername/seagles
+module github.com/Nciibi/seagles
 
 go 1.25.0
 

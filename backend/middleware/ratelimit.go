@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -120,9 +121,9 @@ func RateLimitMiddleware(rl *RateLimiter) gin.HandlerFunc {
 
 		allowed, remaining, limit := rl.Allow(clientIP, userIDStr, c.Request.Method, c.Request.URL.Path)
 
-		c.Header("X-RateLimit-Limit", itoa(limit))
-		c.Header("X-RateLimit-Remaining", itoa(remaining))
-		c.Header("X-RateLimit-Reset", itoa(int(time.Now().Add(30 * time.Second).Unix())))
+		c.Header("X-RateLimit-Limit", strconv.Itoa(limit))
+		c.Header("X-RateLimit-Remaining", strconv.Itoa(remaining))
+		c.Header("X-RateLimit-Reset", strconv.Itoa(int(time.Now().Add(30 * time.Second).Unix())))
 
 		if !allowed {
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
@@ -134,22 +135,4 @@ func RateLimitMiddleware(rl *RateLimiter) gin.HandlerFunc {
 	}
 }
 
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	s := ""
-	neg := false
-	if n < 0 {
-		neg = true
-		n = -n
-	}
-	for n > 0 {
-		s = string(rune('0'+n%10)) + s
-		n /= 10
-	}
-	if neg {
-		s = "-" + s
-	}
-	return s
-}
+

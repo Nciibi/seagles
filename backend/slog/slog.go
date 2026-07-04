@@ -3,6 +3,7 @@ package slog
 import (
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -81,6 +82,7 @@ func Error(msg string, keysAndValues ...interface{}) {
 
 func Fatal(msg string, keysAndValues ...interface{}) {
 	logf(LevelFatal, msg, keysAndValues...)
+	os.Exit(1)
 }
 
 type Logger struct {

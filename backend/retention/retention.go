@@ -33,7 +33,7 @@ func runOnce(db *sql.DB, cfg *config.Config) {
 			cfg.RetentionAuditLogDays, "audit_log")
 	}
 	if cfg.RetentionWebhookDelivDays > 0 {
-		purgeOld(db, "DELETE FROM webhook_deliveries WHERE delivered_at < NOW() - $1::INTERVAL",
+		purgeOld(db, "DELETE FROM webhook_deliveries WHERE created_at < NOW() - $1::INTERVAL",
 			cfg.RetentionWebhookDelivDays, "webhook_deliveries")
 	}
 }

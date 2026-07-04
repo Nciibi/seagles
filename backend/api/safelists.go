@@ -1,12 +1,14 @@
 package api
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/Nciibi/seagles/auth"
 )
 
 const (
@@ -338,14 +340,26 @@ func DeleteWebhookHandler(db *sql.DB) gin.HandlerFunc {
 func TestWebhookHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-		var url, webhookType string
-		err := db.QueryRow(`SELECT url, webhook_type FROM webhooks WHERE id = $1`, id).Scan(&url, &webhookType)
+		var webhookURL string
+		err := db.QueryRow(`SELECT url FROM webhooks WHERE id=$1`, id).Scan(&webhookURL)
 		if err != nil {
-			fail(c, http.StatusNotFound, "Webhook not found")
+			fail(c, 404, "Webhook not found")
 			return
 		}
-		success(c, gin.H{"message": "Test webhook sent", "webhook_id": id})
+		testPayload := map[string]interface{}{
+			"event":     "test",
+			"message":   "This is a test webhook from IronMesh",
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+		}
+		body, _ := json.Marshal(testPayload)
+		resp, err := http.Post(webhookURL, "application/json", bytes.NewReader(body))
+		if err != nil {
+			fail(c, 502, "Failed to send test webhook: "+err.Error())
+			return
+		}
+		resp.Body.Close()
+		ok(c, gin.H{"status": "test_webhook_sent"})
 	}
 }
 
-var _ = auth.AuthMiddleware
+

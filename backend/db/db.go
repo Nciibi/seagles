@@ -3,42 +3,104 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	_ "github.com/lib/pq"
+	"github.com/yourusername/seagles/slog"
 )
 
-// Connect opens a PostgreSQL connection using lib/pq and configures connection pool settings.
+type DBMonitor struct {
+	db          *sql.DB
+	healthy     int32
+	lastChecked time.Time
+	mu          sync.RWMutex
+}
+
+func NewDBMonitor(database *sql.DB) *DBMonitor {
+	m := &DBMonitor{
+		db:      database,
+		healthy: 1,
+	}
+	go m.startHealthChecks()
+	return m
+}
+
+func (m *DBMonitor) startHealthChecks() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		healthy := true
+		if err := m.db.Ping(); err != nil {
+			healthy = false
+			slog.Error("Database health check failed", "error", err.Error())
+
+			for retries := 0; retries < 5; retries++ {
+				time.Sleep(2 * time.Second)
+				if err := m.db.Ping(); err == nil {
+					healthy = true
+					slog.Info("Database reconnected after retry")
+					break
+				}
+			}
+		}
+
+		if healthy {
+			atomic.StoreInt32(&m.healthy, 1)
+		} else {
+			atomic.StoreInt32(&m.healthy, 0)
+		}
+
+		m.mu.Lock()
+		m.lastChecked = time.Now()
+		m.mu.Unlock()
+	}
+}
+
+func (m *DBMonitor) IsHealthy() bool {
+	return atomic.LoadInt32(&m.healthy) == 1
+}
+
+func (m *DBMonitor) LastChecked() time.Time {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.lastChecked
+}
+
+var monitor *DBMonitor
+
 func Connect(databaseURL string) *sql.DB {
 	db, err := sql.Open("postgres", databaseURL)
 	if err != nil {
-		log.Fatalf("Failed to open database connection: %v", err)
+		slog.Fatal("Failed to open database connection", "error", err.Error())
 	}
 
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetConnMaxIdleTime(2 * time.Minute)
 
 	if err := db.Ping(); err != nil {
-		log.Fatalf("Failed to ping database: %v", err)
+		slog.Fatal("Failed to ping database", "error", err.Error())
 	}
 
-	log.Println("Database connection established")
+	monitor = NewDBMonitor(db)
+
+	slog.Info("Database connection established")
 	return db
 }
 
-// RunMigrations reads all .sql files from the db/migrations/ directory in alphabetical
-// order and executes them in sequence against the database.
 func RunMigrations(db *sql.DB) {
 	migrationsDir := findMigrationsDir()
 	entries, err := os.ReadDir(migrationsDir)
 	if err != nil {
-		log.Fatalf("Failed to read migrations directory %s: %v", migrationsDir, err)
+		slog.Fatal("Failed to read migrations directory", "path", migrationsDir, "error", err.Error())
 	}
 
 	var sqlFiles []string
@@ -53,19 +115,18 @@ func RunMigrations(db *sql.DB) {
 		filePath := filepath.Join(migrationsDir, file)
 		content, err := os.ReadFile(filePath)
 		if err != nil {
-			log.Fatalf("Failed to read migration file %s: %v", file, err)
+			slog.Fatal("Failed to read migration file", "file", file, "error", err.Error())
 		}
 
-		log.Printf("Running migration: %s", file)
+		slog.Info("Running migration", "file", file)
 		if _, err := db.Exec(string(content)); err != nil {
-			log.Fatalf("Migration %s failed: %v", file, err)
+			slog.Fatal("Migration failed", "file", file, "error", err.Error())
 		}
 	}
 
-	log.Println("All migrations completed successfully")
+	slog.Info("All migrations completed successfully")
 }
 
-// findMigrationsDir searches for the migrations directory relative to common locations.
 func findMigrationsDir() string {
 	candidates := []string{
 		"db/migrations",
@@ -73,7 +134,6 @@ func findMigrationsDir() string {
 		"../db/migrations",
 	}
 
-	// Check if an absolute path is set via env var
 	if envPath := os.Getenv("MIGRATIONS_DIR"); envPath != "" {
 		if info, err := os.Stat(envPath); err == nil && info.IsDir() {
 			return envPath
@@ -86,7 +146,6 @@ func findMigrationsDir() string {
 		}
 	}
 
-	// Try from executable directory
 	execPath, err := os.Executable()
 	if err == nil {
 		execDir := filepath.Dir(execPath)
@@ -96,6 +155,17 @@ func findMigrationsDir() string {
 		}
 	}
 
-	log.Fatal(fmt.Sprintf("Could not find migrations directory. Tried: %v", candidates))
+	slog.Fatal(fmt.Sprintf("Could not find migrations directory. Tried: %v", candidates))
 	return ""
+}
+
+func GetMonitor() *DBMonitor {
+	return monitor
+}
+
+func IsHealthy() bool {
+	if monitor == nil {
+		return false
+	}
+	return monitor.IsHealthy()
 }

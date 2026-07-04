@@ -1,36 +1,21 @@
 package auth
 
 import (
-	"crypto/hmac"
-	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/yourusername/seagles/cache"
 	"github.com/yourusername/seagles/slog"
 	"golang.org/x/crypto/bcrypt"
 )
-
-var jwtSecret []byte
-
-func init() {
-	secret := make([]byte, 32)
-	if _, err := rand.Read(secret); err != nil {
-		slog.Fatal("Failed to generate JWT secret")
-	}
-	jwtSecret = secret
-}
-
-func SetJWTSecret(secret string) {
-	if secret != "" {
-		jwtSecret = []byte(secret)
-	}
-}
 
 type User struct {
 	ID       string `json:"id"`
@@ -45,89 +30,32 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	Token     string `json:"token"`
-	ExpiresIn int64  `json:"expires_in"`
-	User      User   `json:"user"`
+	Token        string `json:"token"`
+	ExpiresIn    int64  `json:"expires_in"`
+	RefreshToken string `json:"refresh_token,omitempty"`
+	User         User   `json:"user"`
+}
+
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
 type RegisterRequest struct {
 	Username string `json:"username" binding:"required,min=3,max=50,alphanum"`
 	Email    string `json:"email" binding:"required,email,max=255"`
 	Password string `json:"password" binding:"required,min=8,max=128"`
-	Role     string `json:"role" binding:"omitempty,oneof=admin viewer"`
+	Role     string `json:"role" binding:"omitempty,oneof=admin viewer operator auditor"`
 }
 
-func hmacSign(data string, key []byte) string {
-	mac := hmac.New(sha256.New, key)
-	mac.Write([]byte(data))
-	return hex.EncodeToString(mac.Sum(nil))
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required,min=8,max=128"`
+	NewPassword     string `json:"new_password" binding:"required,min=8,max=128"`
 }
 
-func generateTokenID() string {
-	b := make([]byte, 16)
-	rand.Read(b)
-	return hex.EncodeToString(b)
-}
-
-func HashPassword(password string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	return string(hash), err
-}
-
-func CheckPassword(password, hash string) bool {
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
-}
-
-func GenerateToken(user User) (string, time.Time) {
-	tokenID := generateTokenID()
-	expiresAt := time.Now().Add(24 * time.Hour)
-
-	tokenPayload := strings.Join([]string{
-		user.ID, user.Username, user.Role, tokenID,
-		expiresAt.Format(time.RFC3339),
-	}, "|")
-
-	sig := hmacSign(tokenPayload, jwtSecret)
-	token := hex.EncodeToString([]byte(tokenPayload)) + "." + sig
-	return token, expiresAt
-}
-
-func ValidateToken(tokenStr string) (*User, error) {
-	parts := strings.SplitN(tokenStr, ".", 2)
-	if len(parts) != 2 {
-		return nil, errors.New("invalid token format")
+func SetJWTSecret(secret string) {
+	if err := LoadOrGenerateKeys(secret); err != nil {
+		slog.Fatal("Failed to initialize RSA key pair", "error", err.Error())
 	}
-
-	payloadBytes, err := hex.DecodeString(parts[0])
-	if err != nil {
-		return nil, errors.New("invalid token encoding")
-	}
-	payload := string(payloadBytes)
-
-	expectedSig := hmacSign(payload, jwtSecret)
-	if !hmac.Equal([]byte(parts[1]), []byte(expectedSig)) {
-		return nil, errors.New("invalid token signature")
-	}
-
-	fields := strings.Split(payload, "|")
-	if len(fields) != 5 {
-		return nil, errors.New("invalid token payload")
-	}
-
-	expiry, err := time.Parse(time.RFC3339, fields[4])
-	if err != nil {
-		return nil, errors.New("invalid token expiry")
-	}
-
-	if time.Now().After(expiry) {
-		return nil, errors.New("token expired")
-	}
-
-	return &User{
-		ID:       fields[0],
-		Username: fields[1],
-		Role:     fields[2],
-	}, nil
 }
 
 func LoginHandler(db *sql.DB) gin.HandlerFunc {

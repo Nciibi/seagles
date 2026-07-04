@@ -659,10 +659,10 @@ func TestWebhookHandlers(t *testing.T) {
 		}))
 		defer ts.Close()
 
-		mock.ExpectQuery(`SELECT url, webhook_type FROM webhooks`).
+		mock.ExpectQuery(`SELECT url FROM webhooks`).
 			WithArgs(id).
-			WillReturnRows(sqlmock.NewRows([]string{"url", "webhook_type"}).
-				AddRow(ts.URL, "slack"))
+			WillReturnRows(sqlmock.NewRows([]string{"url"}).
+				AddRow(ts.URL))
 
 		w := request(router, "POST", "/api/v1/webhooks/"+id+"/test", nil)
 		if w.Code != http.StatusOK {
@@ -673,7 +673,7 @@ func TestWebhookHandlers(t *testing.T) {
 	t.Run("TestWebhook_NotFound", func(t *testing.T) {
 		router, mock, _ := setupTestRouter(t)
 
-	mock.ExpectQuery(`SELECT url, webhook_type FROM webhooks`).
+	mock.ExpectQuery(`SELECT url FROM webhooks`).
 		WithArgs("nonexistent").
 		WillReturnError(sql.ErrNoRows)
 

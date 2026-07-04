@@ -242,8 +242,29 @@ export interface ScanScope {
 }
 
 // --- Auth ---
+export interface LoginResponse {
+  token: string
+  refresh_token?: string
+  user: AuthUser
+}
+
+export interface UploadFirmwareResponse {
+  filename: string
+  size_bytes: number
+}
+
+export interface DeviceDetailResponse {
+  device: Device
+  latest_scan: Scan | null
+  open_vulnerabilities: number
+}
+
+export interface ScanDetailResponse {
+  scan: Scan
+}
+
 export const login = (username: string, password: string) =>
-  api.post('/auth/login', { username, password })
+  api.post<LoginResponse>('/auth/login', { username, password })
 export const refreshToken = (refreshToken: string) =>
   api.post('/auth/refresh', { refresh_token: refreshToken })
 export const logout = () => api.post('/auth/logout')
@@ -257,7 +278,7 @@ export const getStats = () => api.get<Stats>('/stats')
 
 // --- Devices ---
 export const getDevices = (params?: Record<string, string>) => api.get<Device[]>('/devices', { params })
-export const getDevice = (id: string) => api.get<{ device: Device; latest_scan: Scan | null; open_vulnerabilities: number }>(`/devices/${id}`)
+export const getDevice = (id: string) => api.get<DeviceDetailResponse>(`/devices/${id}`)
 export const deleteDevice = (id: string) => api.delete(`/devices/${id}`)
 export const getRiskBreakdown = (id: string) => api.get<RiskBreakdown>(`/devices/${id}/risk-breakdown`)
 export const triggerScan = (deviceId: string) => api.post(`/devices/${deviceId}/scan`)
@@ -265,7 +286,7 @@ export const triggerNetworkScan = () => api.post('/scan/network')
 
 // --- Scans ---
 export const getScans = () => api.get<Scan[]>('/scans')
-export const getScan = (id: string) => api.get(`/scans/${id}`)
+export const getScan = (id: string) => api.get<ScanDetailResponse>(`/scans/${id}`)
 
 // --- Vulnerabilities ---
 export const getVulnerabilities = (params?: Record<string, string>) => api.get<Vulnerability[]>('/vulnerabilities', { params })
@@ -279,7 +300,7 @@ export const ackAlert = (id: string) => api.post(`/alerts/${id}/ack`)
 export const getFirmware = () => api.get<Firmware[]>('/firmware')
 export const analyzeFirmware = (id: string) => api.post(`/firmware/${id}/analyze`)
 export const uploadFirmware = (formData: FormData) =>
-  api.post('/firmware/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+  api.post<UploadFirmwareResponse>('/firmware/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 
 // --- KEV ---
 export const getKEVStatus = () => api.get('/kev/status')
@@ -309,7 +330,7 @@ export const testWebhook = (id: string) => api.post(`/webhooks/${id}/test`)
 export const getAuditLog = () => api.get('/audit-log')
 
 // --- Users ---
-export const getUsers = () => api.get('/users')
+export const getUsers = () => api.get<AuthUser[]>('/users')
 export const createUser = (user: { username: string; email: string; password: string; role?: string }) =>
   api.post('/users', user)
 

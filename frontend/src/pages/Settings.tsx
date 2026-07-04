@@ -4,7 +4,7 @@ import {
   getWebhooks, createWebhook, deleteWebhook,
   getScanProfiles, getScanScopes, createScanScope, deleteScanScope,
   getUsers, createUser,
-  type SafelistEntry, type Webhook, type ScanProfile, type ScanScope,
+  type SafelistEntry, type Webhook, type ScanProfile, type ScanScope, type AuthUser,
 } from '../api/client'
 
 type Tab = 'safelists' | 'webhooks' | 'profiles' | 'scopes' | 'users'
@@ -43,7 +43,7 @@ function SafelistsTab({ isAdmin }: { isAdmin: boolean }) {
   const [form, setForm] = useState({ entry_type: 'ip', value: '', reason: '' })
 
   const fetch = async () => {
-    try { const r = await getSafelists(); setEntries(r.data as any) } catch {}
+    try { const r = await getSafelists(); setEntries(r.data ?? []) } catch {}
   }
   useEffect(() => { fetch() }, [])
 
@@ -107,7 +107,7 @@ function WebhooksTab({ isAdmin }: { isAdmin: boolean }) {
   const [form, setForm] = useState({ name: '', url: '', webhook_type: 'slack', min_severity: 'high' })
 
   const fetch = async () => {
-    try { const r = await getWebhooks(); setWebhooks(r.data as any) } catch {}
+    try { const r = await getWebhooks(); setWebhooks(r.data ?? []) } catch {}
   }
   useEffect(() => { fetch() }, [])
 
@@ -174,7 +174,7 @@ function WebhooksTab({ isAdmin }: { isAdmin: boolean }) {
 
 function ProfilesTab() {
   const [profiles, setProfiles] = useState<ScanProfile[]>([])
-  useEffect(() => { getScanProfiles().then(r => setProfiles(r.data as any)).catch(() => {}) }, [])
+  useEffect(() => { getScanProfiles().then(r => setProfiles(r.data ?? [])).catch(() => {}) }, [])
 
   return (
     <div className="card" style={{ overflow: 'hidden' }}>
@@ -203,7 +203,7 @@ function ScopesTab({ isAdmin }: { isAdmin: boolean }) {
   const [scopes, setScopes] = useState<ScanScope[]>([])
   const [form, setForm] = useState({ cidr: '', label: '' })
 
-  const fetch = async () => { try { const r = await getScanScopes(); setScopes(r.data as any) } catch {} }
+  const fetch = async () => { try { const r = await getScanScopes(); setScopes(r.data ?? []) } catch {} }
   useEffect(() => { fetch() }, [])
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -253,7 +253,7 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
   const [form, setForm] = useState({ username: '', email: '', password: '', role: 'viewer' })
   const [showForm, setShowForm] = useState(false)
 
-  const fetch = async () => { try { const r = await getUsers(); setUsers(r.data as any) } catch {} }
+  const fetch = async () => { try { const r = await getUsers(); setUsers(r.data ?? []) } catch {} }
   useEffect(() => { fetch() }, [])
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -301,7 +301,7 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
           <tbody>
             {users.length === 0 ? (
               <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '30px' }}>No users found</td></tr>
-            ) : users.map((u: any) => (
+            ) : users.map((u: AuthUser) => (
               <tr key={u.id} style={{ cursor: 'default' }}>
                 <td style={{ fontWeight: 500 }}>{u.username}</td>
                 <td style={{ color: 'var(--text-secondary)' }}>{u.email}</td>

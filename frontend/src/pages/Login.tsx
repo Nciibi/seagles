@@ -16,7 +16,7 @@ export default function Login() {
 
     try {
       const res = await login(username, password)
-      const data = res.data as any
+      const data = res.data!
       localStorage.setItem('ironmesh_token', data.token)
       if (data.refresh_token) {
         localStorage.setItem('ironmesh_refresh', data.refresh_token)

@@ -46,7 +46,7 @@ export default function FirmwarePage() {
     setUploadMsg('')
     try {
       const res = await uploadFirmware(formData)
-      const data = res.data as any
+      const data = res.data!
       setUploadMsg(`✓ Uploaded ${data.filename} (${(data.size_bytes / 1024 / 1024).toFixed(1)} MB)`)
       fetchFirmware()
       ;(e.target as HTMLFormElement).reset()

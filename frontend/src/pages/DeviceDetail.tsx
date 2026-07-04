@@ -32,7 +32,7 @@ export default function DeviceDetail() {
         getVulnerabilities({ device_id: id }),
         getScans(),
       ])
-      const devData = devRes.data as any
+      const devData = devRes.data!
       setDevice(devData.device)
       setOpenVulns(devData.open_vulnerabilities)
       setBreakdown(bdRes.data as unknown as RiskBreakdown)

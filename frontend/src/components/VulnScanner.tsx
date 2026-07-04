@@ -16,7 +16,7 @@ export default function VulnScanner({ scanId }: VulnScannerProps) {
     const poll = setInterval(async () => {
       try {
         const res = await getScan(scanId)
-        const data = (res.data as any)?.scan
+        const data = res.data?.scan
         if (data) {
           setScan(data)
           if (data.status !== 'running') {

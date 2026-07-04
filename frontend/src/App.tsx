@@ -33,7 +33,7 @@ export default function App() {
   useEffect(() => {
     const stored = localStorage.getItem('ironmesh_user')
     if (stored) {
-      try { setUser(JSON.parse(stored)) } catch {}
+      try { setUser(JSON.parse(stored)) } catch { /* ignore invalid JSON */ }
     }
   }, [location])
 

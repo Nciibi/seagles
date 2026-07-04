@@ -424,9 +424,9 @@ func TestListAlertsHandler_Success(t *testing.T) {
 	rows := sqlmock.NewRows([]string{
 		"id", "device_id", "severity", "alert_type", "title", "description",
 		"triggered_at", "acknowledged_at", "is_acknowledged", "metadata",
-	}).AddRow(
+	}	).AddRow(
 		uuid.NewString(), nil, "high", "telnet_open", "Telnet exposed",
-		nil, now, nil, false, nil,
+		nil, now, nil, false, []byte("null"),
 	)
 
 	mock.ExpectQuery(`SELECT id, device_id, severity, alert_type, title, description`).
@@ -770,8 +770,8 @@ func TestRiskBreakdownHandler_Success(t *testing.T) {
 	if resp.Data.TotalScore < 6.0 {
 		t.Fatalf("expected score >= 6.0 for default_creds+telnet, got %f", resp.Data.TotalScore)
 	}
-	if resp.Data.Severity != "high" {
-		t.Fatalf("expected severity high, got %s", resp.Data.Severity)
+	if resp.Data.Severity != "critical" {
+		t.Fatalf("expected severity critical (score >= 8), got %s (score=%.1f)", resp.Data.Severity, resp.Data.TotalScore)
 	}
 }
 

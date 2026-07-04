@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"strconv"
 	"testing"
 	"time"
 )
@@ -152,9 +153,9 @@ func TestItoa(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := itoa(tt.input)
+		result := strconv.Itoa(tt.input)
 		if result != tt.want {
-			t.Errorf("itoa(%d) = %s, want %s", tt.input, result, tt.want)
+			t.Errorf("strconv.Itoa(%d) = %s, want %s", tt.input, result, tt.want)
 		}
 	}
 }

@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"database/sql"
+	"log"
 	"time"
 
 	"github.com/gin-gonic/gin"

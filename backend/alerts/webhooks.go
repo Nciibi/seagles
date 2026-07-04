@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -22,6 +23,11 @@ type WebhookConfig struct {
 	Secret      sql.NullString  `json:"-"`
 	Headers     json.RawMessage `json:"headers"`
 }
+
+const (
+	maxWebhookRetries    = 3
+	webhookRetryBaseMs   = 1000
+)
 
 func severityLevel(sev string) int {
 	switch strings.ToLower(sev) {
@@ -59,17 +65,44 @@ func DispatchWebhooks(db *sql.DB, alertID, severity, title, description, deviceI
 			continue
 		}
 
-		go deliverWebhook(db, wh, alertID, severity, title, description, deviceID)
+		go deliverWebhookWithRetry(db, wh, alertID, severity, title, description, deviceID)
 	}
 }
 
-func deliverWebhook(db *sql.DB, wh WebhookConfig, alertID, severity, title, description, deviceID string) {
+func deliverWebhookWithRetry(db *sql.DB, wh WebhookConfig, alertID, severity, title, description, deviceID string) {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("Webhook delivery panicked", "name", wh.Name, "recover", r)
 		}
 	}()
 
+	lastErr := ""
+	for attempt := 0; attempt < maxWebhookRetries; attempt++ {
+		statusCode, err := deliverWebhook(db, wh, alertID, severity, title, description, deviceID, attempt)
+		if err == nil {
+			return
+		}
+
+		lastErr = err.Error()
+		if attempt < maxWebhookRetries-1 {
+			delay := time.Duration(webhookRetryBaseMs*int(math.Pow(2, float64(attempt)))) * time.Millisecond
+			slog.Warn("webhook delivery failed, retrying",
+				"name", wh.Name,
+				"attempt", attempt+1,
+				"max", maxWebhookRetries,
+				"retry_delay_ms", delay.Milliseconds(),
+				"error", lastErr)
+			time.Sleep(delay)
+		}
+	}
+
+	slog.Error("webhook delivery failed after all retries",
+		"name", wh.Name,
+		"attempts", maxWebhookRetries,
+		"last_error", lastErr)
+}
+
+func deliverWebhook(db *sql.DB, wh WebhookConfig, alertID, severity, title, description, deviceID string, attempt int) (int, error) {
 	var payload []byte
 	var err error
 
@@ -83,13 +116,13 @@ func deliverWebhook(db *sql.DB, wh WebhookConfig, alertID, severity, title, desc
 	}
 	if err != nil {
 		logDelivery(db, wh.ID, alertID, 0, "", err.Error())
-		return
+		return 0, err
 	}
 
 	req, err := http.NewRequest("POST", wh.URL, bytes.NewReader(payload))
 	if err != nil {
 		logDelivery(db, wh.ID, alertID, 0, "", err.Error())
-		return
+		return 0, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "IronMesh-Webhook/2.0")
@@ -106,8 +139,10 @@ func deliverWebhook(db *sql.DB, wh WebhookConfig, alertID, severity, title, desc
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		logDelivery(db, wh.ID, alertID, 0, "", err.Error())
-		return
+		if attempt == maxWebhookRetries-1 {
+			logDelivery(db, wh.ID, alertID, 0, "", err.Error())
+		}
+		return 0, err
 	}
 	defer resp.Body.Close()
 
@@ -117,10 +152,14 @@ func deliverWebhook(db *sql.DB, wh WebhookConfig, alertID, severity, title, desc
 
 	logDelivery(db, wh.ID, alertID, resp.StatusCode, body, "")
 
-	db.Exec(`UPDATE alerts SET webhook_sent = TRUE, webhook_sent_at = NOW() WHERE id = $1`, alertID)
-	db.Exec(`UPDATE webhooks SET last_triggered = NOW() WHERE id = $1`, wh.ID)
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		db.Exec(`UPDATE alerts SET webhook_sent = TRUE, webhook_sent_at = NOW() WHERE id = $1`, alertID)
+		db.Exec(`UPDATE webhooks SET last_triggered = NOW() WHERE id = $1`, wh.ID)
+		slog.Info("webhook_delivered", "name", wh.Name, "type", wh.WebhookType, "status", resp.StatusCode)
+		return resp.StatusCode, nil
+	}
 
-	slog.Info("webhook_delivered", "name", wh.Name, "type", wh.WebhookType, "status", resp.StatusCode)
+	return resp.StatusCode, fmt.Errorf("HTTP %d: %s", resp.StatusCode, body)
 }
 
 func logDelivery(db *sql.DB, webhookID, alertID string, statusCode int, responseBody, errMsg string) {

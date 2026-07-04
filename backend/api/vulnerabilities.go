@@ -7,11 +7,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/yourusername/seagles/models"
+	"github.com/yourusername/seagles/slog"
 )
 
-// ListVulnerabilitiesHandler returns vulnerabilities with optional filters.
 func ListVulnerabilitiesHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		requestID, _ := c.Get("request_id")
+
 		query := `SELECT id, device_id, scan_id, cve_id, cvss_score, severity, title,
 			description, affected_component, remediation, is_kev, discovered_at,
 			resolved_at, is_resolved FROM vulnerabilities WHERE 1=1`
@@ -45,6 +47,7 @@ func ListVulnerabilitiesHandler(db *sql.DB) gin.HandlerFunc {
 
 		rows, err := db.Query(query, args...)
 		if err != nil {
+			slog.Error("Failed to query vulnerabilities", "request_id", requestID, "error", err.Error())
 			fail(c, 500, "Failed to query vulnerabilities: "+err.Error())
 			return
 		}
@@ -60,17 +63,21 @@ func ListVulnerabilitiesHandler(db *sql.DB) gin.HandlerFunc {
 			}
 			vulns = append(vulns, v.ToJSON())
 		}
-		if vulns == nil { vulns = []models.VulnerabilityJSON{} }
+		if vulns == nil {
+			vulns = []models.VulnerabilityJSON{}
+		}
 		success(c, vulns)
 	}
 }
 
-// ResolveVulnerabilityHandler marks a vulnerability as resolved.
 func ResolveVulnerabilityHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		requestID, _ := c.Get("request_id")
 		id := c.Param("id")
+
 		result, err := db.Exec(`UPDATE vulnerabilities SET is_resolved=true, resolved_at=NOW() WHERE id=$1`, id)
 		if err != nil {
+			slog.Error("Failed to resolve vulnerability", "request_id", requestID, "vuln_id", id, "error", err.Error())
 			fail(c, 500, "Failed to resolve vulnerability: "+err.Error())
 			return
 		}
@@ -80,12 +87,10 @@ func ResolveVulnerabilityHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Update risk score for associated device
 		var deviceID sql.NullString
 		db.QueryRow(`SELECT device_id FROM vulnerabilities WHERE id=$1`, id).Scan(&deviceID)
 		if deviceID.Valid {
 			go func() {
-				// Lazy import to avoid circular deps — calling inline
 				db.Exec(`UPDATE devices SET risk_score = COALESCE(
 					(SELECT LEAST(
 						CASE WHEN EXISTS(SELECT 1 FROM vulnerabilities WHERE device_id=$1 AND is_resolved=FALSE AND title ILIKE '%Default credentials%') THEN 4.0 ELSE 0 END +
@@ -95,6 +100,7 @@ func ResolveVulnerabilityHandler(db *sql.DB) gin.HandlerFunc {
 			}()
 		}
 
+		slog.Info("Vulnerability resolved", "request_id", requestID, "vuln_id", id)
 		success(c, gin.H{"message": "Vulnerability resolved"})
 	}
 }

@@ -193,8 +193,9 @@ func RegisterHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		role := "viewer"
-		if req.Role == "admin" {
-			role = "admin"
+		switch req.Role {
+		case "admin", "operator", "auditor":
+			role = req.Role
 		}
 
 		hash, err := HashPassword(req.Password)
@@ -227,6 +228,121 @@ func RegisterHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
+func RefreshTokenHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req RefreshRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"data": nil, "error": "Invalid request: " + err.Error()})
+			return
+		}
+
+		user, err := validateRefreshToken(db, req.RefreshToken)
+		if err != nil {
+			slog.Warn("refresh_failed", "error", err.Error())
+			c.JSON(http.StatusUnauthorized, gin.H{"data": nil, "error": "Invalid or expired refresh token"})
+			return
+		}
+
+		accessToken, err := GenerateAccessToken(*user)
+		if err != nil {
+			slog.Error("token_generation_failed", "error", err.Error())
+			c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Failed to generate token"})
+			return
+		}
+
+		refreshTokenID := generateTokenID()
+		refreshExpiry := time.Now().Add(RefreshTokenTTL)
+		if err := storeRefreshToken(db, user.ID, refreshTokenID, refreshExpiry); err != nil {
+			slog.Error("refresh_token_store_failed", "error", err.Error())
+			c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Failed to generate refresh token"})
+			return
+		}
+
+		newRefreshToken := refreshTokenID + "." + user.ID
+
+		slog.Info("token_refreshed", "username", user.Username)
+
+		c.JSON(http.StatusOK, gin.H{
+			"data": gin.H{
+				"token":         accessToken.Token,
+				"expires_in":    int64(time.Until(time.Unix(accessToken.Claims.Exp, 0)).Seconds()),
+				"refresh_token": newRefreshToken,
+			},
+			"error": nil,
+		})
+	}
+}
+
+func LogoutHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"data": nil, "error": "Authorization header required"})
+			return
+		}
+
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+			c.JSON(http.StatusUnauthorized, gin.H{"data": nil, "error": "Invalid authorization format"})
+			return
+		}
+
+		claims, err := verifyRS256(parts[1])
+		if err == nil && claims != nil {
+			cache.BlacklistToken(claims.JTI)
+		}
+
+		userID, _ := c.Get("user_id")
+		slog.Info("user_logout", "user_id", userID)
+		c.JSON(http.StatusOK, gin.H{"data": "Logged out successfully", "error": nil})
+	}
+}
+
+func ChangePasswordHandler(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, _ := c.Get("user_id")
+		username, _ := c.Get("username")
+
+		var req ChangePasswordRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"data": nil, "error": "Invalid request: " + err.Error()})
+			return
+		}
+
+		var passwordHash string
+		err := db.QueryRow(`SELECT password_hash FROM users WHERE id = $1`, userID).Scan(&passwordHash)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Failed to verify current password"})
+			return
+		}
+
+		if !CheckPassword(req.CurrentPassword, passwordHash) {
+			slog.Warn("password_change_failed", "username", username, "reason", "wrong_current_password")
+			c.JSON(http.StatusForbidden, gin.H{"data": nil, "error": "Current password is incorrect"})
+			return
+		}
+
+		newHash, err := HashPassword(req.NewPassword)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Failed to hash new password"})
+			return
+		}
+
+		_, err = db.Exec(`UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2`, newHash, userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Failed to update password"})
+			return
+		}
+
+		if err := revokeAllRefreshTokens(db, userID.(string)); err != nil {
+			slog.Error("refresh_token_revoke_failed", "user_id", userID, "error", err.Error())
+		}
+
+		slog.Info("password_changed", "username", username)
+		c.JSON(http.StatusOK, gin.H{"data": "Password changed successfully. All sessions have been invalidated.", "error": nil})
+	}
+}
+
 func MeHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, exists := c.Get("user")
@@ -254,7 +370,7 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		user, err := ValidateToken(parts[1])
+		user, err := ValidateAccessToken(parts[1])
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"data": nil, "error": "Invalid or expired token"})
 			c.Abort()
@@ -263,21 +379,144 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		c.Set("user", user)
 		c.Set("user_id", user.ID)
+		c.Set("username", user.Username)
 		c.Set("user_role", user.Role)
 		c.Next()
 	}
 }
 
-func AdminOnly() gin.HandlerFunc {
+var RoleHierarchy = map[string]int{
+	"viewer":   0,
+	"auditor":  1,
+	"operator": 2,
+	"admin":    3,
+}
+
+func RequireRole(minRole string) gin.HandlerFunc {
+	minLevel, ok := RoleHierarchy[minRole]
+	if !ok {
+		minLevel = RoleHierarchy["viewer"]
+	}
+
 	return func(c *gin.Context) {
 		role, exists := c.Get("user_role")
-		if !exists || role != "admin" {
-			c.JSON(http.StatusForbidden, gin.H{"data": nil, "error": "Admin access required"})
+		if !exists {
+			c.JSON(http.StatusForbidden, gin.H{"data": nil, "error": "Access denied"})
+			c.Abort()
+			return
+		}
+
+		userLevel, ok := RoleHierarchy[role.(string)]
+		if !ok || userLevel < minLevel {
+			slog.Warn("access_denied", "user_role", role, "required_role", minRole,
+				"path", c.Request.URL.Path, "method", c.Request.Method)
+			c.JSON(http.StatusForbidden, gin.H{"data": nil, "error": "Insufficient permissions"})
 			c.Abort()
 			return
 		}
 		c.Next()
 	}
+}
+
+func AdminOnly() gin.HandlerFunc {
+	return RequireRole("admin")
+}
+
+func RequirePermission(permission string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, exists := c.Get("user_role")
+		if !exists {
+			c.JSON(http.StatusForbidden, gin.H{"data": nil, "error": "Access denied"})
+			c.Abort()
+			return
+		}
+
+		if !HasPermission(role.(string), permission) {
+			slog.Warn("permission_denied", "user_role", role, "permission", permission,
+				"path", c.Request.URL.Path, "method", c.Request.Method)
+			c.JSON(http.StatusForbidden, gin.H{"data": nil, "error": "Insufficient permissions"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+var RolePermissions = map[string][]string{
+	"viewer": {
+		"devices:list", "devices:view",
+		"scans:list", "scans:view",
+		"vulnerabilities:list", "vulnerabilities:view",
+		"alerts:list", "alerts:view",
+		"firmware:list", "firmware:view",
+		"stats:view", "kev:view",
+		"safelists:list", "safelists:view",
+		"webhooks:list", "webhooks:view",
+		"users:list", "users:view",
+		"scan-profiles:list", "scan-scopes:list",
+	},
+	"auditor": {
+		"devices:list", "devices:view",
+		"scans:list", "scans:view",
+		"vulnerabilities:list", "vulnerabilities:view",
+		"alerts:list", "alerts:list_all",
+		"firmware:list", "firmware:view",
+		"stats:view", "kev:view",
+		"safelists:list",
+		"webhooks:list",
+		"users:list",
+		"scan-profiles:list", "scan-scopes:list",
+		"audit:view",
+	},
+	"operator": {
+		"devices:list", "devices:view", "devices:scan", "devices:delete",
+		"scans:list", "scans:view", "scans:create",
+		"vulnerabilities:list", "vulnerabilities:view", "vulnerabilities:resolve",
+		"alerts:list", "alerts:ack", "alerts:dismiss",
+		"firmware:list", "firmware:view", "firmware:upload", "firmware:analyze",
+		"stats:view", "kev:view",
+		"safelists:list", "safelists:view", "safelists:create", "safelists:delete",
+		"webhooks:list", "webhooks:view", "webhooks:create", "webhooks:delete", "webhooks:test",
+		"users:list", "users:view",
+		"scan-profiles:list", "scan-scopes:list", "scan-scopes:create", "scan-scopes:delete",
+		"audit:view",
+	},
+	"admin": {
+		"devices:*",
+		"scans:*",
+		"vulnerabilities:*",
+		"alerts:*",
+		"firmware:*",
+		"stats:*",
+		"kev:*",
+		"safelists:*",
+		"webhooks:*",
+		"users:*",
+		"scan-profiles:*",
+		"scan-scopes:*",
+		"audit:*",
+		"admin:*",
+	},
+}
+
+func HasPermission(role, permission string) bool {
+	perms, ok := RolePermissions[role]
+	if !ok {
+		return false
+	}
+
+	for _, p := range perms {
+		if p == permission {
+			return true
+		}
+		if strings.HasSuffix(p, ":*") {
+			resource := strings.TrimSuffix(p, ":*")
+			if strings.HasPrefix(permission, resource+":") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func ListUsersHandler(db *sql.DB) gin.HandlerFunc {

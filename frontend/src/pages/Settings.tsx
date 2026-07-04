@@ -80,7 +80,7 @@ function SafelistsTab({ isAdmin }: { isAdmin: boolean }) {
         </form>
       )}
 
-      <div className="card" style={{ overflow: 'hidden' }}>
+      <div className="card table-wrapper" style={{ overflow: 'hidden' }}>
         <table className="data-table">
           <thead><tr><th>Type</th><th>Value</th><th>Reason</th><th>Status</th>{isAdmin && <th>Action</th>}</tr></thead>
           <tbody>
@@ -149,7 +149,7 @@ function WebhooksTab({ isAdmin }: { isAdmin: boolean }) {
         </form>
       )}
 
-      <div className="card" style={{ overflow: 'hidden' }}>
+      <div className="card table-wrapper" style={{ overflow: 'hidden' }}>
         <table className="data-table">
           <thead><tr><th>Name</th><th>Type</th><th>Min Severity</th><th>Status</th><th>Last Triggered</th>{isAdmin && <th>Action</th>}</tr></thead>
           <tbody>
@@ -227,7 +227,7 @@ function ScopesTab({ isAdmin }: { isAdmin: boolean }) {
         </form>
       )}
 
-      <div className="card" style={{ overflow: 'hidden' }}>
+      <div className="card table-wrapper" style={{ overflow: 'hidden' }}>
         <table className="data-table">
           <thead><tr><th>CIDR</th><th>Label</th><th>Status</th>{isAdmin && <th>Action</th>}</tr></thead>
           <tbody>
@@ -295,7 +295,7 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
         </div>
       )}
 
-      <div className="card" style={{ overflow: 'hidden' }}>
+      <div className="card table-wrapper" style={{ overflow: 'hidden' }}>
         <table className="data-table">
           <thead><tr><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th></tr></thead>
           <tbody>

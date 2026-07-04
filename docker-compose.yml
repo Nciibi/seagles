@@ -147,8 +147,42 @@ services:
         limits:
           memory: 128M
 
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_INSTALL_PLUGINS: ""
+    volumes:
+      - ./docker/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./docker/grafana/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
 volumes:
   postgres_data:
   firmware_uploads:
   s3_data:
   redis_data:
+  prometheus_data:
+  grafana_data:

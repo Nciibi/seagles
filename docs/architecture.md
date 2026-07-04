@@ -4,15 +4,45 @@
 
 IronMesh is an IoT security platform that discovers devices on a network, scans them for vulnerabilities, analyzes firmware, and provides risk scoring. It consists of three main components:
 
-```
-┌─────────────┐     ┌──────────────┐     ┌───────────────────┐
-│  Frontend   │────▶│   Backend    │────▶│  Firmware Analyzer│
-│  (React SPA)│     │  (Go/Gin)    │     │  (FastAPI/Python) │
-└─────────────┘     └──────┬───────┘     └───────────────────┘
-                           │
-                    ┌──────┴───────┐
-                    │  PostgreSQL  │
-                    └──────────────┘
+```mermaid
+graph TB
+    subgraph "Frontend"
+        React[React SPA<br/>Port 3000]
+        SW[Service Worker<br/>PWA + Offline Cache]
+    end
+
+    subgraph "Backend"
+        Gin[Go/Gin API Server<br/>Port 8080]
+        WS[WebSocket Hub<br/>Real-time Events]
+        Scanner[Scanner Engine<br/>nmap + libpcap]
+        Risk[Risk Scorer<br/>CVSS + EPSS + KEV]
+        Audit[Audit Logger]
+    end
+
+    subgraph "Microservices"
+        FA[Firmware Analyzer<br/>Python/FastAPI<br/>Port 8001]
+    end
+
+    subgraph "Data Layer"
+        PG[(PostgreSQL<br/>Devices, Scans, Vulns)]
+        RD[(Redis<br/>Cache + Rate Limiter)]
+        MO[(MinIO/S3<br/>Firmware Files)]
+    end
+
+    subgraph "Monitoring"
+        PM[Prometheus<br/>Metrics]
+        GF[Grafana<br/>Dashboards]
+    end
+
+    React -->|REST API| Gin
+    React -->|WebSocket| WS
+    Gin -->|Firmware Analysis| FA
+    Gin -->|Persist| PG
+    Gin -->|Cache| RD
+    Gin -->|Store| MO
+    PM -->|Scrape| Gin
+    GF -->|Query| PM
+    Scanner -->|nmap| Network{Target Network}
 ```
 
 ## Backend Architecture
@@ -22,44 +52,88 @@ backend/
 ├── main.go          # Entry point, graceful shutdown
 ├── api/             # HTTP handlers + router
 │   ├── router.go    # Route definitions, middleware chain
-│   ├── ws.go        # WebSocket hub
-│   ├── swagger.go   # OpenAPI docs
-│   └── *.go         # Per-resource handlers
+│   ├── ws.go        # WebSocket hub + origin whitelist
+│   ├── swagger.go   # OpenAPI docs endpoint
+│   ├── handlers.go  # Devices, scans, vulns, alerts CRUD
+│   ├── firmware.go  # Firmware upload + analysis
+│   ├── safelist.go  # IP/MAC safe list management
+│   ├── webhooks.go  # Webhook CRUD + test
+│   ├── scopes.go    # Scan scope management
+│   ├── profiles.go  # Scan profile CRUD
+│   ├── users.go     # User management
+│   └── health.go    # Health check + stats
 ├── auth/            # Authentication & authorization
 │   ├── auth.go      # Handlers (login, register, refresh, logout)
 │   ├── tokens.go    # RS256 JWT core
-│   └── rbac.go      # Role/permission definitions (in auth.go)
+│   └── rbac.go      # Role/permission definitions
 ├── breaker/         # Circuit breaker for external APIs
 ├── cache/           # In-memory TTL cache + token blacklist
 ├── config/          # Environment config loading
 ├── db/              # Database connection + migrations
+│   └── migrations/  # 13 SQL migration files
 ├── kev/             # CISA KEV + EPSS feed updaters
 ├── middleware/       # Cross-cutting concerns
-│   ├── sanitize.go  # XSS filtering, file validation
-│   ├── ratelimit.go # Per-endpoint rate limiter
 │   ├── audit.go     # Audit logging for write ops
-│   └── csrf.go      # CSRF token utility
+│   ├── ratelimit.go # Per-endpoint rate limiter
+│   ├── sanitize.go  # XSS filtering, file validation
+│   ├── tls.go       # TLS enforcement + cert pinning
+│   └── metrics.go   # Prometheus metrics
 ├── models/          # Data models
 ├── risk/            # Risk scoring engine
-├── scanner/         # Network scanning (nmap, TLS, creds, protocols)
-└── slog/            # Structured logging
+├── scanner/         # Network scanning
+│   ├── protocols.go # Protocol detection (Telnet, ADB, MQTT, etc.)
+│   ├── credentials.go # Default credential testing
+│   ├── tls.go       # TLS version/cipher detection
+│   └── passive.go   # gopacket passive monitoring
+├── slog/            # Structured logging
+├── alerts/          # Alert engine + dedup
+└── tests/           # Integration tests
 ```
 
 ### Middleware Chain
 
 Requests flow through this pipeline:
 
-```
-Recovery → Request ID → Security Headers → CORS → Body Limit → Rate Limiter → Sanitize → Audit Log → Route Handler
+```mermaid
+graph LR
+    A[Recovery] --> B[Request ID]
+    B --> C[Security Headers]
+    C --> D[CORS]
+    D --> E[Body Limit]
+    E --> F[Rate Limiter]
+    F --> G[Sanitize]
+    G --> H[Audit Log]
+    H --> I[Route Handler]
 ```
 
 ### Authentication Flow
 
-1. User logs in → receives access token (15m) + refresh token (7d)
-2. Client stores refresh token securely, sends access token as `Authorization: Bearer`
-3. On 401, client transparently refreshes via `POST /auth/refresh`
-4. On logout, access token is blacklisted (prevents reuse for 15m)
-5. On password change, all refresh tokens are revoked
+```mermaid
+sequenceDiagram
+    participant U as User/Browser
+    participant F as Frontend
+    participant B as Backend
+    participant DB as PostgreSQL
+
+    U->>F: Enter credentials
+    F->>B: POST /auth/login
+    B->>DB: Verify credentials
+    DB-->>B: User found
+    B-->>F: Access token (15m) + Refresh token (7d)
+    F->>F: Store refresh in secure storage
+
+    Note over F,B: Subsequent requests
+    F->>B: GET /devices (Authorization: Bearer)
+    B->>B: Verify JWT signature
+    B-->>F: 200 OK
+
+    Note over F,B: Token refresh flow
+    F->>B: GET /devices (expired token)
+    B-->>F: 401 Unauthorized
+    F->>B: POST /auth/refresh
+    B-->>F: New access + refresh token
+    F->>B: Retry original request with new token
+```
 
 ## Frontend Architecture
 
@@ -78,13 +152,24 @@ frontend/
 │   │   ├── Alerts.tsx
 │   │   ├── Firmware.tsx
 │   │   └── Settings.tsx
-│   └── components/      # Reusable components
-│       ├── ErrorBoundary.tsx
-│       ├── Loading.tsx
-│       └── VirtualScroller.tsx
+│   ├── components/      # Reusable components
+│   │   ├── ErrorBoundary.tsx
+│   │   ├── Loading.tsx
+│   │   ├── DeviceInventory.tsx
+│   │   ├── RiskScore.tsx
+│   │   ├── AlertFeed.tsx
+│   │   ├── FirmwarePanel.tsx
+│   │   ├── VulnScanner.tsx
+│   │   ├── NetworkMap.tsx
+│   │   └── VirtualScroller.tsx
+│   ├── test/            # Test setup
+│   │   └── setup.ts     # jest-dom matchers
+│   └── styles/          # CSS modules
 ├── public/
 │   ├── sw.js            # Service Worker
 │   └── manifest.json    # PWA manifest
+├── vitest.config.ts     # Vitest configuration
+└── vite.config.ts       # Vite configuration
 ```
 
 ## Firmware Analyzer
@@ -93,7 +178,36 @@ frontend/
 firmware-analyzer/
 ├── main.py       # FastAPI app with Pydantic v2 models
 ├── analyze.py    # Analysis logic (entropy, binwalk, decompile)
+├── cve_lookup.py # CVE matching against firmware metadata
 └── Dockerfile
+```
+
+## Network Architecture (Docker Compose)
+
+```mermaid
+graph TB
+    subgraph "ironmesh-internal (172.20.0.0/16)"
+        Backend[Backend<br/>:8080]
+        Frontend[Frontend<br/>:80]
+        FA[Firmware Analyzer<br/>:8001]
+        Postgres[PostgreSQL<br/>:5432]
+        PgB[PgBouncer<br/>:5432]
+        Redis[Redis<br/>:6379]
+        MinIO[MinIO<br/>:9000]
+        Prom[Prometheus<br/>:9090]
+        Grafana[Grafana<br/>:3000]
+
+        Backend --> PgB
+        Backend --> Redis
+        Backend --> MinIO
+        Backend --> FA
+        Postgres --> PgB
+        Prom --> Backend
+        Grafana --> Prom
+    end
+
+    Internet --> Frontend
+    Frontend --> Backend
 ```
 
 ## Key Design Decisions
@@ -107,3 +221,5 @@ firmware-analyzer/
 | Worker pool (20) | Controls resource usage during network scans |
 | DB health monitor | Auto-reconnect prevents permanent loss of DB connectivity |
 | Audit logging | All write ops logged for compliance and incident response |
+| Origin whitelist (WS) | Prevents unauthorized WebSocket connections from unknown origins |
+| Isolated Docker network | Removed `network_mode: host` for security isolation |

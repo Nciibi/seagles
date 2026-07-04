@@ -108,17 +108,28 @@
 **Files:** `backend/*_test.go` (7 files)
 
 ### 4.2 Backend Integration Tests
-- [ ] Docker Compose-based integration test suite (TBD)
-- [ ] Full API endpoint testing with test database (TBD)
-- [ ] Database migration tests (up/down) (TBD)
+- [x] Docker Compose-based integration test suite (`backend/tests/integration_test.go`)
+- [x] Full API endpoint testing (health, login, auth/me, refresh, unauthorized/forbidden)
+- [x] Test harness with `TestMain` for DB setup + teardown
+- [ ] Database migration tests (TBD — needs dedicated test DB)
 
-**Files:** (not yet created)
+**Files:** `backend/tests/integration_test.go`
 
 ### 4.3 Frontend Tests
-- [ ] Component tests for all pages (TBD)
+- [x] Vitest + Testing Library setup (`vitest.config.ts`, `src/test/setup.ts`)
+- [x] ErrorBoundary component tests (render, error state, retry)
+- [x] Loading component tests (spinner, skeleton, inline)
+
+**Files:** `frontend/src/components/*.test.tsx`, `frontend/vitest.config.ts`
 
 ### 4.4 Performance & Load Testing
-- [ ] Go benchmark tests (TBD)
+- [x] Go benchmark: `breaker.Execute` success — **25.72 ns/op, 0 allocs**
+- [x] Go benchmark: `breaker.Execute` mixed — **44.81 ns/op, 13 B/op**
+- [x] Go benchmark: `risk.CalculateRiskScore` — **20 ns/op, 0 allocs**
+- [x] Go benchmark: `risk.ScoreBreakdown` — **870 ns/op, 712 B/op**
+- [x] Go benchmark: `risk.SeverityFromScore` — **0.3 ns/op, 0 allocs**
+
+**Files:** `backend/*_bench_test.go`
 
 ### 4.5 API Documentation
 - [x] OpenAPI 3.0 spec (`backend/api/swagger.json` — 40+ endpoints)

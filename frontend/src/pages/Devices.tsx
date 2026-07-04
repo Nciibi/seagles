@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getDevices, triggerScan, type Device } from '../api/client'
 import { severityBadge, timeAgo } from '../utils/helpers'
@@ -43,7 +43,7 @@ export default function Devices() {
     }, 3000)
   }
 
-  const filtered = devices.filter((d) => {
+  const filtered = useMemo(() => devices.filter((d) => {
     const q = search.toLowerCase()
     const matchSearch = !q || d.ip_address.includes(q) || (d.hostname?.toLowerCase().includes(q))
     const matchType = !typeFilter || d.device_type === typeFilter
@@ -53,7 +53,7 @@ export default function Devices() {
     else if (riskFilter === 'medium') matchRisk = d.risk_score >= 3 && d.risk_score < 6
     else if (riskFilter === 'low') matchRisk = d.risk_score < 3
     return matchSearch && matchType && matchRisk
-  })
+  }), [devices, search, typeFilter, riskFilter])
 
   const deviceTypes = [...new Set(devices.map((d) => d.device_type).filter(Boolean))]
 

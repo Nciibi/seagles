@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { getVulnerabilities, resolveVuln, type Vulnerability } from '../api/client'
 import { timeAgo, epssColor } from '../utils/helpers'
 import { LoadingCard } from '../components/Loading'
@@ -34,16 +34,17 @@ export default function Vulnerabilities() {
     try { await resolveVuln(id); fetchVulns() } catch (e) { console.error(e) }
   }
 
-  let filtered = vulns.filter((v) => {
-    if (searchCVE && v.cve_id && !v.cve_id.toLowerCase().includes(searchCVE.toLowerCase())) return false
-    if (searchCVE && !v.cve_id) return false
-    return true
-  })
-
-  // Sort by EPSS if toggled
-  if (sortByEPSS) {
-    filtered = [...filtered].sort((a, b) => (b.epss_score || 0) - (a.epss_score || 0))
-  }
+  const filtered = useMemo(() => {
+    let result = vulns.filter((v) => {
+      if (searchCVE && v.cve_id && !v.cve_id.toLowerCase().includes(searchCVE.toLowerCase())) return false
+      if (searchCVE && !v.cve_id) return false
+      return true
+    })
+    if (sortByEPSS) {
+      result = [...result].sort((a, b) => (b.epss_score || 0) - (a.epss_score || 0))
+    }
+    return result
+  }, [vulns, searchCVE, sortByEPSS])
 
   if (loading) {
     return (

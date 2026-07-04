@@ -31,7 +31,7 @@ func TestSetAndValidateCSRFToken(t *testing.T) {
 	hash := hashToken(token)
 
 	globalCSRF.mu.Lock()
-	globalCSRF.tokens[hash] = globalCSRF.maxAge
+	globalCSRF.tokens[hash] = time.Now().Add(globalCSRF.maxAge)
 	globalCSRF.mu.Unlock()
 
 	if !ValidateCSRFToken(token) {

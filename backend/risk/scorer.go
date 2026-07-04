@@ -2,10 +2,12 @@ package risk
 
 import (
 	"database/sql"
-	"log"
+	"fmt"
 	"math"
 	"strings"
 	"time"
+
+	"github.com/Nciibi/seagles/slog"
 )
 
 // RiskFactors contains all the factors that contribute to a device's risk score.
@@ -217,7 +219,7 @@ func UpdateDeviceRiskScore(db *sql.DB, deviceID string) error {
 		return err
 	}
 
-	log.Printf("Risk score updated for device %s: %.1f → %.1f", deviceID, oldScore, newScore)
+	slog.Info(fmt.Sprintf("Risk score updated for device %s: %.1f → %.1f", deviceID, oldScore, newScore))
 	return nil
 }
 

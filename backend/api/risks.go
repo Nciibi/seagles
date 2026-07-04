@@ -29,12 +29,20 @@ func StatsHandler(db *sql.DB) gin.HandlerFunc {
 
 		var criticalVulns, highVulns, mediumVulns, kevVulns, openAlerts, suspiciousFirmware int
 
-		db.QueryRow(`SELECT COUNT(*) FROM vulnerabilities WHERE is_resolved = FALSE AND severity = 'critical'`).Scan(&criticalVulns)
-		db.QueryRow(`SELECT COUNT(*) FROM vulnerabilities WHERE is_resolved = FALSE AND severity = 'high'`).Scan(&highVulns)
-		db.QueryRow(`SELECT COUNT(*) FROM vulnerabilities WHERE is_resolved = FALSE AND severity = 'medium'`).Scan(&mediumVulns)
-		db.QueryRow(`SELECT COUNT(*) FROM vulnerabilities WHERE is_resolved = FALSE AND is_kev = TRUE`).Scan(&kevVulns)
-		db.QueryRow(`SELECT COUNT(*) FROM alerts WHERE is_acknowledged = FALSE`).Scan(&openAlerts)
-		db.QueryRow(`SELECT COUNT(*) FROM firmware WHERE analysis_status = 'complete' AND entropy_score > 7.2`).Scan(&suspiciousFirmware)
+		err = db.QueryRow(`
+			SELECT
+				COALESCE((SELECT COUNT(*) FROM vulnerabilities WHERE severity='critical' AND is_resolved=FALSE), 0),
+				COALESCE((SELECT COUNT(*) FROM vulnerabilities WHERE severity='high' AND is_resolved=FALSE), 0),
+				COALESCE((SELECT COUNT(*) FROM vulnerabilities WHERE severity='medium' AND is_resolved=FALSE), 0),
+				COALESCE((SELECT COUNT(*) FROM vulnerabilities WHERE is_kev=TRUE AND is_resolved=FALSE), 0),
+				COALESCE((SELECT COUNT(*) FROM alerts WHERE is_acknowledged=FALSE), 0),
+				COALESCE((SELECT COUNT(*) FROM firmware WHERE analysis_status='complete' AND (has_backdoor_indicators=TRUE OR has_default_creds=TRUE)), 0)
+		`).Scan(&criticalVulns, &highVulns, &mediumVulns, &kevVulns, &openAlerts, &suspiciousFirmware)
+		if err != nil {
+			slog.Error("Failed to query stats counts", "request_id", requestID, "error", err.Error())
+			fail(c, 500, "Failed to query stats counts: "+err.Error())
+			return
+		}
 
 		avg := 0.0
 		if avgRiskScore.Valid {

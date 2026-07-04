@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/Nciibi/seagles/kev"
 	"github.com/Nciibi/seagles/scanner"
 	"github.com/Nciibi/seagles/slog"
+	"github.com/Nciibi/seagles/retention"
 )
 
 func main() {
@@ -24,6 +26,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
+
+	slog.SetLevel(parseLogLevel(cfg.LogLevel))
+	slog.SetFormat(cfg.LogFormat)
 
 	jwtKey := cfg.JWTSecret
 	if jwtKey == "" && cfg.JWTPrivateKeyFile != "" {
@@ -38,13 +43,37 @@ func main() {
 
 	db.RunMigrations(database)
 
+	var wg sync.WaitGroup
+
 	kevCatalog := kev.StartKEVUpdater("data/cisa-kev.json")
 	kev.StartEPSSUpdater(database)
 
-	go alerts.StartAlertMonitor(database)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		alerts.StartAlertMonitor(database)
+	}()
 
 	passiveMonitor := scanner.NewPassiveMonitor(database, "")
-	go passiveMonitor.Start()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		passiveMonitor.Start()
+	}()
+
+	if cfg.RetentionScansDays > 0 || cfg.RetentionAlertsDays > 0 ||
+		cfg.RetentionAuditLogDays > 0 || cfg.RetentionWebhookDelivDays > 0 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			retention.StartRetentionJob(database, cfg)
+		}()
+		slog.Info("Data retention job enabled",
+			"scans_days", cfg.RetentionScansDays,
+			"alerts_days", cfg.RetentionAlertsDays,
+			"audit_log_days", cfg.RetentionAuditLogDays,
+			"webhook_deliv_days", cfg.RetentionWebhookDelivDays)
+	}
 
 	router := api.NewRouter(database, cfg, kevCatalog)
 
@@ -53,10 +82,21 @@ func main() {
 		Handler: router,
 	}
 
+	useTLS := cfg.TLSEnabled && cfg.TLSCertFile != "" && cfg.TLSKeyFile != ""
+	if useTLS {
+		slog.Info("TLS enabled", "cert", cfg.TLSCertFile)
+	}
+
 	go func() {
-		slog.Info("IronMesh API v2.0.0", "port", cfg.Port)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server failed: %v", err)
+		slog.Info("IronMesh API v2.1.0", "port", cfg.Port, "log_format", cfg.LogFormat)
+		var serveErr error
+		if useTLS {
+			serveErr = srv.ListenAndServeTLS(cfg.TLSCertFile, cfg.TLSKeyFile)
+		} else {
+			serveErr = srv.ListenAndServe()
+		}
+		if serveErr != nil && serveErr != http.ErrServerClosed {
+			log.Fatalf("Server failed: %v", serveErr)
 		}
 	}()
 
@@ -73,6 +113,24 @@ func main() {
 		log.Fatalf("Server forced to shutdown: %v", err)
 	}
 
+	slog.Info("Waiting for background goroutines to finish...")
+	wg.Wait()
+
 	passiveMonitor.Stop()
 	slog.Info("Server exited gracefully")
+}
+
+func parseLogLevel(s string) slog.Level {
+	switch s {
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }

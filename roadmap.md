@@ -161,9 +161,14 @@
 **Files:** `.github/workflows/ci.yml`
 
 ### 4.8 Monitoring & Observability
-- [ ] Prometheus metrics endpoint (`/metrics`) (TBD)
-- [ ] Grafana dashboard templates (TBD)
-- [ ] Distributed tracing (TBD)
+- [x] Prometheus metrics endpoint (`GET /api/v1/metrics`) — request counts, latency, errors, active, uptime
+- [x] Prometheus scrape config (`docker/prometheus/prometheus.yml`)
+- [x] Grafana auto-provisioned datasource (`docker/grafana/datasources/`)
+- [x] Dashboard provisioning config
+- [x] Prometheus + Grafana services in `docker-compose.yml`
+- [ ] Distributed tracing (TBD — OpenTelemetry)
+
+**Files:** `backend/middleware/metrics.go`, `docker/prometheus/`, `docker/grafana/`
 
 ---
 

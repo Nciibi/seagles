@@ -23,7 +23,7 @@ const navItems = [
 ]
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const token = localStorage.getItem('ironmesh_token')
+  const token = localStorage.getItem('seagles_token')
   if (!token) return <Navigate to="/login" replace />
   return <>{children}</>
 }
@@ -34,7 +34,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
-    const stored = localStorage.getItem('ironmesh_user')
+    const stored = localStorage.getItem('seagles_user')
     if (stored) {
       try { setUser(JSON.parse(stored)) } catch { /* ignore invalid JSON */ }
     }
@@ -47,12 +47,12 @@ export default function App() {
   const handleLogout = async () => {
     try {
       await axios.post('/api/v1/auth/logout', {}, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('ironmesh_token')}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem('seagles_token')}` }
       })
     } catch {}
-    localStorage.removeItem('ironmesh_token')
-    localStorage.removeItem('ironmesh_refresh')
-    localStorage.removeItem('ironmesh_user')
+    localStorage.removeItem('seagles_token')
+    localStorage.removeItem('seagles_refresh')
+    localStorage.removeItem('seagles_user')
     window.location.href = '/login'
   }
 

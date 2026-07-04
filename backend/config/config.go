@@ -70,7 +70,7 @@ func Load() (*Config, error) {
 		SlackWebhookURL:     getEnv("SLACK_WEBHOOK_URL", ""),
 		TeamsWebhookURL:     getEnv("TEAMS_WEBHOOK_URL", ""),
 		S3Endpoint:          getEnv("S3_ENDPOINT", ""),
-		S3Bucket:            getEnv("S3_BUCKET", "ironmesh-firmware"),
+		S3Bucket:            getEnv("S3_BUCKET", "seagles-firmware"),
 		S3AccessKey:         getEnv("S3_ACCESS_KEY", ""),
 		S3SecretKey:         getEnv("S3_SECRET_KEY", ""),
 		RedisURL:            getEnv("REDIS_URL", ""),

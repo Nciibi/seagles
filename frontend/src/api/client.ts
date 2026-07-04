@@ -12,7 +12,7 @@ let pendingRequests: Array<(token: string) => void> = []
 
 // Request interceptor: attach JWT token
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('ironmesh_token')
+  const token = localStorage.getItem('seagles_token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -27,7 +27,7 @@ api.interceptors.response.use(
     }
     // Update token if server returned a new one (token rotation)
     if (response.data?.data?.token) {
-      localStorage.setItem('ironmesh_token', response.data.data.token)
+      localStorage.setItem('seagles_token', response.data.data.token)
     }
     return response.data?.data !== undefined ? { ...response, data: response.data.data } : response
   },
@@ -40,7 +40,7 @@ api.interceptors.response.use(
         !originalRequest.url?.includes('/auth/login') &&
         !originalRequest.url?.includes('/auth/refresh')) {
       
-      const refreshToken = localStorage.getItem('ironmesh_refresh')
+      const refreshToken = localStorage.getItem('seagles_refresh')
       if (!refreshToken) {
         clearSession()
         return Promise.reject(error)
@@ -65,9 +65,9 @@ api.interceptors.response.use(
         const newToken = data.token
         const newRefresh = data.refresh_token
 
-        localStorage.setItem('ironmesh_token', newToken)
+        localStorage.setItem('seagles_token', newToken)
         if (newRefresh) {
-          localStorage.setItem('ironmesh_refresh', newRefresh)
+          localStorage.setItem('seagles_refresh', newRefresh)
         }
 
         // Process queued requests
@@ -93,9 +93,9 @@ api.interceptors.response.use(
 )
 
 function clearSession() {
-  localStorage.removeItem('ironmesh_token')
-  localStorage.removeItem('ironmesh_refresh')
-  localStorage.removeItem('ironmesh_user')
+  localStorage.removeItem('seagles_token')
+  localStorage.removeItem('seagles_refresh')
+  localStorage.removeItem('seagles_user')
   if (!window.location.pathname.includes('/login')) {
     window.location.href = '/login'
   }

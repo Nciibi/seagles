@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ironmesh-v1'
+const CACHE_NAME = 'seagles-v1'
 const STATIC_ASSETS = [
   '/',
   '/index.html',

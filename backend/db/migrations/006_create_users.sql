@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- Create default admin account (password: changeme — must be changed on first login)
 -- bcrypt hash for "changeme"
 INSERT INTO users (username, email, password_hash, role)
-VALUES ('admin', 'admin@ironmesh.local', '$2a$12$LJ3VBRqPpE.yCLtRpUwOZ.1FxPOMJvT5q1RkGQxJJp.HYDHh3l2Oe', 'admin')
+VALUES ('admin', 'admin@seagles.local', '$2a$12$LJ3VBRqPpE.yCLtRpUwOZ.1FxPOMJvT5q1RkGQxJJp.HYDHh3l2Oe', 'admin')
 ON CONFLICT (username) DO NOTHING;
 
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);

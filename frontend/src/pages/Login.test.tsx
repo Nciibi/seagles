@@ -32,7 +32,7 @@ describe('Login Page', () => {
         <Login />
       </BrowserRouter>
     )
-    const headings = screen.getAllByText(/ironmesh/i)
+    const headings = screen.getAllByText(/seagles/i)
     expect(headings.length).toBeGreaterThanOrEqual(1)
   })
 

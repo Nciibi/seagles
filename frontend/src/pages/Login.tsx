@@ -17,11 +17,11 @@ export default function Login() {
     try {
       const res = await login(username, password)
       const data = res.data!
-      localStorage.setItem('ironmesh_token', data.token)
+      localStorage.setItem('seagles_token', data.token)
       if (data.refresh_token) {
-        localStorage.setItem('ironmesh_refresh', data.refresh_token)
+        localStorage.setItem('seagles_refresh', data.refresh_token)
       }
-      localStorage.setItem('ironmesh_user', JSON.stringify(data.user))
+      localStorage.setItem('seagles_user', JSON.stringify(data.user))
       navigate('/')
     } catch (err: any) {
       setError(err?.response?.data?.error || err?.message || 'Login failed')

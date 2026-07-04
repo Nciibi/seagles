@@ -62,30 +62,30 @@ func MetricsHandler() gin.HandlerFunc {
 		var sb strings.Builder
 		uptime := time.Since(globalMetrics.uptimeStart)
 
-		sb.WriteString("# HELP ironmesh_uptime_seconds Service uptime\n")
-		sb.WriteString("# TYPE ironmesh_uptime_seconds gauge\n")
-		sb.WriteString(fmt.Sprintf("ironmesh_uptime_seconds %0.f\n", uptime.Seconds()))
+		sb.WriteString("# HELP seagles_uptime_seconds Service uptime\n")
+		sb.WriteString("# TYPE seagles_uptime_seconds gauge\n")
+		sb.WriteString(fmt.Sprintf("seagles_uptime_seconds %0.f\n", uptime.Seconds()))
 
-		sb.WriteString("\n# HELP ironmesh_requests_active Currently active requests\n")
-		sb.WriteString("# TYPE ironmesh_requests_active gauge\n")
-		sb.WriteString(fmt.Sprintf("ironmesh_requests_active %d\n", atomic.LoadInt64(&globalMetrics.requestsActive)))
+		sb.WriteString("\n# HELP seagles_requests_active Currently active requests\n")
+		sb.WriteString("# TYPE seagles_requests_active gauge\n")
+		sb.WriteString(fmt.Sprintf("seagles_requests_active %d\n", atomic.LoadInt64(&globalMetrics.requestsActive)))
 
-		sb.WriteString("\n# HELP ironmesh_requests_total Total requests by endpoint\n")
-		sb.WriteString("# TYPE ironmesh_requests_total counter\n")
+		sb.WriteString("\n# HELP seagles_requests_total Total requests by endpoint\n")
+		sb.WriteString("# TYPE seagles_requests_total counter\n")
 		for key, count := range globalMetrics.requestsTotal {
 			labelKey := prometheusLabelKey(key)
-			sb.WriteString(fmt.Sprintf("ironmesh_requests_total{endpoint=\"%s\"} %d\n", labelKey, count))
+			sb.WriteString(fmt.Sprintf("seagles_requests_total{endpoint=\"%s\"} %d\n", labelKey, count))
 		}
 
-		sb.WriteString("\n# HELP ironmesh_errors_total Total errors by endpoint\n")
-		sb.WriteString("# TYPE ironmesh_errors_total counter\n")
+		sb.WriteString("\n# HELP seagles_errors_total Total errors by endpoint\n")
+		sb.WriteString("# TYPE seagles_errors_total counter\n")
 		for key, count := range globalMetrics.errorsTotal {
 			labelKey := prometheusLabelKey(key)
-			sb.WriteString(fmt.Sprintf("ironmesh_errors_total{error=\"%s\"} %d\n", labelKey, count))
+			sb.WriteString(fmt.Sprintf("seagles_errors_total{error=\"%s\"} %d\n", labelKey, count))
 		}
 
-		sb.WriteString("\n# HELP ironmesh_request_latency_seconds Request latency\n")
-		sb.WriteString("# TYPE ironmesh_request_latency_seconds summary\n")
+		sb.WriteString("\n# HELP seagles_request_latency_seconds Request latency\n")
+		sb.WriteString("# TYPE seagles_request_latency_seconds summary\n")
 		for key, buckets := range globalMetrics.latencyBuckets {
 			if len(buckets) == 0 {
 				continue
@@ -96,7 +96,7 @@ func MetricsHandler() gin.HandlerFunc {
 			}
 			avg := sum / float64(len(buckets))
 			labelKey := prometheusLabelKey(key)
-			sb.WriteString(fmt.Sprintf("ironmesh_request_latency_seconds{endpoint=\"%s\"} %f\n", labelKey, avg))
+			sb.WriteString(fmt.Sprintf("seagles_request_latency_seconds{endpoint=\"%s\"} %f\n", labelKey, avg))
 		}
 
 		c.String(200, sb.String())

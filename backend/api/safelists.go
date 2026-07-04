@@ -348,7 +348,7 @@ func TestWebhookHandler(db *sql.DB) gin.HandlerFunc {
 		}
 		testPayload := map[string]interface{}{
 			"event":     "test",
-			"message":   "This is a test webhook from IronMesh",
+			"message":   "This is a test webhook from Seagles",
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
 		}
 		body, _ := json.Marshal(testPayload)

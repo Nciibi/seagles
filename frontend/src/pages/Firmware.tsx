@@ -58,7 +58,7 @@ export default function FirmwarePage() {
     }
   }
 
-  const user = JSON.parse(localStorage.getItem('ironmesh_user') || '{}')
+  const user = JSON.parse(localStorage.getItem('seagles_user') || '{}')
   const isAdmin = user.role === 'admin'
 
   if (loading) {

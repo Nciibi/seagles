@@ -11,7 +11,7 @@ type Tab = 'safelists' | 'webhooks' | 'profiles' | 'scopes' | 'users'
 
 export default function Settings() {
   const [tab, setTab] = useState<Tab>('safelists')
-  const user = JSON.parse(localStorage.getItem('ironmesh_user') || '{}')
+  const user = JSON.parse(localStorage.getItem('seagles_user') || '{}')
   const isAdmin = user.role === 'admin'
 
   return (

@@ -21,16 +21,16 @@ type RateLimitRule struct {
 }
 
 type RateLimiter struct {
-	mu       sync.Mutex
-	visitors map[string]*visitor
-	default  *RateLimitRule
-	rules    []RateLimitRule
+	mu          sync.Mutex
+	visitors    map[string]*visitor
+	fallback    *RateLimitRule
+	rules       []RateLimitRule
 }
 
 func NewRateLimiter(defaultLimit int, window time.Duration) *RateLimiter {
 	rl := &RateLimiter{
 		visitors: make(map[string]*visitor),
-		default:  &RateLimitRule{Limit: defaultLimit, Window: window},
+		fallback: &RateLimitRule{Limit: defaultLimit, Window: window},
 	}
 	go rl.cleanup()
 	return rl
@@ -53,7 +53,7 @@ func (rl *RateLimiter) getRule(method, path string) *RateLimitRule {
 			return &rule
 		}
 	}
-	return rl.default
+	return rl.fallback
 }
 
 func matchPath(pattern, path string) bool {
@@ -104,7 +104,7 @@ func (rl *RateLimiter) cleanup() {
 		rl.mu.Lock()
 		now := time.Now()
 		for k, v := range rl.visitors {
-			if now.Sub(v.lastSeen) > rl.default.Window {
+			if now.Sub(v.lastSeen) > rl.fallback.Window {
 				delete(rl.visitors, k)
 			}
 		}

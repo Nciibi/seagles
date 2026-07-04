@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changelog (this file)
 
 ### Changed
-- Docker Compose: removed `network_mode: host`, added isolated `ironmesh-internal` bridge network
+- Docker Compose: removed `network_mode: host`, added isolated `seagles-internal` bridge network
 - Docker Compose: pinned all service versions (replaced `:latest` tags)
 - Docker Compose: added healthchecks to all services, proper `depends_on` conditions
 - `docker-compose.yml`: Grafana default password via `GRAFANA_PASSWORD` env var

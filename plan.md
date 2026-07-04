@@ -1,4 +1,4 @@
-# IronMesh — IoT Security Platform
+# Seagles — IoT Security Platform
 ### Full Project Specification & Agent Build Orders
 
 ---
@@ -25,7 +25,7 @@
 
 ## 1. Project Overview
 
-**IronMesh** is an open-source IoT security platform that gives security teams full visibility into every connected device on their network — what it is, what vulnerabilities it carries, what firmware it runs, how risky it is, and when it does something suspicious.
+**Seagles** is an open-source IoT security platform that gives security teams full visibility into every connected device on their network — what it is, what vulnerabilities it carries, what firmware it runs, how risky it is, and when it does something suspicious.
 
 It is built to be deployed in minutes on real hardware, tested against real CVEs, and extended by the community. It is not a dashboard with fake data. It is a working security tool.
 
@@ -48,22 +48,22 @@ It is built to be deployed in minutes on real hardware, tested against real CVEs
 These are real threats from 2025–2026, not hypothetical scenarios.
 
 ### Threat 1 — Botnet Recruitment (Critical)
-Botnets like Aisuru/TurboMirai now achieve 20+ Tbps DDoS capability by compromising home routers, IP cameras, and smart TVs. The root cause is always the same: default credentials and exposed management ports (Telnet/SSH). IronMesh detects this by scanning for open Telnet (port 23), testing default credentials, and monitoring for abnormal outbound traffic patterns indicative of C2 communication.
+Botnets like Aisuru/TurboMirai now achieve 20+ Tbps DDoS capability by compromising home routers, IP cameras, and smart TVs. The root cause is always the same: default credentials and exposed management ports (Telnet/SSH). Seagles detects this by scanning for open Telnet (port 23), testing default credentials, and monitoring for abnormal outbound traffic patterns indicative of C2 communication.
 
 ### Threat 2 — IP Camera Exploitation (Critical)
-Nation-state actors (Iran-linked groups, Feb 2026) targeted AVTECH cameras across hospitals and financial institutions. AVTECH cameras carry CVE-2024-7029, allowing unauthenticated remote code execution. IronMesh cross-references every discovered camera's make/model against the CISA Known Exploited Vulnerabilities (KEV) list and flags unauthenticated RTSP stream exposure.
+Nation-state actors (Iran-linked groups, Feb 2026) targeted AVTECH cameras across hospitals and financial institutions. AVTECH cameras carry CVE-2024-7029, allowing unauthenticated remote code execution. Seagles cross-references every discovered camera's make/model against the CISA Known Exploited Vulnerabilities (KEV) list and flags unauthenticated RTSP stream exposure.
 
 ### Threat 3 — Supply Chain Firmware Malware (High)
-BadBox 2.0 pre-infected 10M+ Android TV boxes and routers before they reached customers by injecting malware during manufacturing. Devices arrive already compromised — no user action required. IronMesh detects this through firmware entropy analysis (packed/encrypted malicious payloads have abnormally high entropy) and by flagging Android Debug Bridge (ADB) port 5555 exposure.
+BadBox 2.0 pre-infected 10M+ Android TV boxes and routers before they reached customers by injecting malware during manufacturing. Devices arrive already compromised — no user action required. Seagles detects this through firmware entropy analysis (packed/encrypted malicious payloads have abnormally high entropy) and by flagging Android Debug Bridge (ADB) port 5555 exposure.
 
 ### Threat 4 — OT/ICS Infrastructure Attacks (Critical)
-In April 2026, CISA issued emergency advisories for Honeywell, Mitsubishi Electric, and Delta Electronics. Industrial PLCs using Modbus and DNP3 protocols carry no authentication by design. IronMesh fingerprints industrial protocols on the network and treats any internet-reachable OT device as an automatic critical risk.
+In April 2026, CISA issued emergency advisories for Honeywell, Mitsubishi Electric, and Delta Electronics. Industrial PLCs using Modbus and DNP3 protocols carry no authentication by design. Seagles fingerprints industrial protocols on the network and treats any internet-reachable OT device as an automatic critical risk.
 
 ### Threat 5 — Insecure Communication (High)
-24% of IoT companion apps have TLS issues. Unencrypted MQTT brokers (port 1883) are trivially intercepted. IronMesh scans for cleartext protocol usage, detects TLS versions below 1.2, and flags HTTP management interfaces.
+24% of IoT companion apps have TLS issues. Unencrypted MQTT brokers (port 1883) are trivially intercepted. Seagles scans for cleartext protocol usage, detects TLS versions below 1.2, and flags HTTP management interfaces.
 
 ### Threat 6 — Default & Weak Credentials (High)
-820,000 IoT attacks happen daily, most via default credentials. Mirai's entire power came from scanning for admin/admin and root/root. IronMesh tests every discovered device against the top-100 default credential list and immediately scores any match as Critical (9.0+).
+820,000 IoT attacks happen daily, most via default credentials. Mirai's entire power came from scanning for admin/admin and root/root. Seagles tests every discovered device against the top-100 default credential list and immediately scores any match as Critical (9.0+).
 
 ---
 
@@ -122,7 +122,7 @@ In April 2026, CISA issued emergency advisories for Honeywell, Mitsubishi Electr
 ## 5. Directory Structure
 
 ```
-ironmesh/
+seagles/
 ├── README.md
 ├── THREAT_MODEL.md
 ├── docker-compose.yml
@@ -311,9 +311,9 @@ package main
 
 import (
     "log"
-    "github.com/yourusername/ironmesh/config"
-    "github.com/yourusername/ironmesh/api"
-    "github.com/yourusername/ironmesh/db"
+    "github.com/yourusername/seagles/config"
+    "github.com/yourusername/seagles/api"
+    "github.com/yourusername/seagles/db"
 )
 
 func main() {
@@ -322,7 +322,7 @@ func main() {
     defer database.Close()
     db.RunMigrations(database)
     router := api.NewRouter(database, cfg)
-    log.Printf("IronMesh API running on :%s", cfg.Port)
+    log.Printf("Seagles API running on :%s", cfg.Port)
     log.Fatal(router.Run(":" + cfg.Port))
 }
 ```
@@ -383,7 +383,7 @@ Returns the dashboard summary:
 
 ## 8. Scanner Engine
 
-The scanner is the heart of IronMesh. It has five components:
+The scanner is the heart of Seagles. It has five components:
 
 ### 8.1 Network Discovery (`scanner/nmap.go`)
 
@@ -449,7 +449,7 @@ For every HTTPS or MQTTS endpoint:
 
 ### 8.5 CISA KEV Cross-Reference (`scanner/protocols.go`)
 
-On startup and daily thereafter, IronMesh fetches the CISA KEV feed:
+On startup and daily thereafter, Seagles fetches the CISA KEV feed:
 ```
 https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
 ```
@@ -649,15 +649,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: ironmesh
-      POSTGRES_USER: ironmesh
+      POSTGRES_DB: seagles
+      POSTGRES_USER: seagles
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ironmesh"]
+      test: ["CMD-SHELL", "pg_isready -U seagles"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -668,7 +668,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://ironmesh:${DB_PASSWORD}@postgres:5432/ironmesh
+      DATABASE_URL: postgres://seagles:${DB_PASSWORD}@postgres:5432/seagles
       PORT: 8080
       NETWORK_CIDR: ${NETWORK_CIDR:-192.168.1.0/24}
       NVD_API_KEY: ${NVD_API_KEY:-}
@@ -684,7 +684,7 @@ services:
     depends_on:
       - postgres
     environment:
-      DATABASE_URL: postgres://ironmesh:${DB_PASSWORD}@postgres:5432/ironmesh
+      DATABASE_URL: postgres://seagles:${DB_PASSWORD}@postgres:5432/seagles
       API_URL: http://backend:8080
     volumes:
       - firmware_data:/firmware
@@ -707,8 +707,8 @@ volumes:
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/yourusername/ironmesh
-cd ironmesh
+git clone https://github.com/yourusername/seagles
+cd seagles
 
 # 2. Copy and configure environment
 cp .env.example .env
@@ -740,7 +740,7 @@ These are precise, sequenced instructions for AI coding agents (Claude Code, Cur
 
 **Instructions:**
 1. Create the directory tree exactly as specified in Section 5
-2. Initialize Go module: `go mod init github.com/yourusername/ironmesh`
+2. Initialize Go module: `go mod init github.com/yourusername/seagles`
 3. Add Go dependencies:
    - `github.com/gin-gonic/gin` (HTTP router)
    - `github.com/lib/pq` (PostgreSQL driver)
@@ -998,9 +998,9 @@ These are precise, sequenced instructions for AI coding agents (Claude Code, Cur
    NVD_API_KEY=
    ```
 3. Create `backend/Dockerfile`:
-   - Build stage: `golang:1.22-alpine` — runs `go build -o ironmesh`
+   - Build stage: `golang:1.22-alpine` — runs `go build -o seagles`
    - Install `nmap` in the build stage
-   - Run stage: `alpine:latest` — copies binary and nmap, runs `./ironmesh`
+   - Run stage: `alpine:latest` — copies binary and nmap, runs `./seagles`
 4. Verify `network_mode: host` is set on the backend service (required for nmap to scan the local network)
 5. Verify `cap_add: [NET_ADMIN, NET_RAW]` is set (required for nmap raw socket access)
 6. Test full startup: `docker compose up -d` should start all 4 services in order with health checks passing
@@ -1026,9 +1026,9 @@ These are precise, sequenced instructions for AI coding agents (Claude Code, Cur
 2. Create `THREAT_MODEL.md` with:
    - Section: What is in scope (network-attached IoT devices, firmware analysis, credential testing)
    - Section: What is out of scope (physical attacks, encrypted traffic decryption, zero-days)
-   - For each threat in Section 2: Attack surface → attacker capability needed → IronMesh detection method → remediation recommendation
-   - Section: Limitations and known gaps (IronMesh is passive where possible, but credential testing is semi-active)
-   - Section: Responsible use (IronMesh must only be run on networks you own or have explicit permission to scan)
+   - For each threat in Section 2: Attack surface → attacker capability needed → Seagles detection method → remediation recommendation
+   - Section: Limitations and known gaps (Seagles is passive where possible, but credential testing is semi-active)
+   - Section: Responsible use (Seagles must only be run on networks you own or have explicit permission to scan)
 3. Create `CONTRIBUTING.md`:
    - How to add a new vulnerability check (step-by-step guide with code example)
    - How to update the default credentials list
@@ -1060,7 +1060,7 @@ Use this environment to show:
 
 ### What to Say in Interviews
 
-When asked about IronMesh, open with the problem:
+When asked about Seagles, open with the problem:
 - "820,000 IoT attacks happen every day, mostly through default credentials. Most companies have no visibility into the IoT devices on their network."
 
 Then go straight to a specific technical decision:
@@ -1073,4 +1073,4 @@ That is the interview answer that gets offers. Problem → hard technical decisi
 
 ---
 
-*IronMesh — built to be real, built to get you hired.*
+*Seagles — built to be real, built to get you hired.*

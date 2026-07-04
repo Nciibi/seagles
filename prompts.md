@@ -1,4 +1,4 @@
-# IronMesh — Agent Prompts
+# Seagles — Agent Prompts
 ### Copy-paste these into Claude Code, Cursor, or any coding agent. One prompt per order. Do not skip steps.
 
 ---
@@ -18,7 +18,7 @@
 ## PROMPT 001 — Project Scaffolding
 
 ```
-You are building IronMesh, an open-source IoT security platform. Your job in this step is to create the full project scaffold.
+You are building Seagles, an open-source IoT security platform. Your job in this step is to create the full project scaffold.
 
 Create the following directory structure exactly:
 
@@ -112,7 +112,7 @@ Then do the following:
    NETWORK_CIDR=192.168.1.0/24
    NVD_API_KEY=
 5. Create backend/config/config.go that reads these env vars and returns a Config struct with fields: DatabaseURL, Port, NetworkCIDR, NVDAPIKey
-6. Create a minimal backend/main.go that imports the config package, loads env, prints "IronMesh starting..." and exits cleanly
+6. Create a minimal backend/main.go that imports the config package, loads env, prints "Seagles starting..." and exits cleanly
 7. Create data/default-credentials.txt with these 50 entries (one per line, format username:password):
    admin:admin
    admin:password
@@ -173,7 +173,7 @@ Confirm when all files and directories are created and go mod tidy completes wit
 ## PROMPT 002 — Database & Migrations
 
 ```
-You are continuing to build IronMesh, an IoT security platform. The project scaffold already exists. Your job now is to set up the PostgreSQL database layer.
+You are continuing to build Seagles, an IoT security platform. The project scaffold already exists. Your job now is to set up the PostgreSQL database layer.
 
 Create the following files:
 
@@ -304,7 +304,7 @@ Confirm all 5 migration files execute without errors.
 ## PROMPT 003 — Go API Server
 
 ```
-You are continuing to build IronMesh. The database schema is set up. Now build the full REST API server.
+You are continuing to build Seagles. The database schema is set up. Now build the full REST API server.
 
 The API must use the gin-gonic/gin framework. All responses use this envelope:
 - Success: {"data": <payload>, "error": null}
@@ -401,7 +401,7 @@ All must return {"data": ..., "error": null}.
 ## PROMPT 004 — Network Discovery Scanner
 
 ```
-You are continuing to build IronMesh. The API server is running. Now build the network scanner engine.
+You are continuing to build Seagles. The API server is running. Now build the network scanner engine.
 
 Prerequisite: nmap must be installed on the system. If running in Docker, it will be installed via the Dockerfile. For local development, install it with: sudo apt-get install nmap (Linux) or brew install nmap (Mac).
 
@@ -499,7 +499,7 @@ Should show discovered devices.
 ## PROMPT 005 — Default Credential Scanner
 
 ```
-You are continuing to build IronMesh. The network scanner is running. Now build the default credential testing module.
+You are continuing to build Seagles. The network scanner is running. Now build the default credential testing module.
 
 IMPORTANT SAFETY RULES — these must be implemented exactly as written:
 - Maximum 50 credential pairs tested per device per scan
@@ -589,7 +589,7 @@ Confirm by setting up a test SSH server with default credentials and verifying t
 ## PROMPT 006 — CISA KEV Integration
 
 ```
-You are continuing to build IronMesh. Now integrate the CISA Known Exploited Vulnerabilities feed.
+You are continuing to build Seagles. Now integrate the CISA Known Exploited Vulnerabilities feed.
 
 --- kev/updater.go ---
 
@@ -617,7 +617,7 @@ Implement:
 
 1. FetchKEV(cacheFilePath string) error
    - Download from: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
-   - HTTP GET with timeout 30s and User-Agent "IronMesh-Security-Scanner/1.0"
+   - HTTP GET with timeout 30s and User-Agent "Seagles-Security-Scanner/1.0"
    - Save raw response body to cacheFilePath
    - Log: "KEV catalog updated: <count> entries"
    - Return error if download fails
@@ -671,7 +671,7 @@ Should return: {"last_updated": "<timestamp>", "total_entries": <number above 10
 ## PROMPT 007 — Risk Scoring Engine
 
 ```
-You are continuing to build IronMesh. Now build the risk scoring engine.
+You are continuing to build Seagles. Now build the risk scoring engine.
 
 --- risk/scorer.go ---
 
@@ -766,7 +766,7 @@ Should return a breakdown showing which factors contributed to the score.
 ## PROMPT 008 — Alerting Engine
 
 ```
-You are continuing to build IronMesh. Now build the full alerting system.
+You are continuing to build Seagles. Now build the full alerting system.
 
 --- alerts/engine.go ---
 
@@ -848,7 +848,7 @@ Should show a device_offline alert for that device.
 ## PROMPT 009 — Firmware Analyzer (Python Microservice)
 
 ```
-You are continuing to build IronMesh. Now build the Python firmware analysis microservice.
+You are continuing to build Seagles. Now build the Python firmware analysis microservice.
 
 --- firmware-analyzer/requirements.txt ---
 fastapi==0.111.0
@@ -974,7 +974,7 @@ def lookup_cve(vendor: str, version: str, api_key: str = None) -> list[dict]:
     if not keyword or keyword == " ":
         return []
     
-    headers = {"User-Agent": "IronMesh-Security-Scanner/1.0"}
+    headers = {"User-Agent": "Seagles-Security-Scanner/1.0"}
     if api_key:
         headers["apiKey"] = api_key
     
@@ -1037,7 +1037,7 @@ from entropy import analyze_file_entropy
 from binwalk_runner import find_suspicious_strings, run_binwalk
 from cve_lookup import lookup_cve
 
-app = FastAPI(title="IronMesh Firmware Analyzer")
+app = FastAPI(title="Seagles Firmware Analyzer")
 
 DB_URL = os.environ.get("DATABASE_URL", "")
 NVD_API_KEY = os.environ.get("NVD_API_KEY", "")
@@ -1157,7 +1157,7 @@ Should return a JSON report with entropy_score and suspicious_strings.
 ## PROMPT 010 — React Frontend
 
 ```
-You are continuing to build IronMesh. The backend API is complete. Now build the React frontend.
+You are continuing to build Seagles. The backend API is complete. Now build the React frontend.
 
 Use: React 18 + TypeScript + Tailwind CSS + recharts + axios + react-router-dom v6.
 
@@ -1169,7 +1169,7 @@ Create an axios instance:
 - export typed helper functions: getStats(), getDevices(params?), getDevice(id), triggerScan(deviceId), triggerNetworkScan(), getVulnerabilities(params?), resolveVuln(id), getAlerts(params?), ackAlert(id), getKEVStatus()
 
 --- frontend/src/pages/Dashboard.tsx ---
-Layout: top bar with IronMesh logo + "IoT Security Platform" subtitle, right side shows KEV status badge.
+Layout: top bar with Seagles logo + "IoT Security Platform" subtitle, right side shows KEV status badge.
 
 Four metric cards in a row:
 - Total Devices (icon: server)
@@ -1291,7 +1291,7 @@ Scanning a device from the Devices page must create a scan record visible in Dev
 ## PROMPT 011 — Docker Compose & Final Wiring
 
 ```
-You are finishing the IronMesh build. Wire everything together with Docker Compose and verify the full system works end-to-end.
+You are finishing the Seagles build. Wire everything together with Docker Compose and verify the full system works end-to-end.
 
 --- docker-compose.yml ---
 Create this file exactly:
@@ -1436,7 +1436,7 @@ If all 7 checks pass, the system is fully operational.
 ## PROMPT 012 — README & Threat Model
 
 ```
-You are writing the documentation for IronMesh that will make people on GitHub star it, share it, and hire the person who built it.
+You are writing the documentation for Seagles that will make people on GitHub star it, share it, and hire the person who built it.
 
 --- README.md ---
 
@@ -1460,7 +1460,7 @@ Write a README with these sections in order:
    docker compose up -d
    open http://localhost:3000
 
-5. A "What it detects" section — a table with 3 columns: Threat | Real-world example | How IronMesh catches it:
+5. A "What it detects" section — a table with 3 columns: Threat | Real-world example | How Seagles catches it:
    - Default credentials | Mirai botnet (820K attacks/day) | Tests top-100 credential pairs per device, scores 9.5 if found
    - Telnet exposure | Aisuru botnet (20+ Tbps DDoS) | Detects open port 23, creates Critical alert
    - CISA KEV matches | AVTECH CVE-2024-7029 | Cross-references every CVE against CISA's active exploit list
@@ -1482,7 +1482,7 @@ Write a README with these sections in order:
 
 9. A "Adding new checks" section with a 5-step guide: (1) add vulnerability check function in scanner/, (2) call alerts.CreateAlert with appropriate type constant, (3) add risk factor to RiskFactors struct, (4) update CalculateRiskScore, (5) open a PR
 
-10. A "Responsible use" section: "IronMesh performs active network scanning and credential testing. Only use it on networks you own or have explicit written permission to test. Unauthorized scanning may be illegal in your jurisdiction."
+10. A "Responsible use" section: "Seagles performs active network scanning and credential testing. Only use it on networks you own or have explicit written permission to test. Unauthorized scanning may be illegal in your jurisdiction."
 
 11. License: MIT
 
@@ -1490,11 +1490,11 @@ Write a README with these sections in order:
 
 Write a threat model document with these sections:
 
-1. Scope: what IronMesh protects against (network-visible IoT devices, their credentials, firmware, exposed protocols)
+1. Scope: what Seagles protects against (network-visible IoT devices, their credentials, firmware, exposed protocols)
 
 2. Out of scope: physical device access, encrypted traffic interception, zero-day discovery, lateral movement after compromise
 
-3. For each of these 6 threats, write: Attack surface | Attacker capability required | IronMesh detection | Remediation recommendation
+3. For each of these 6 threats, write: Attack surface | Attacker capability required | Seagles detection | Remediation recommendation
    - Default credential attacks
    - Botnet recruitment via Telnet/ADB
    - Supply chain firmware compromise
@@ -1507,7 +1507,7 @@ Write a threat model document with these sections:
    - Firmware analysis requires the firmware file to be present locally
    - Entropy analysis has a false positive rate — compressed legitimate firmware may score high
    - Network scanning requires nmap and raw socket access — must run as privileged container
-   - IronMesh does not monitor encrypted traffic (no MitM)
+   - Seagles does not monitor encrypted traffic (no MitM)
 
 5. Safe scanning guidelines: rate limits, delay between attempts, lockout detection, audit logging
 

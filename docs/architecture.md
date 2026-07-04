@@ -301,7 +301,7 @@ The firmware analyzer is a Python/FastAPI microservice that:
 
 ```mermaid
 graph TB
-    subgraph "seagles-internal (172.20.0.0/16)"
+    subgraph "seagles-internal"
         Backend[Backend<br/>:8080]
         Frontend[Frontend<br/>:80]
         FA[Firmware Analyzer<br/>:8001]
@@ -325,7 +325,7 @@ graph TB
         H80[":80"] --> Frontend
         H3000[":3000"] --> Grafana
         H9000[":9000"] --> MinIO
-        H9001[":9001"] --> MinIO Console
+        H9001[":9001"] -->|Console| MinIO
         H9090[":9090"] --> Prom
     end
 

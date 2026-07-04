@@ -1,9 +1,9 @@
 {
 	"info": {
-		"name": "IronMesh API",
+		"name": "Seagles API",
 		"description": "IoT Security Platform — Authentication, Device Management, Firmware Analysis, and Scanning",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "ironmesh"
+		"_exporter_id": "seagles"
 	},
 	"auth": {
 		"type": "bearer",
@@ -17,7 +17,7 @@
 	},
 	"variable": [
 		{ "key": "base_url", "value": "http://localhost:8080/api/v1", "type": "string" },
-		{ "key": "email", "value": "admin@ironmesh.dev", "type": "string" },
+		{ "key": "email", "value": "admin@seagles.dev", "type": "string" },
 		{ "key": "password", "value": "admin123", "type": "string" },
 		{ "key": "access_token", "value": "", "type": "string" },
 		{ "key": "refresh_token", "value": "", "type": "string" }

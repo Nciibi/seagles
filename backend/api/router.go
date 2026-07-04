@@ -155,6 +155,7 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 	})
 
 	r.Use(middleware.SanitizeInput(middleware.DefaultXSSConfig))
+	r.Use(middleware.AuditLogger(db, "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/health", "/api/v1/ws"))
 
 	v1 := r.Group("/api/v1")
 	{
@@ -209,6 +210,7 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 			protected.POST("/webhooks/:id/test", auth.AdminOnly(), TestWebhookHandler(db))
 			protected.GET("/users", auth.AdminOnly(), auth.ListUsersHandler(db))
 			protected.POST("/users", auth.AdminOnly(), auth.RegisterHandler(db))
+			protected.GET("/audit-log", auth.RequireRole("auditor"), middleware.ListAuditLogsHandler(db))
 		}
 	}
 

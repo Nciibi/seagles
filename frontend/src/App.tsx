@@ -1,15 +1,17 @@
 import axios from 'axios'
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom'
-import { useEffect, useState } from 'react'
-import Dashboard from './pages/Dashboard'
-import Devices from './pages/Devices'
-import DeviceDetail from './pages/DeviceDetail'
-import Vulnerabilities from './pages/Vulnerabilities'
-import FirmwarePage from './pages/Firmware'
-import AlertsPage from './pages/Alerts'
-import Settings from './pages/Settings'
-import Login from './pages/Login'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import ErrorBoundary from './components/ErrorBoundary'
+import { Loading } from './components/Loading'
+
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Devices = lazy(() => import('./pages/Devices'))
+const DeviceDetail = lazy(() => import('./pages/DeviceDetail'))
+const Vulnerabilities = lazy(() => import('./pages/Vulnerabilities'))
+const FirmwarePage = lazy(() => import('./pages/Firmware'))
+const AlertsPage = lazy(() => import('./pages/Alerts'))
+const Settings = lazy(() => import('./pages/Settings'))
+const Login = lazy(() => import('./pages/Login'))
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: '📊' },

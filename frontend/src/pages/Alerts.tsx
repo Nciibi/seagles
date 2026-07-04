@@ -82,7 +82,7 @@ export default function AlertsPage() {
           <input type="checkbox" checked={showAcked} onChange={(e) => setShowAcked(e.target.checked)} />
           Show Acknowledged
         </label>
-        <div style={{ marginLeft: 'auto', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+        <div style={{ marginLeft: 'auto', fontSize: '0.8rem', color: 'var(--text-muted)' }} aria-live="polite">
           {alerts.length} alerts · Auto-refreshing
         </div>
       </div>

@@ -126,7 +126,7 @@ export default function DeviceDetail() {
 
       {/* Tab content */}
       {activeTab === 'vulns' && (
-        <div className="card" style={{ overflow: 'hidden' }}>
+        <div className="card table-wrapper" style={{ overflow: 'hidden' }}>
           <table className="data-table">
             <thead>
               <tr>
@@ -163,7 +163,7 @@ export default function DeviceDetail() {
       )}
 
       {activeTab === 'scans' && (
-        <div className="card" style={{ overflow: 'hidden' }}>
+        <div className="card table-wrapper" style={{ overflow: 'hidden' }}>
           <table className="data-table">
             <thead>
               <tr><th>Started</th><th>Status</th><th>Type</th><th>Open Ports</th></tr>

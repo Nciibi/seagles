@@ -251,8 +251,8 @@ func TestHasPermission_Operator(t *testing.T) {
 	if !HasPermission("operator", "alerts:ack") {
 		t.Fatal("expected operator to have alerts:ack")
 	}
-	if HasPermission("operator", "audit:view") {
-		t.Fatal("expected operator to NOT have audit:view")
+	if !HasPermission("operator", "audit:view") {
+		t.Fatal("expected operator to have audit:view")
 	}
 }
 

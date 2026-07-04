@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"testing"
+	"time"
 )
 
 func TestGenerateCSRFToken(t *testing.T) {
@@ -54,7 +55,7 @@ func TestValidateCSRFToken_Expired(t *testing.T) {
 	hash := hashToken(token)
 
 	globalCSRF.mu.Lock()
-	globalCSRF.tokens[hash] = -1
+	globalCSRF.tokens[hash] = time.Now().Add(-time.Hour)
 	globalCSRF.mu.Unlock()
 
 	if ValidateCSRFToken(token) {

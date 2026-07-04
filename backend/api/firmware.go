@@ -105,6 +105,11 @@ func AnalyzeFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 		slog.Info("Firmware analysis triggered", "request_id", requestID, "firmware_id", id)
 
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("PANIC in firmware analysis: %v", r)
+				}
+			}()
 			analyzerURL := cfg.FirmwareAnalyzerURL
 			if analyzerURL == "" {
 				analyzerURL = "http://firmware-analyzer:8001"

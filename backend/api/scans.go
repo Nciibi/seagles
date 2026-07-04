@@ -313,6 +313,11 @@ func NetworkScanHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 		slog.Info("Network scan triggered", "request_id", requestID)
 
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("PANIC in network scan: %v", r)
+				}
+			}()
 			hosts, err := scanner.DiscoverHosts(cfg.NetworkCIDR)
 			if err != nil {
 				slog.Error("Network discovery failed", "error", err.Error())

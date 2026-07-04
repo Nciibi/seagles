@@ -3,6 +3,7 @@ package api
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -95,6 +96,11 @@ func ResolveVulnerabilityHandler(db *sql.DB) gin.HandlerFunc {
 		db.QueryRow(`SELECT device_id FROM vulnerabilities WHERE id=$1`, id).Scan(&deviceID)
 		if deviceID.Valid {
 			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("PANIC in risk score update: %v", r)
+					}
+				}()
 				db.Exec(`UPDATE devices SET risk_score = COALESCE(
 					(SELECT LEAST(
 						CASE WHEN EXISTS(SELECT 1 FROM vulnerabilities WHERE device_id=$1 AND is_resolved=FALSE AND title ILIKE '%Default credentials%') THEN 4.0 ELSE 0 END +

@@ -358,7 +358,7 @@ func TestWebhookHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		resp.Body.Close()
-		ok(c, gin.H{"status": "test_webhook_sent"})
+		success(c, gin.H{"status": "test_webhook_sent"})
 	}
 }
 

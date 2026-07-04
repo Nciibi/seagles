@@ -98,6 +98,8 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 		c.Next()
 	})
 
+	r.Use(middleware.CSRFMiddleware())
+
 	r.Use(func(c *gin.Context) {
 		bodySize := c.Request.ContentLength
 		if bodySize > 100<<20 {

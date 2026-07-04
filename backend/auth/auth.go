@@ -593,7 +593,8 @@ func ListUsersHandler(db *sql.DB) gin.HandlerFunc {
 			users = append(users, u)
 		}
 		if err := rows.Err(); err != nil {
-			return nil, fmt.Errorf("iterate users: %w", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Failed to iterate users: "+err.Error()})
+			return
 		}
 		if users == nil {
 			users = []UserInfo{}

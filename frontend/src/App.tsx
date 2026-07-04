@@ -84,8 +84,12 @@ export default function App() {
           />
         )}
 
+        <a href="#main-content" className="skip-to-content">
+          Skip to content
+        </a>
+
         <div style={{ display: 'flex', minHeight: '100vh' }}>
-          <aside className="sidebar" style={{
+          <aside className="sidebar" role="navigation" aria-label="Main navigation" style={{
             transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
             transition: 'transform 0.2s ease',
           }}>

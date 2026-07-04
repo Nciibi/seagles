@@ -1,0 +1,476 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "IronMesh API",
+    "description": "IoT Security Platform API",
+    "version": "2.1.0",
+    "contact": {
+      "name": "IronMesh Team",
+      "email": "security@ironmesh.io"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "API v1"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "data": { "type": "object", "nullable": true },
+          "error": { "type": "string", "nullable": true }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["username", "password"],
+        "properties": {
+          "username": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "password": { "type": "string", "minLength": 8, "maxLength": 128 }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string" },
+          "expires_in": { "type": "integer" },
+          "refresh_token": { "type": "string" },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "username": { "type": "string" },
+              "email": { "type": "string" },
+              "role": { "type": "string", "enum": ["admin", "operator", "auditor", "viewer"] }
+            }
+          }
+        }
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "required": ["refresh_token"],
+        "properties": {
+          "refresh_token": { "type": "string" }
+        }
+      },
+      "ChangePasswordRequest": {
+        "type": "object",
+        "required": ["current_password", "new_password"],
+        "properties": {
+          "current_password": { "type": "string", "minLength": 8 },
+          "new_password": { "type": "string", "minLength": 8 }
+        }
+      },
+      "Device": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "ip_address": { "type": "string" },
+          "mac_address": { "type": "string", "nullable": true },
+          "hostname": { "type": "string", "nullable": true },
+          "vendor": { "type": "string", "nullable": true },
+          "device_type": { "type": "string" },
+          "risk_score": { "type": "number" },
+          "is_active": { "type": "boolean" }
+        }
+      },
+      "Vulnerability": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "cve_id": { "type": "string", "nullable": true },
+          "cvss_score": { "type": "number", "nullable": true },
+          "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+          "title": { "type": "string" },
+          "is_kev": { "type": "boolean" },
+          "is_resolved": { "type": "boolean" }
+        }
+      },
+      "Alert": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "severity": { "type": "string" },
+          "alert_type": { "type": "string" },
+          "title": { "type": "string" },
+          "is_acknowledged": { "type": "boolean" }
+        }
+      },
+      "Scan": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "status": { "type": "string" },
+          "scan_type": { "type": "string" },
+          "open_ports": { "type": "array", "items": { "type": "integer" } }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "username": { "type": "string" },
+          "email": { "type": "string" },
+          "role": { "type": "string" },
+          "is_active": { "type": "boolean" },
+          "last_login": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Authenticate user",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Login successful", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginResponse" } } } },
+          "401": { "description": "Invalid credentials" }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Refresh access token",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefreshRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Token refreshed" },
+          "401": { "description": "Invalid refresh token" }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Get current user",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Current user info" },
+          "401": { "description": "Not authenticated" }
+        }
+      }
+    },
+    "/auth/permissions": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Get user permissions",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Role and permission list" }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Logout and blacklist token",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Logged out" }
+        }
+      }
+    },
+    "/auth/change-password": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Change password",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChangePasswordRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Password changed" },
+          "403": { "description": "Current password incorrect" }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Health check",
+        "responses": {
+          "200": { "description": "Service is healthy" }
+        }
+      }
+    },
+    "/stats": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Dashboard statistics",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Statistics" }
+        }
+      }
+    },
+    "/devices": {
+      "get": {
+        "tags": ["Devices"],
+        "summary": "List devices",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Device list", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Device" } } } } }
+        }
+      }
+    },
+    "/devices/{id}": {
+      "get": {
+        "tags": ["Devices"],
+        "summary": "Get device details",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Device details" } }
+      },
+      "delete": {
+        "tags": ["Devices"],
+        "summary": "Delete device",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Device deleted" } }
+      }
+    },
+    "/devices/{id}/scan": {
+      "post": {
+        "tags": ["Devices"],
+        "summary": "Trigger device scan",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Scan started" } }
+      }
+    },
+    "/devices/{id}/risk-breakdown": {
+      "get": {
+        "tags": ["Devices"],
+        "summary": "Get risk score breakdown",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Risk breakdown" } }
+      }
+    },
+    "/scan/network": {
+      "post": {
+        "tags": ["Scans"],
+        "summary": "Trigger network scan",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Network scan started" } }
+      }
+    },
+    "/scans": {
+      "get": {
+        "tags": ["Scans"],
+        "summary": "List scans",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Scan list" } }
+      }
+    },
+    "/scans/{id}": {
+      "get": {
+        "tags": ["Scans"],
+        "summary": "Get scan details",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Scan details" } }
+      }
+    },
+    "/vulnerabilities": {
+      "get": {
+        "tags": ["Vulnerabilities"],
+        "summary": "List vulnerabilities",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Vulnerability list" } }
+      }
+    },
+    "/vulnerabilities/{id}/resolve": {
+      "patch": {
+        "tags": ["Vulnerabilities"],
+        "summary": "Resolve vulnerability",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Vulnerability resolved" } }
+      }
+    },
+    "/firmware": {
+      "get": {
+        "tags": ["Firmware"],
+        "summary": "List firmware",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Firmware list" } }
+      }
+    },
+    "/firmware/{id}/analyze": {
+      "post": {
+        "tags": ["Firmware"],
+        "summary": "Trigger firmware analysis",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Analysis started" } }
+      }
+    },
+    "/firmware/upload": {
+      "post": {
+        "tags": ["Firmware"],
+        "summary": "Upload firmware file",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "content": { "multipart/form-data": { "schema": { "type": "object", "properties": { "firmware": { "type": "string", "format": "binary" }, "device_id": { "type": "string" }, "vendor": { "type": "string" }, "version": { "type": "string" } } } } }
+        },
+        "responses": { "201": { "description": "Firmware uploaded" } }
+      }
+    },
+    "/alerts": {
+      "get": {
+        "tags": ["Alerts"],
+        "summary": "List alerts",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Alert list" } }
+      }
+    },
+    "/alerts/{id}/ack": {
+      "post": {
+        "tags": ["Alerts"],
+        "summary": "Acknowledge alert",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Alert acknowledged" } }
+      }
+    },
+    "/kev/status": {
+      "get": {
+        "tags": ["System"],
+        "summary": "KEV catalog status",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "KEV status" } }
+      }
+    },
+    "/users": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "List users",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "User list" } }
+      },
+      "post": {
+        "tags": ["Users"],
+        "summary": "Create user",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "username": { "type": "string" }, "email": { "type": "string" }, "password": { "type": "string" }, "role": { "type": "string", "enum": ["admin", "viewer", "operator", "auditor"] } } } } }
+        },
+        "responses": { "201": { "description": "User created" } }
+      }
+    },
+    "/audit-log": {
+      "get": {
+        "tags": ["System"],
+        "summary": "View audit log",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Audit log entries" } }
+      }
+    },
+    "/safelists": {
+      "get": {
+        "tags": ["Safelists"],
+        "summary": "List safelist entries",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Safelist entries" } }
+      },
+      "post": {
+        "tags": ["Safelists"],
+        "summary": "Create safelist entry",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "201": { "description": "Safelist entry created" } }
+      }
+    },
+    "/safelists/{id}": {
+      "delete": {
+        "tags": ["Safelists"],
+        "summary": "Delete safelist entry",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Safelist entry deleted" } }
+      }
+    },
+    "/webhooks": {
+      "get": {
+        "tags": ["Webhooks"],
+        "summary": "List webhooks",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Webhook list" } }
+      },
+      "post": {
+        "tags": ["Webhooks"],
+        "summary": "Create webhook",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "201": { "description": "Webhook created" } }
+      }
+    },
+    "/webhooks/{id}": {
+      "delete": {
+        "tags": ["Webhooks"],
+        "summary": "Delete webhook",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Webhook deleted" } }
+      }
+    },
+    "/webhooks/{id}/test": {
+      "post": {
+        "tags": ["Webhooks"],
+        "summary": "Test webhook",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Webhook test sent" } }
+      }
+    },
+    "/scan-profiles": {
+      "get": {
+        "tags": ["Scans"],
+        "summary": "List scan profiles",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Scan profiles" } }
+      }
+    },
+    "/scan-scopes": {
+      "get": {
+        "tags": ["Scans"],
+        "summary": "List scan scopes",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Scan scopes" } }
+      },
+      "post": {
+        "tags": ["Scans"],
+        "summary": "Create scan scope",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "201": { "description": "Scan scope created" } }
+      }
+    },
+    "/scan-scopes/{id}": {
+      "delete": {
+        "tags": ["Scans"],
+        "summary": "Delete scan scope",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Scan scope deleted" } }
+      }
+    }
+  }
+}

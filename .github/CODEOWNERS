@@ -1,0 +1,15 @@
+# Each line is a file pattern followed by one or more owners.
+
+# Global owners
+* @Nciibi
+
+# Backend
+/backend/ @Nciibi
+
+# Frontend
+/frontend/ @Nciibi
+
+# Infrastructure
+/k8s/ @Nciibi
+/docker-compose.yml @Nciibi
+/.github/ @Nciibi

@@ -1,52 +1,92 @@
-.PHONY: up down logs scan stats reset build-backend build-frontend test
+.PHONY: all build test lint fmt vet clean docker-build docker-up security-scan help
 
-up:
-	docker compose up -d --build
+GO_DIR := backend
+FRONTEND_DIR := frontend
+FIRMWARE_DIR := firmware-analyzer
 
-down:
-	docker compose down
+all: lint test build
 
-logs:
-	docker compose logs -f
+# === Build ===
 
-scan:
-	curl -s -X POST http://localhost:8080/api/v1/scan/network | jq .
-
-stats:
-	curl -s http://localhost:8080/api/v1/stats | jq .
-
-reset:
-	docker compose down -v
-	docker compose up -d --build
+build:
+	cd $(GO_DIR) && go build -o ironmesh .
+	cd $(FRONTEND_DIR) && npm run build
 
 build-backend:
-	cd backend && go build -o bin/ironmesh .
+	cd $(GO_DIR) && go build -o ironmesh .
 
 build-frontend:
-	cd frontend && npm run build
+	cd $(FRONTEND_DIR) && npm run build
 
-build-all: build-backend build-frontend
+# === Test ===
 
-test:
-	cd backend && go test -v ./...
+test: test-backend test-frontend
 
-test-race:
-	cd backend && go test -race ./...
+test-backend:
+	cd $(GO_DIR) && go test -v -count=1 ./...
+
+test-frontend:
+	cd $(FRONTEND_DIR) && npm test
+
+test-backend-race:
+	cd $(GO_DIR) && go test -race -count=1 ./...
+
+# === Lint ===
+
+lint: lint-backend lint-frontend
+
+lint-backend:
+	cd $(GO_DIR) && golangci-lint run --timeout=5m
+
+lint-frontend:
+	cd $(FRONTEND_DIR) && npx tsc --noEmit
+
+fmt:
+	cd $(GO_DIR) && go fmt ./...
 
 vet:
-	cd backend && go vet ./...
+	cd $(GO_DIR) && go vet ./...
 
-watch-logs:
-	docker compose logs -f backend
+# === Docker ===
 
-health:
-	curl -s http://localhost:8080/api/v1/health | jq .
+docker-build:
+	docker build -t seagles-backend:latest $(GO_DIR)
+	docker build -t seagles-frontend:latest $(FRONTEND_DIR)
+	docker build -t seagles-firmware-analyzer:latest $(FIRMWARE_DIR)
 
-dev:
-	docker compose up -d postgres redis minio pgbouncer
-	cd backend && go run .
+docker-up:
+	docker compose up -d
 
-login:
-	curl -s -X POST http://localhost:8080/api/v1/auth/login \
-		-H "Content-Type: application/json" \
-		-d '{"username":"admin","password":"changeme"}' | jq .
+docker-down:
+	docker compose down
+
+docker-logs:
+	docker compose logs -f
+
+# === Security ===
+
+security-scan:
+	trivy fs --severity CRITICAL,HIGH .
+
+# === Clean ===
+
+clean:
+	rm -f $(GO_DIR)/ironmesh
+	rm -rf $(FRONTEND_DIR)/dist
+	rm -rf $(FRONTEND_DIR)/node_modules/.vite
+
+# === Help ===
+
+help:
+	@echo "Targets:"
+	@echo "  build              Build backend + frontend"
+	@echo "  test               Run all tests"
+	@echo "  test-backend       Run Go tests"
+	@echo "  test-frontend      Run Vitest"
+	@echo "  lint               Run all linters"
+	@echo "  fmt                Format Go code"
+	@echo "  vet                Run go vet"
+	@echo "  docker-build       Build all Docker images"
+	@echo "  docker-up          Start Docker Compose services"
+	@echo "  security-scan      Run Trivy vulnerability scan"
+	@echo "  clean              Remove build artifacts"

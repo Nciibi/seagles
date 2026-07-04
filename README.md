@@ -1,5 +1,9 @@
 # IronMesh
 
+<p align="center">
+  <img src="banner.png" alt="IronMesh Banner" width="100%">
+</p>
+
 **Open-source IoT security platform. Find vulnerable devices before attackers do.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)

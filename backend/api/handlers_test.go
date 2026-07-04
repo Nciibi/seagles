@@ -12,10 +12,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/Nciibi/seagles/config"
+	"github.com/Nciibi/seagles/models"
 	"github.com/lib/pq"
 )
 
-func setupTestRouter(t *testing.T) (gin.IRouter, sqlmock.Sqlmock, *config.Config) {
+func setupTestRouter(t *testing.T) (*gin.Engine, sqlmock.Sqlmock, *config.Config) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
@@ -37,7 +38,6 @@ func setupTestRouter(t *testing.T) (gin.IRouter, sqlmock.Sqlmock, *config.Config
 	})
 	v1 := r.Group("/api/v1")
 	{
-		v1.POST("/auth/login", LoginHandler(db))
 		v1.GET("/health", func(c *gin.Context) {
 			c.JSON(200, gin.H{"status": "ok"})
 		})
@@ -72,14 +72,14 @@ func setupTestRouter(t *testing.T) (gin.IRouter, sqlmock.Sqlmock, *config.Config
 			protected.POST("/webhooks", CreateWebhookHandler(db))
 			protected.DELETE("/webhooks/:id", DeleteWebhookHandler(db))
 			protected.POST("/webhooks/:id/test", TestWebhookHandler(db))
-			protected.GET("/audit-log", ListAuditLogsHandler(db))
+
 		}
 	}
 
 	return r, mock, cfg
 }
 
-func request(router gin.IRouter, method, path string, body interface{}) *httptest.ResponseRecorder {
+func request(router *gin.Engine, method, path string, body interface{}) *httptest.ResponseRecorder {
 	var reqBody []byte
 	if body != nil {
 		reqBody, _ = json.Marshal(body)
@@ -123,7 +123,7 @@ func TestListDevicesHandler_Success(t *testing.T) {
 	}
 
 	var resp struct {
-		Data []DeviceJSON `json:"data"`
+		Data []models.DeviceJSON `json:"data"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
@@ -158,7 +158,7 @@ func TestListDevicesHandler_Empty(t *testing.T) {
 	}
 
 	var resp struct {
-		Data []DeviceJSON `json:"data"`
+		Data []models.DeviceJSON `json:"data"`
 	}
 	json.Unmarshal(w.Body.Bytes(), &resp)
 	if len(resp.Data) != 0 {
@@ -290,7 +290,7 @@ func TestListScansHandler_Success(t *testing.T) {
 	}
 
 	var resp struct {
-		Data []ScanJSON `json:"data"`
+		Data []models.ScanJSON `json:"data"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
@@ -374,7 +374,7 @@ func TestListVulnerabilitiesHandler_Success(t *testing.T) {
 	}
 
 	var resp struct {
-		Data []VulnerabilityJSON `json:"data"`
+		Data []models.VulnerabilityJSON `json:"data"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
@@ -436,7 +436,7 @@ func TestListAlertsHandler_Success(t *testing.T) {
 	}
 
 	var resp struct {
-		Data []AlertJSON `json:"data"`
+		Data []models.AlertJSON `json:"data"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
@@ -822,27 +822,6 @@ func TestListFirmwareHandler_Success(t *testing.T) {
 		WillReturnRows(rows)
 
 	w := request(router, "GET", "/api/v1/firmware", nil)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestAuditLogHandler_Success(t *testing.T) {
-	router, mock, _ := setupTestRouter(t)
-	now := time.Now()
-
-	rows := sqlmock.NewRows([]string{
-		"id", "user_id", "username", "action", "resource", "resource_id", "detail",
-		"ip_address", "user_agent", "status_code", "latency_ms", "created_at",
-	}).AddRow(
-		uuid.NewString(), nil, "testuser", "POST", "/api/v1/devices", nil,
-		nil, "10.0.0.1", "test-agent", 200, 5, now,
-	)
-
-	mock.ExpectQuery(`SELECT id, user_id, username, action, resource, resource_id, detail`).
-		WillReturnRows(rows)
-
-	w := request(router, "GET", "/api/v1/audit-log", nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}

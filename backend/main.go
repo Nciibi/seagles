@@ -1,7 +1,13 @@
 package main
 
 import (
+	"context"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/yourusername/seagles/alerts"
 	"github.com/yourusername/seagles/api"
@@ -10,6 +16,7 @@ import (
 	"github.com/yourusername/seagles/db"
 	"github.com/yourusername/seagles/kev"
 	"github.com/yourusername/seagles/scanner"
+	"github.com/yourusername/seagles/slog"
 )
 
 func main() {
@@ -18,34 +25,48 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	// Configure JWT secret from environment
 	auth.SetJWTSecret(cfg.JWTSecret)
 
-	// Connect to database
 	database := db.Connect(cfg.DatabaseURL)
 	defer database.Close()
 
-	// Run migrations
 	db.RunMigrations(database)
 
-	// Start KEV updater (background refresh every 24h)
 	kevCatalog := kev.StartKEVUpdater("data/cisa-kev.json")
-
-	// Start EPSS updater (background refresh every 6h)
 	kev.StartEPSSUpdater(database)
 
-	// Start alert monitor (background checks every 60s)
 	go alerts.StartAlertMonitor(database)
 
-	// Start passive traffic monitor
-	// Note: Requires libpcap-dev and privileges. It will gracefully skip if unavailable.
 	passiveMonitor := scanner.NewPassiveMonitor(database, "")
 	go passiveMonitor.Start()
 
-	// Create and start the API server
 	router := api.NewRouter(database, cfg, kevCatalog)
 
-	log.Printf("IronMesh API v2.0.0 running on :%s", cfg.Port)
-	log.Printf("Default admin credentials: admin / changeme")
-	log.Fatal(router.Run(":" + cfg.Port))
+	srv := &http.Server{
+		Addr:    ":" + cfg.Port,
+		Handler: router,
+	}
+
+	go func() {
+		slog.Info("IronMesh API v2.0.0", "port", cfg.Port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server failed: %v", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	sig := <-quit
+
+	slog.Info("Shutting down server", "signal", sig.String())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	passiveMonitor.Stop()
+	slog.Info("Server exited gracefully")
 }

@@ -874,6 +874,26 @@ func TestListAlertsHandler_FilterBySeverity(t *testing.T) {
 	}
 }
 
+func TestListFirmwareHandler_Empty(t *testing.T) {
+	router, mock, _ := setupTestRouter(t)
+
+	rows := sqlmock.NewRows([]string{
+		"id", "device_id", "version", "vendor", "checksum", "file_path",
+		"analyzed_at", "entropy_score", "has_default_creds",
+		"has_telnet", "has_backdoor_indicators", "strings_of_interest",
+		"cve_matches", "analysis_status", "analysis_report",
+		"ip_address", "hostname",
+	})
+
+	mock.ExpectQuery(`SELECT f.id, f.device_id, f.version, f.vendor, f.checksum`).
+		WillReturnRows(rows)
+
+	w := request(router, "GET", "/api/v1/firmware", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func assertAnError(msg string) error {
 	return &testError{msg: msg}
 }

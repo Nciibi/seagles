@@ -2,22 +2,21 @@ package scanner
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"strings"
 	"time"
+
+	"github.com/yourusername/seagles/slog"
 )
 
-// ProtocolFinding represents a detected dangerous protocol on a device.
 type ProtocolFinding struct {
 	Protocol    string `json:"protocol"`
 	Port        int    `json:"port"`
-	Risk        string `json:"risk"` // "critical", "high", "medium"
+	Risk        string `json:"risk"`
 	Description string `json:"description"`
 	Evidence    string `json:"evidence"`
 }
 
-// DetectProtocols checks for dangerous protocols on the given open ports.
 func DetectProtocols(ip string, openPorts []int) []ProtocolFinding {
 	var findings []ProtocolFinding
 	portSet := make(map[int]bool)
@@ -25,37 +24,38 @@ func DetectProtocols(ip string, openPorts []int) []ProtocolFinding {
 		portSet[p] = true
 	}
 
-	// Telnet detection (port 23)
 	if portSet[23] {
 		if f := detectTelnet(ip, 23); f != nil {
 			findings = append(findings, *f)
 		}
 	}
 
-	// ADB detection (port 5555)
 	if portSet[5555] {
 		if f := detectADB(ip, 5555); f != nil {
 			findings = append(findings, *f)
 		}
 	}
 
-	// MQTT plaintext detection (port 1883)
 	if portSet[1883] {
 		if f := detectMQTT(ip, 1883); f != nil {
 			findings = append(findings, *f)
 		}
 	}
 
-	// Modbus detection (port 502)
 	if portSet[502] {
 		if f := detectModbus(ip, 502); f != nil {
 			findings = append(findings, *f)
 		}
 	}
 
-	// RTSP unauthenticated detection (port 554)
 	if portSet[554] {
 		if f := detectRTSP(ip, 554); f != nil {
+			findings = append(findings, *f)
+		}
+	}
+
+	if portSet[8443] || portSet[8883] {
+		if f := detectTLS(ip, portSet); f != nil {
 			findings = append(findings, *f)
 		}
 	}
@@ -63,7 +63,6 @@ func DetectProtocols(ip string, openPorts []int) []ProtocolFinding {
 	return findings
 }
 
-// detectTelnet attempts a TCP connection to port 23 and reads the banner.
 func detectTelnet(ip string, port int) *ProtocolFinding {
 	addr := fmt.Sprintf("%s:%d", ip, port)
 	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
@@ -85,7 +84,7 @@ func detectTelnet(ip string, port int) *ProtocolFinding {
 	if n == 0 || strings.Contains(strings.ToLower(banner), "login") ||
 		strings.Contains(strings.ToLower(banner), "telnet") ||
 		strings.Contains(strings.ToLower(banner), "username") {
-		log.Printf("[PROTOCOL] Telnet detected on %s:%d", ip, port)
+		slog.Warn("Telnet detected", "ip", ip, "port", port)
 		return &ProtocolFinding{
 			Protocol:    "Telnet",
 			Port:        port,
@@ -98,7 +97,6 @@ func detectTelnet(ip string, port int) *ProtocolFinding {
 	return nil
 }
 
-// detectADB attempts to detect Android Debug Bridge on port 5555.
 func detectADB(ip string, port int) *ProtocolFinding {
 	addr := fmt.Sprintf("%s:%d", ip, port)
 	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
@@ -116,7 +114,7 @@ func detectADB(ip string, port int) *ProtocolFinding {
 		evidence = "ADB CNXN banner detected"
 	}
 
-	log.Printf("[PROTOCOL] ADB detected on %s:%d", ip, port)
+	slog.Warn("ADB detected", "ip", ip, "port", port)
 	return &ProtocolFinding{
 		Protocol:    "ADB",
 		Port:        port,
@@ -126,7 +124,6 @@ func detectADB(ip string, port int) *ProtocolFinding {
 	}
 }
 
-// detectMQTT sends an MQTT CONNECT packet to detect a plaintext MQTT broker.
 func detectMQTT(ip string, port int) *ProtocolFinding {
 	addr := fmt.Sprintf("%s:%d", ip, port)
 	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
@@ -135,14 +132,13 @@ func detectMQTT(ip string, port int) *ProtocolFinding {
 	}
 	defer conn.Close()
 
-	// MQTT CONNECT packet
 	mqttConnect := []byte{
-		0x10, 0x0d, // Fixed header: CONNECT, remaining length 13
-		0x00, 0x04, 0x4d, 0x51, 0x54, 0x54, // Protocol name "MQTT"
-		0x04,       // Protocol level 4 (MQTT 3.1.1)
-		0x02,       // Connect flags (clean session)
-		0x00, 0x3c, // Keep alive 60s
-		0x00, 0x01, 0x00, // Client ID length 1, empty
+		0x10, 0x0d,
+		0x00, 0x04, 0x4d, 0x51, 0x54, 0x54,
+		0x04,
+		0x02,
+		0x00, 0x3c,
+		0x00, 0x01, 0x00,
 	}
 
 	conn.SetWriteDeadline(time.Now().Add(3 * time.Second))
@@ -158,9 +154,8 @@ func detectMQTT(ip string, port int) *ProtocolFinding {
 		return nil
 	}
 
-	// MQTT CONNACK starts with byte 0x20
 	if resp[0] == 0x20 {
-		log.Printf("[PROTOCOL] MQTT plaintext detected on %s:%d", ip, port)
+		slog.Warn("Plaintext MQTT detected", "ip", ip, "port", port)
 		return &ProtocolFinding{
 			Protocol:    "MQTT-plaintext",
 			Port:        port,
@@ -173,7 +168,6 @@ func detectMQTT(ip string, port int) *ProtocolFinding {
 	return nil
 }
 
-// detectModbus sends a Modbus request to detect industrial control protocol.
 func detectModbus(ip string, port int) *ProtocolFinding {
 	addr := fmt.Sprintf("%s:%d", ip, port)
 	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
@@ -182,14 +176,13 @@ func detectModbus(ip string, port int) *ProtocolFinding {
 	}
 	defer conn.Close()
 
-	// Modbus TCP: Transaction ID, Protocol ID, Length, Unit ID, Function Code 0x11 (Report Slave ID)
 	modbusReq := []byte{
-		0x00, 0x01, // Transaction ID
-		0x00, 0x00, // Protocol ID (Modbus)
-		0x00, 0x06, // Length
-		0x01,                               // Unit ID
-		0x11,                               // Function code: Report Slave ID
-		0x00, 0x00, 0x00, 0x00,             // Data
+		0x00, 0x01,
+		0x00, 0x00,
+		0x00, 0x06,
+		0x01,
+		0x11,
+		0x00, 0x00, 0x00, 0x00,
 	}
 
 	conn.SetWriteDeadline(time.Now().Add(3 * time.Second))
@@ -205,7 +198,7 @@ func detectModbus(ip string, port int) *ProtocolFinding {
 		return nil
 	}
 
-	log.Printf("[PROTOCOL] Modbus detected on %s:%d", ip, port)
+	slog.Warn("Modbus detected", "ip", ip, "port", port)
 	return &ProtocolFinding{
 		Protocol:    "Modbus",
 		Port:        port,
@@ -215,7 +208,6 @@ func detectModbus(ip string, port int) *ProtocolFinding {
 	}
 }
 
-// detectRTSP sends an RTSP OPTIONS request to check for unauthenticated camera streams.
 func detectRTSP(ip string, port int) *ProtocolFinding {
 	addr := fmt.Sprintf("%s:%d", ip, port)
 	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
@@ -224,7 +216,6 @@ func detectRTSP(ip string, port int) *ProtocolFinding {
 	}
 	defer conn.Close()
 
-	// Send RTSP OPTIONS request
 	request := fmt.Sprintf("OPTIONS rtsp://%s:%d/ RTSP/1.0\r\nCSeq: 1\r\n\r\n", ip, port)
 	conn.SetWriteDeadline(time.Now().Add(3 * time.Second))
 	_, err = conn.Write([]byte(request))
@@ -240,9 +231,8 @@ func detectRTSP(ip string, port int) *ProtocolFinding {
 	}
 
 	response := string(resp[:n])
-	// If we get 200 OK without 401 Unauthorized, stream is unauthenticated
 	if strings.Contains(response, "200 OK") && !strings.Contains(response, "401") {
-		log.Printf("[PROTOCOL] Unauthenticated RTSP detected on %s:%d", ip, port)
+		slog.Warn("Unauthenticated RTSP detected", "ip", ip, "port", port)
 		return &ProtocolFinding{
 			Protocol:    "RTSP-unauth",
 			Port:        port,
@@ -252,5 +242,21 @@ func detectRTSP(ip string, port int) *ProtocolFinding {
 		}
 	}
 
+	return nil
+}
+
+func detectTLS(ip string, portSet map[int]bool) *ProtocolFinding {
+	ports := []int{8443, 8883}
+	for _, p := range ports {
+		if portSet[p] {
+			return &ProtocolFinding{
+				Protocol:    "TLS-service",
+				Port:        p,
+				Risk:        "medium",
+				Description: fmt.Sprintf("TLS service on port %d - verify certificate and cipher strength", p),
+				Evidence:    fmt.Sprintf("Port %d is open", p),
+			}
+		}
+	}
 	return nil
 }

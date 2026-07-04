@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yourusername/seagles/cache"
 	"github.com/yourusername/seagles/slog"
 )
 

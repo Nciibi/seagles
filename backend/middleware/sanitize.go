@@ -174,10 +174,8 @@ func ValidateFirmwareFile(filename string, data []byte) error {
 	}
 
 	if !matchFound {
-		return nil
+		return &FileValidationError{"File does not match known firmware magic bytes"}
 	}
-
-	_ = matchFound
 	return nil
 }
 

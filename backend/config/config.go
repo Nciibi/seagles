@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -29,13 +30,14 @@ type Config struct {
 	DBMaxOpenConns      int
 	DBMaxIdleConns      int
 	DBConnMaxLifetime   time.Duration
+	AllowedOrigins      []string
 }
 
 func Load() (*Config, error) {
 	_ = godotenv.Load(".env", "../.env")
 
 	cfg := &Config{
-		DatabaseURL:         getEnv("DATABASE_URL", "postgres://ironmesh:changeme_strong_password_here@localhost:5432/ironmesh?sslmode=disable"),
+		DatabaseURL:         getEnv("DATABASE_URL", ""),
 		Port:                getEnv("PORT", "8080"),
 		NetworkCIDR:         getEnv("NETWORK_CIDR", "192.168.1.0/24"),
 		NVDAPIKey:           getEnv("NVD_API_KEY", ""),
@@ -55,6 +57,7 @@ func Load() (*Config, error) {
 		DBMaxOpenConns:      getEnvInt("DB_MAX_OPEN_CONNS", 25),
 		DBMaxIdleConns:      getEnvInt("DB_MAX_IDLE_CONNS", 5),
 		DBConnMaxLifetime:   time.Duration(getEnvInt("DB_CONN_MAX_LIFETIME_MINUTES", 5)) * time.Minute,
+		AllowedOrigins:      getAllowedOrigins(getEnv("ALLOWED_ORIGINS", "")),
 	}
 
 	return cfg, nil
@@ -74,4 +77,19 @@ func getEnvInt(key string, fallback int) int {
 		}
 	}
 	return fallback
+}
+
+func getAllowedOrigins(val string) []string {
+	if val == "" {
+		return nil
+	}
+	parts := strings.Split(val, ",")
+	origins := make([]string, 0, len(parts))
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			origins = append(origins, trimmed)
+		}
+	}
+	return origins
 }

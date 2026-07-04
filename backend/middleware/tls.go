@@ -76,21 +76,22 @@ func NewPinnedHTTPClient(pins []CertPin) *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: false,
+				InsecureSkipVerify: true,
 				VerifyPeerCertificate: func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-					for _, chain := range verifiedChains {
-						if len(chain) == 0 {
-							continue
-						}
-						cert := chain[0]
-						fingerprint := fmt.Sprintf("%x", sha256.Sum256(cert.Raw))
-						for _, pin := range pins {
-							if (strings.Contains(cert.Subject.CommonName, pin.Hostname) ||
-								containsHost(cert.DNSNames, pin.Hostname)) &&
-								fingerprint != pin.SHA256 {
-								return fmt.Errorf("certificate pinning failed for %s: expected %s, got %s",
-									pin.Hostname, pin.SHA256, fingerprint)
-							}
+					if len(rawCerts) == 0 {
+						return fmt.Errorf("no peer certificates provided")
+					}
+					cert, err := x509.ParseCertificate(rawCerts[0])
+					if err != nil {
+						return fmt.Errorf("failed to parse peer certificate: %w", err)
+					}
+					fingerprint := fmt.Sprintf("%x", sha256.Sum256(cert.Raw))
+					for _, pin := range pins {
+						if (strings.Contains(cert.Subject.CommonName, pin.Hostname) ||
+							containsHost(cert.DNSNames, pin.Hostname)) &&
+							fingerprint != pin.SHA256 {
+							return fmt.Errorf("certificate pinning failed for %s: expected %s, got %s",
+								pin.Hostname, pin.SHA256, fingerprint)
 						}
 					}
 					return nil

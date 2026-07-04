@@ -24,6 +24,16 @@ func fail(c *gin.Context, status int, msg string) {
 	c.JSON(status, gin.H{"data": nil, "error": msg})
 }
 
+type HealthStatus struct {
+	Status  string `json:"status"`
+	Service string `json:"service"`
+	Version string `json:"version"`
+	DBOK    bool   `json:"db_ok"`
+	RedisOK bool   `json:"redis_ok"`
+	MinIOOK bool   `json:"minio_ok"`
+	FAOK    bool   `json:"fa_ok"`
+}
+
 func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
@@ -115,12 +125,49 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 
 		v1.GET("/health", func(c *gin.Context) {
 			dbOk := dbpkg.IsHealthy()
-			c.JSON(200, gin.H{
-				"status":  "ok",
-				"service": "ironmesh-api",
-				"version": "2.1.0",
-				"db_ok":   dbOk,
-			})
+			allOk := true
+			if !dbOk {
+				allOk = false
+			}
+
+			hs := HealthStatus{
+				Status:  "ok",
+				Service: "ironmesh-api",
+				Version: "2.1.0",
+				DBOK:    dbOk,
+				RedisOK: cfg.RedisURL == "",
+				MinIOOK: cfg.S3Endpoint == "",
+				FAOK:    cfg.FirmwareAnalyzerURL == "",
+			}
+
+			if cfg.RedisURL != "" {
+				hs.RedisOK = middleware.CheckRedis(cfg.RedisURL)
+				if !hs.RedisOK {
+					allOk = false
+				}
+			}
+			if cfg.S3Endpoint != "" {
+				hs.MinIOOK = middleware.CheckMinIO(cfg.S3Endpoint)
+				if !hs.MinIOOK {
+					allOk = false
+				}
+			}
+			if cfg.FirmwareAnalyzerURL != "" {
+				hs.FAOK = middleware.CheckFirmwareAnalyzer(cfg.FirmwareAnalyzerURL)
+				if !hs.FAOK {
+					allOk = false
+				}
+			}
+
+			if !allOk {
+				hs.Status = "degraded"
+			}
+
+			statusCode := http.StatusOK
+			if !dbOk {
+				statusCode = http.StatusServiceUnavailable
+			}
+			c.JSON(statusCode, hs)
 		})
 
 		protected := v1.Group("")
@@ -162,6 +209,8 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 			protected.GET("/users", auth.AdminOnly(), auth.ListUsersHandler(db))
 			protected.POST("/users", auth.AdminOnly(), auth.RegisterHandler(db))
 			protected.GET("/audit-log", auth.RequireRole("auditor"), middleware.ListAuditLogsHandler(db))
+			protected.GET("/sessions", auth.AdminOnly(), ListSessionsHandler(db))
+			protected.DELETE("/sessions/:id", auth.AdminOnly(), RevokeSessionHandler(db))
 		}
 	}
 

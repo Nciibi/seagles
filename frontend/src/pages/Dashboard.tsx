@@ -54,7 +54,7 @@ export default function Dashboard() {
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
           <LoadingCard height={40} />
-          <LoadingCard width="160px" height={40} />
+          <LoadingCard height={40} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '28px' }}>
           {[1, 2, 3, 4].map((i) => <LoadingCard key={i} height={100} />)}

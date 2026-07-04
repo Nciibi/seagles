@@ -156,7 +156,6 @@ func deliverWebhook(db *sql.DB, wh WebhookConfig, alertID, severity, title, desc
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		db.Exec(`UPDATE alerts SET webhook_sent = TRUE, webhook_sent_at = NOW() WHERE id = $1`, alertID)
 		db.Exec(`UPDATE webhooks SET last_triggered = NOW() WHERE id = $1`, wh.ID)
-		slog.Info("webhook_delivered", "name", wh.Name, "type", wh.WebhookType, "status", resp.StatusCode)
 		return resp.StatusCode, nil
 	}
 

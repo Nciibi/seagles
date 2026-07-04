@@ -17,9 +17,11 @@ services:
       resources:
         limits:
           memory: 512M
+    networks:
+      - ironmesh-internal
 
   pgbouncer:
-    image: edoburu/pgbouncer:latest
+    image: edoburu/pgbouncer:1.23
     restart: unless-stopped
     environment:
       DATABASE_URL: postgres://ironmesh:${DB_PASSWORD}@postgres:5432/ironmesh
@@ -32,6 +34,8 @@ services:
       resources:
         limits:
           memory: 128M
+    networks:
+      - ironmesh-internal
 
   redis:
     image: redis:7-alpine
@@ -47,9 +51,11 @@ services:
       resources:
         limits:
           memory: 128M
+    networks:
+      - ironmesh-internal
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2024-07-01T01-30-04Z
     command: server /data --console-address ":9001"
     restart: unless-stopped
     environment:
@@ -60,18 +66,29 @@ services:
       - "9001:9001"
     volumes:
       - s3_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     deploy:
       resources:
         limits:
           memory: 512M
+    networks:
+      - ironmesh-internal
 
   backend:
     build: ./backend
     restart: unless-stopped
     depends_on:
-      - pgbouncer
-      - minio
-      - redis
+      pgbouncer:
+        condition: service_started
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgres://ironmesh:${DB_PASSWORD}@pgbouncer:5432/ironmesh?sslmode=disable
       PORT: 8080
@@ -94,13 +111,18 @@ services:
       DB_CONN_MAX_LIFETIME_MINUTES: ${DB_CONN_MAX_LIFETIME_MINUTES:-5}
     ports:
       - "8080:8080"
-    network_mode: host
     cap_add:
       - NET_ADMIN
       - NET_RAW
     volumes:
       - ./data:/app/data
       - firmware_uploads:/app/data/firmware-uploads
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -110,12 +132,15 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    networks:
+      - ironmesh-internal
 
   firmware-analyzer:
     build: ./firmware-analyzer
     restart: unless-stopped
     depends_on:
-      - pgbouncer
+      pgbouncer:
+        condition: service_started
     environment:
       DATABASE_URL: postgres://ironmesh:${DB_PASSWORD}@pgbouncer:5432/ironmesh?sslmode=disable
       NVD_API_KEY: ${NVD_API_KEY:-}
@@ -123,6 +148,12 @@ services:
       - firmware_uploads:/firmware
     ports:
       - "8001:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -132,6 +163,8 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    networks:
+      - ironmesh-internal
 
   frontend:
     build: ./frontend
@@ -141,32 +174,45 @@ services:
     ports:
       - "3000:80"
     environment:
-      REACT_APP_API_URL: /api/v1
+      VITE_API_URL: /api/v1
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     deploy:
       resources:
         limits:
           memory: 128M
+    networks:
+      - ironmesh-internal
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.53.0
     restart: unless-stopped
     volumes:
       - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
     deploy:
       resources:
         limits:
           memory: 256M
+    networks:
+      - ironmesh-internal
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.1.0
     restart: unless-stopped
     depends_on:
       - prometheus
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
       GF_INSTALL_PLUGINS: ""
     volumes:
       - ./docker/grafana/datasources:/etc/grafana/provisioning/datasources
@@ -178,6 +224,8 @@ services:
       resources:
         limits:
           memory: 256M
+    networks:
+      - ironmesh-internal
 
 volumes:
   postgres_data:
@@ -186,3 +234,10 @@ volumes:
   redis_data:
   prometheus_data:
   grafana_data:
+
+networks:
+  ironmesh-internal:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

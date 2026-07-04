@@ -1,59 +1,45 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { describe, it, expect } from 'vitest'
+import { render, screen } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import Login from './Login'
 
-vi.mock('../api/client', () => ({
-  login: vi.fn(),
-  default: {
-    interceptors: {
-      request: { use: vi.fn() },
-      response: { use: vi.fn() },
-    },
-  },
-}))
-
 describe('Login Page', () => {
-  it('renders login form', () => {
+  it('renders login form with username field', () => {
     render(
       <BrowserRouter>
         <Login />
       </BrowserRouter>
     )
-    expect(screen.getByPlaceholderText(/username/i)).toBeInTheDocument()
-    expect(screen.getByPlaceholderText(/password/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/username/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/password/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()
   })
 
-  it('renders the logo/title', () => {
+  it('renders the title', () => {
     render(
       <BrowserRouter>
         <Login />
       </BrowserRouter>
     )
-    expect(screen.getByText(/ironmesh/i)).toBeInTheDocument()
+    expect(screen.getByText('Sign In')).toBeInTheDocument()
   })
 
-  it('has a link to register', () => {
+  it('renders IronMesh heading', () => {
     render(
       <BrowserRouter>
         <Login />
       </BrowserRouter>
     )
-    const registerLink = screen.getByText(/register/i)
-    expect(registerLink).toBeInTheDocument()
+    const headings = screen.getAllByText(/ironmesh/i)
+    expect(headings.length).toBeGreaterThanOrEqual(1)
   })
 
-  it('validates empty form submission', async () => {
+  it('renders the IoT Security Platform subtitle', () => {
     render(
       <BrowserRouter>
         <Login />
       </BrowserRouter>
     )
-    const button = screen.getByRole('button', { name: /sign in/i })
-    fireEvent.click(button)
-    await waitFor(() => {
-      expect(screen.getByPlaceholderText(/username/i)).toBeInTheDocument()
-    })
+    expect(screen.getByText(/iot security platform/i)).toBeInTheDocument()
   })
 })

@@ -97,7 +97,7 @@
 
 | Task | Files | Description |
 |------|-------|-------------|
-| API handler tests | `api/*_test.go` | `httptest.NewServer` + mock DB for all 40+ endpoints — health, auth, devices, scans, vulns, firmware, alerts, safelists, webhooks, users, audit-log |
+| API handler tests | `api/handlers_test.go` | `httptest` + sqlmock for 28+ test cases across all handler files — devices, scans, vulns, alerts, firmware, safelists, webhooks, scan-scopes, scan-profiles, stats, risk-breakdown, health ✅ |
 | Middleware integration tests | `middleware/*_test.go` | Chain middleware with `httptest`, test audit log writes, TLS enforcement, metrics output, full sanitize flow with real HTTP requests |
 | Scanner exec mocks | `scanner/*_test.go` | Interface-based `exec.Command` mock for `DiscoverHosts`/`DeepScan` tests, test XML parsing, error paths |
 | Protocol detection tests | `scanner/protocols_test.go` | Table-driven tests with mock TCP connections for Telnet, ADB, Modbus, MQTT, RTSP, TLS detection |

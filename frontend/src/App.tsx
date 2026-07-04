@@ -31,12 +31,17 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   const location = useLocation()
   const [user, setUser] = useState<any>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     const stored = localStorage.getItem('ironmesh_user')
     if (stored) {
       try { setUser(JSON.parse(stored)) } catch { /* ignore invalid JSON */ }
     }
+  }, [location])
+
+  useEffect(() => {
+    setSidebarOpen(false)
   }, [location])
 
   const handleLogout = async () => {
@@ -66,8 +71,24 @@ export default function App() {
   return (
     <ErrorBoundary>
       <ProtectedRoute>
+        {/* Mobile overlay */}
+        {sidebarOpen && (
+          <div
+            onClick={() => setSidebarOpen(false)}
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+              zIndex: 39, display: 'none',
+            }}
+            className="sidebar-overlay"
+            aria-hidden="true"
+          />
+        )}
+
         <div style={{ display: 'flex', minHeight: '100vh' }}>
-          <aside className="sidebar">
+          <aside className="sidebar" style={{
+            transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+            transition: 'transform 0.2s ease',
+          }}>
             <div style={{ padding: '24px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{ fontSize: '1.5rem' }}>🛡️</span>
@@ -111,7 +132,7 @@ export default function App() {
                       background: 'none', border: 'none', color: 'var(--text-muted)',
                       cursor: 'pointer', fontSize: '0.75rem', padding: '4px 8px',
                     }}
-                    title="Sign Out"
+                    aria-label="Sign Out"
                   >
                     ↪ Out
                   </button>
@@ -123,7 +144,26 @@ export default function App() {
             </div>
           </aside>
 
-          <main style={{ marginLeft: '240px', flex: 1, padding: '24px 32px', minWidth: 0 }}>
+          <main style={{
+            marginLeft: '240px',
+            flex: 1,
+            padding: '24px 32px',
+            minWidth: 0,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }} className="mobile-header">
+              <button
+                onClick={() => setSidebarOpen(true)}
+                style={{
+                  background: 'none', border: 'none', color: 'var(--text-secondary)',
+                  cursor: 'pointer', fontSize: '1.5rem', padding: '4px',
+                  display: 'none',
+                }}
+                className="hamburger"
+                aria-label="Open navigation menu"
+              >
+                ☰
+              </button>
+            </div>
             <ErrorBoundary>
               <Suspense fallback={<Loading text="Loading page..." />}>
                 <Routes>

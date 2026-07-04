@@ -173,6 +173,8 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 		protected.Use(auth.AuthMiddleware())
 		{
 			protected.GET("/auth/me", auth.MeHandler())
+			protected.POST("/auth/logout", auth.LogoutHandler())
+			protected.POST("/auth/change-password", auth.ChangePasswordHandler(db))
 			protected.GET("/stats", StatsHandler(db))
 			protected.GET("/devices", ListDevicesHandler(db))
 			protected.GET("/devices/:id", GetDeviceHandler(db))

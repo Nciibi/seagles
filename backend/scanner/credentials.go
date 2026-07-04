@@ -200,7 +200,7 @@ func TestHTTPBasicCreds(ip string, port int, path string, creds []Credential, ma
 
 func TestTelnetCreds(ip string, port int, creds []Credential, maxPairs int) CredentialResult {
 	result := CredentialResult{Method: "telnet"}
-	addr := fmt.Sprintf("%s:%d", ip, port)
+	addr := net.JoinHostPort(ip, strconv.Itoa(port))
 
 	limit := maxPairs
 	if limit > 50 {

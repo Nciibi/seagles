@@ -110,7 +110,7 @@ export default function Vulnerabilities() {
                 <td><span className={`badge badge-${v.severity}`}>{v.severity}</span></td>
                 <td>
                   {v.cve_id ? (
-                    <a href={`https://nvd.nist.gov/vuln/detail/${v.cve_id}`} target="_blank" rel="noopener" style={{ color: 'var(--accent)', fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                    <a href={`https://nvd.nist.gov/vuln/detail/${v.cve_id}`} target="_blank" rel="noreferrer noopener" style={{ color: 'var(--accent)', fontFamily: 'monospace', fontSize: '0.8rem' }}>
                       {v.cve_id}
                     </a>
                   ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}

@@ -43,17 +43,17 @@ function SafelistsTab({ isAdmin }: { isAdmin: boolean }) {
   const [form, setForm] = useState({ entry_type: 'ip', value: '', reason: '' })
 
   const fetch = async () => {
-    try { const r = await getSafelists(); setEntries(r.data ?? []) } catch {}
+    try { const r = await getSafelists(); setEntries(r.data ?? []) } catch (e) { console.error('Failed to fetch safelists:', e) }
   }
   useEffect(() => { fetch() }, [])
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
-    try { await createSafelist(form); setForm({ entry_type: 'ip', value: '', reason: '' }); fetch() } catch {}
+    try { await createSafelist(form); setForm({ entry_type: 'ip', value: '', reason: '' }); fetch() } catch (e) { console.error('Failed to create safelist:', e) }
   }
 
   const handleDelete = async (id: string) => {
-    try { await deleteSafelist(id); fetch() } catch {}
+    try { await deleteSafelist(id); fetch() } catch (e) { console.error('Failed to delete safelist:', e) }
   }
 
   return (
@@ -107,13 +107,13 @@ function WebhooksTab({ isAdmin }: { isAdmin: boolean }) {
   const [form, setForm] = useState({ name: '', url: '', webhook_type: 'slack', min_severity: 'high' })
 
   const fetch = async () => {
-    try { const r = await getWebhooks(); setWebhooks(r.data ?? []) } catch {}
+    try { const r = await getWebhooks(); setWebhooks(r.data ?? []) } catch (e) { console.error('Failed to fetch webhooks:', e) }
   }
   useEffect(() => { fetch() }, [])
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
-    try { await createWebhook(form); setForm({ name: '', url: '', webhook_type: 'slack', min_severity: 'high' }); fetch() } catch {}
+    try { await createWebhook(form); setForm({ name: '', url: '', webhook_type: 'slack', min_severity: 'high' }); fetch() } catch (e) { console.error('Failed to create webhook:', e) }
   }
 
   return (
@@ -174,7 +174,7 @@ function WebhooksTab({ isAdmin }: { isAdmin: boolean }) {
 
 function ProfilesTab() {
   const [profiles, setProfiles] = useState<ScanProfile[]>([])
-  useEffect(() => { getScanProfiles().then(r => setProfiles(r.data ?? [])).catch(() => {}) }, [])
+  useEffect(() => { getScanProfiles().then(r => setProfiles(r.data ?? [])).catch(e => console.error('Failed to fetch scan profiles:', e)) }, [])
 
   return (
       <div className="card table-wrapper" style={{ overflow: 'hidden' }}>
@@ -203,12 +203,12 @@ function ScopesTab({ isAdmin }: { isAdmin: boolean }) {
   const [scopes, setScopes] = useState<ScanScope[]>([])
   const [form, setForm] = useState({ cidr: '', label: '' })
 
-  const fetch = async () => { try { const r = await getScanScopes(); setScopes(r.data ?? []) } catch {} }
+  const fetch = async () => { try { const r = await getScanScopes(); setScopes(r.data ?? []) } catch (e) { console.error('Failed to fetch scan scopes:', e) } }
   useEffect(() => { fetch() }, [])
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
-    try { await createScanScope(form); setForm({ cidr: '', label: '' }); fetch() } catch {}
+    try { await createScanScope(form); setForm({ cidr: '', label: '' }); fetch() } catch (e) { console.error('Failed to create scan scope:', e) }
   }
 
   return (
@@ -253,12 +253,12 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
   const [form, setForm] = useState({ username: '', email: '', password: '', role: 'viewer' })
   const [showForm, setShowForm] = useState(false)
 
-  const fetch = async () => { try { const r = await getUsers(); setUsers(r.data ?? []) } catch {} }
+  const fetch = async () => { try { const r = await getUsers(); setUsers(r.data ?? []) } catch (e) { console.error('Failed to fetch users:', e) } }
   useEffect(() => { fetch() }, [])
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
-    try { await createUser(form); setForm({ username: '', email: '', password: '', role: 'viewer' }); setShowForm(false); fetch() } catch {}
+    try { await createUser(form); setForm({ username: '', email: '', password: '', role: 'viewer' }); setShowForm(false); fetch() } catch (e) { console.error('Failed to create user:', e) }
   }
 
   return (

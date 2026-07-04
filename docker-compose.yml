@@ -84,7 +84,7 @@ services:
     restart: unless-stopped
     depends_on:
       pgbouncer:
-        condition: service_started
+        condition: service_healthy
       minio:
         condition: service_healthy
       redis:
@@ -140,7 +140,7 @@ services:
     restart: unless-stopped
     depends_on:
       pgbouncer:
-        condition: service_started
+        condition: service_healthy
     environment:
       DATABASE_URL: postgres://ironmesh:${DB_PASSWORD}@pgbouncer:5432/ironmesh?sslmode=disable
       NVD_API_KEY: ${NVD_API_KEY:-}

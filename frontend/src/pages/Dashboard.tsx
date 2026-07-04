@@ -1,9 +1,8 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { getStats, getAlerts, triggerNetworkScan, type Stats, type Alert } from '../api/client'
 import AlertFeed from '../components/AlertFeed'
 import RiskScore from '../components/RiskScore'
 import { Loading, LoadingCard } from '../components/Loading'
-import { severityColor } from '../utils/helpers'
 
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null)
@@ -12,6 +11,7 @@ export default function Dashboard() {
   const [scanning, setScanning] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const scanTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
 
   const fetchData = useCallback(async () => {
     try {
@@ -37,6 +37,12 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [fetchData])
 
+  useEffect(() => {
+    return () => {
+      if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current)
+    }
+  }, [])
+
   const handleNetworkScan = async () => {
     setScanning(true)
     try {
@@ -44,7 +50,7 @@ export default function Dashboard() {
     } catch (e) {
       console.error('Network scan failed:', e)
     }
-    setTimeout(() => {
+    scanTimeoutRef.current = setTimeout(() => {
       setScanning(false)
       fetchData()
     }, 3000)

@@ -1,4 +1,4 @@
-.PHONY: all build test lint fmt vet clean docker-build docker-up security-scan help
+.PHONY: all build build-backend build-frontend test test-backend test-frontend test-backend-race lint lint-backend lint-frontend fmt vet clean docker-build docker-up docker-down docker-logs security-scan help
 
 GO_DIR := backend
 FRONTEND_DIR := frontend

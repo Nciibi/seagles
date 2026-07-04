@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { getDevice, getRiskBreakdown, getVulnerabilities, getScans, resolveVuln, triggerScan, type Device, type Vulnerability, type Scan, type RiskBreakdown } from '../api/client'
 import RiskScore from '../components/RiskScore'
@@ -13,8 +13,11 @@ export default function DeviceDetail() {
   const [activeTab, setActiveTab] = useState<'vulns' | 'scans' | 'firmware'>('vulns')
   const [openVulns, setOpenVulns] = useState(0)
   const [scanning, setScanning] = useState(false)
+  const abortRef = useRef(false)
+  const scanTimerRef = useRef<ReturnType<typeof setTimeout>>()
 
   const fetchAll = async () => {
+    abortRef.current = false
     if (!id) return
     try {
       const [devRes, bdRes, vulnRes, scanRes] = await Promise.all([
@@ -23,18 +26,31 @@ export default function DeviceDetail() {
         getVulnerabilities({ device_id: id }),
         getScans(),
       ])
+      if (abortRef.current) return
       const devData = devRes.data!
       setDevice(devData.device)
       setOpenVulns(devData.open_vulnerabilities)
+      if (abortRef.current) return
       setBreakdown(bdRes.data as unknown as RiskBreakdown)
+      if (abortRef.current) return
       setVulns(vulnRes.data as unknown as Vulnerability[])
+      if (abortRef.current) return
       setScans((scanRes.data as unknown as Scan[]).filter((s) => s.device_id === id))
     } catch (e) {
       console.error('Failed to fetch device:', e)
     }
   }
 
-  useEffect(() => { fetchAll() }, [id])
+  useEffect(() => {
+    fetchAll()
+    return () => { abortRef.current = true }
+  }, [id])
+
+  useEffect(() => {
+    return () => {
+      if (scanTimerRef.current) clearTimeout(scanTimerRef.current)
+    }
+  }, [])
 
   const handleResolve = async (vulnId: string) => {
     try {
@@ -49,7 +65,7 @@ export default function DeviceDetail() {
     if (!id) return
     setScanning(true)
     try { await triggerScan(id) } catch (e) { console.error(e) }
-    setTimeout(() => { setScanning(false); fetchAll() }, 3000)
+    scanTimerRef.current = setTimeout(() => { setScanning(false); fetchAll() }, 3000)
   }
 
   if (!device) return <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading device...</div>
@@ -145,7 +161,7 @@ export default function DeviceDetail() {
               ) : vulns.map((v) => (
                 <tr key={v.id} style={{ cursor: 'default' }}>
                   <td><span className={`badge badge-${v.severity}`}>{v.severity}</span></td>
-                  <td>{v.cve_id ? <a href={`https://nvd.nist.gov/vuln/detail/${v.cve_id}`} target="_blank" rel="noopener" style={{ color: 'var(--accent)' }}>{v.cve_id}</a> : '—'}</td>
+                  <td>{v.cve_id ? <a href={`https://nvd.nist.gov/vuln/detail/${v.cve_id}`} target="_blank" rel="noreferrer noopener" style={{ color: 'var(--accent)' }}>{v.cve_id}</a> : '—'}</td>
                   <td>{v.title}</td>
                   <td>{v.cvss_score?.toFixed(1) || '—'}</td>
                   <td>{v.is_kev ? <span className="badge badge-kev">KEV</span> : '—'}</td>

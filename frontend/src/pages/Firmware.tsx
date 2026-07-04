@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { getFirmware, analyzeFirmware, uploadFirmware, type Firmware } from '../api/client'
 import { entropyColor, entropyLabel } from '../utils/helpers'
 import { LoadingCard } from '../components/Loading'
@@ -9,6 +9,7 @@ export default function FirmwarePage() {
   const [uploading, setUploading] = useState(false)
   const [uploadMsg, setUploadMsg] = useState('')
   const [loading, setLoading] = useState(true)
+  const analyzeTimerRef = useRef<ReturnType<typeof setTimeout>>()
 
   const fetchFirmware = async () => {
     setLoading(true)
@@ -24,10 +25,16 @@ export default function FirmwarePage() {
 
   useEffect(() => { fetchFirmware() }, [])
 
+  useEffect(() => {
+    return () => {
+      if (analyzeTimerRef.current) clearTimeout(analyzeTimerRef.current)
+    }
+  }, [])
+
   const handleAnalyze = async (id: string) => {
     setAnalyzingId(id)
     try { await analyzeFirmware(id) } catch (e) { console.error(e) }
-    setTimeout(() => { setAnalyzingId(null); fetchFirmware() }, 5000)
+    analyzeTimerRef.current = setTimeout(() => { setAnalyzingId(null); fetchFirmware() }, 5000)
   }
 
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {

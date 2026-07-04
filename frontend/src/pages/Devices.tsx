@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getDevices, triggerScan, type Device } from '../api/client'
 import { severityBadge, timeAgo } from '../utils/helpers'
@@ -11,10 +11,17 @@ export default function Devices() {
   const [riskFilter, setRiskFilter] = useState('')
   const [scanningId, setScanningId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const scanTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const navigate = useNavigate()
 
   useEffect(() => {
     fetchDevices()
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (scanTimerRef.current) clearTimeout(scanTimerRef.current)
+    }
   }, [])
 
   const fetchDevices = async () => {
@@ -37,7 +44,7 @@ export default function Devices() {
     } catch (err) {
       console.error('Scan failed:', err)
     }
-    setTimeout(() => {
+    scanTimerRef.current = setTimeout(() => {
       setScanningId(null)
       fetchDevices()
     }, 3000)

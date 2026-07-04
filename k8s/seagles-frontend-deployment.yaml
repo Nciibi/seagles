@@ -16,9 +16,10 @@ spec:
         app: seagles-frontend
     spec:
       securityContext:
-        runAsUser: 101
-        runAsGroup: 101
-        fsGroup: 101
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        runAsNonRoot: true
       containers:
       - name: seagles-frontend
         image: your-registry.com/seagles-frontend:v2.0.0

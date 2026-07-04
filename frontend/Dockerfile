@@ -5,7 +5,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM nginx:alpine
+FROM nginx:1.26-alpine
 RUN addgroup -S ironmesh && adduser -S -G ironmesh ironmesh
 
 COPY --from=builder /app/dist /usr/share/nginx/html

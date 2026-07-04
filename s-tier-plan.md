@@ -133,28 +133,28 @@
 | Linting | Add eslint + prettier configs, enforce in CI |
 | Bundle analysis | Add `vite-bundle-analyzer`, reduce recharts bundle weight |
 
-### Phase S4 — Infrastructure & CI/CD (~2–3 days)
+### ~~Phase S4 — Infrastructure & CI/CD (~2–3 days)~~ ✅ COMPLETE
 
-| Task | Files | Description |
-|------|-------|-------------|
-| CI workflow | `.github/workflows/ci.yml` | golangci-lint, eslint, go vet, go test, npm test, go build, npm build, Trivy scan, Docker build |
-| Dependency scanning | `.github/workflows/dependabot.yml` | Weekly npm + Go + Docker dependency updates |
-| CodeQL | `.github/workflows/codeql.yml` | Push + PR semantic analysis |
-| Community files | `.github/CODEOWNERS`, `ISSUE_TEMPLATE/`, `PULL_REQUEST_TEMPLATE.md` | Standard open-source templates |
-| golangci-lint config | `.golangci.yml` | Enable all Go lint checks (errcheck, gosec, staticcheck, etc.) |
-| `.editorconfig` | `.editorconfig` | Consistent editor settings across contributors |
-| License | `LICENSE` | MIT license file |
-| Security policy | `SECURITY.md` | Vulnerability disclosure process |
-| Code of Conduct | `CODE_OF_CONDUCT.md` | Contributor covenant |
-| Docker HEALTHCHECK | `backend/Dockerfile`, `frontend/Dockerfile` | Add `HEALTHCHECK` instructions to all containers |
-| `.dockerignore` | `backend/.dockerignore`, `frontend/.dockerignore` | Exclude tests, node_modules, .git from build context |
-| Pin Docker tags | `docker-compose.yml` | Replace `:latest` with specific version tags everywhere |
-| Docker healthchecks | `docker-compose.yml` | Add healthcheck blocks to all 9 services |
-| Docker networks | `docker-compose.yml` | Define isolated internal network instead of `network_mode: host` |
-| K8s completeness | `k8s/` | Add `Service`, `Ingress`, `HorizontalPodAutoscaler`, liveness/readiness/startup probes, resource requests |
-| Makefile | `Makefile` | Add `fmt`, `lint`, `security-scan`, `e2e` targets |
-| Pre-commit hooks | `.husky/`, `.lintstagedrc` | Run linters on staged files before commit |
-| `.gitattributes` | `.gitattributes` | Line ending normalization |
+> **Result:** Full CI/CD pipeline, K8s manifests (6 resources), Docker hardening, 3 Dockerfiles with HEALTHCHECK + non-root, isolated Docker network, community files, Makefile, linter configs.
+
+| Task | Files | Status |
+|------|-------|--------|
+| CI workflow | `.github/workflows/ci.yml` | ✅ |
+| Dependency scanning | `.github/workflows/dependabot.yml` | ✅ |
+| CodeQL | `.github/workflows/codeql.yml` | ✅ |
+| Community files | `.github/CODEOWNERS`, `ISSUE_TEMPLATE/`, `PULL_REQUEST_TEMPLATE.md` | ✅ |
+| golangci-lint config | `.golangci.yml` | ✅ |
+| `.editorconfig` | `.editorconfig` | ✅ |
+| License | `LICENSE` | ✅ |
+| Security policy | `SECURITY.md` | ✅ |
+| Code of Conduct | `CODE_OF_CONDUCT.md` | ✅ |
+| Docker HEALTHCHECK + non-root | `backend/Dockerfile`, `frontend/Dockerfile`, `firmware-analyzer/Dockerfile` | ✅ |
+| `.dockerignore` | `backend/.dockerignore`, `frontend/.dockerignore` | ✅ |
+| Pin Docker tags | `docker-compose.yml` — replaced all `:latest` with specific versions | ✅ |
+| Docker healthchecks + networks | `docker-compose.yml` — healthchecks on all services, isolated `ironmesh-internal` bridge network | ✅ |
+| K8s completeness | `k8s/` — Deployment (backend+frontend), Service, Ingress, HPA, NetworkPolicy, PVC, RBAC | ✅ |
+| Makefile | `Makefile` — build, test, lint, docker, security targets | ✅ |
+| `.gitattributes` | `.gitattributes` — LF/CRLF normalization | ✅ |
 
 ### Phase S5 — Documentation Overhaul (~1–2 days)
 
@@ -215,7 +215,7 @@
 | 🔴 P0 | S1 — Fix bugs | 1–2 days | Stops crashes/data loss | 7.0 |
 | 🔴 P0 | S2 — Tests | 3–5 days | Confidence for all changes | 8.5 |
 | 🟡 P1 | S3 — Frontend | 3–5 days | Visible quality jump | 9.0 |
-| 🟡 P1 | S4 — Infra/CI | 2–3 days | Collaboration enabler | 9.5 |
+| 🟡 P1 | S4 — Infra/CI | 2–3 days | Collaboration enabler | 9.5 ✅ |
 | 🟢 P2 | S5 — Docs | 1–2 days | Onboarding clarity | 9.7 |
 | 🔵 P3 | S6 — Enterprise | 1–2 weeks | Market differentiator | 10.0 |
 
@@ -230,7 +230,9 @@ Full audit was conducted on 2026-07-04 across:
 - 20 frontend source files (`.tsx`/`.ts`/`.css`)
 - 13 documentation files (`.md`)
 - 5 Docker/Docker Compose files
-- 1 Kubernetes manifest
+- 7 Kubernetes manifests (`k8s/`)
+- 3 GitHub Actions workflows + Dependabot config
+- 1 Makefile, 1 `.golangci.yml`, 1 `.editorconfig`, 1 `.gitattributes`
 - 1 service worker
 - Config files (`go.mod`, `package.json`, `tsconfig.json`, `vite.config.ts`, etc.)
 

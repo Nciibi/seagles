@@ -50,6 +50,11 @@ cd backend && go run .
 - `client.send` channel buffer (256) may be full
 - Client must send `pong` within 60s of receiving `ping`
 - Unauthenticated connections are rejected
+- Check `ALLOWED_ORIGINS` env var includes your frontend URL
+
+**Fix:**
+- Ensure WebSocket client sends `pong` on each `ping`
+- Configure `ALLOWED_ORIGINS` (comma-separated) in `.env`
 
 ### KEV/EPSS errors in logs
 
@@ -59,6 +64,21 @@ cd backend && go run .
 - KEV: uses last cached catalog file
 - EPSS: returns vulnerabilities without EPSS scores
 - Circuit breaker auto-recovers after 30s (configurable)
+
+### CORS errors in browser console
+
+**Cause:** Browser is blocking cross-origin requests because the `Origin` header doesn't match the server's whitelist.
+
+**Check:**
+```bash
+# Verify ALLOWED_ORIGINS is set
+docker compose exec backend env | grep ALLOWED_ORIGINS
+```
+
+**Fix:** Set `ALLOWED_ORIGINS` in `.env` to your frontend URL:
+```
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+```
 
 ### Auth fails after deployment
 
@@ -87,10 +107,80 @@ JWT_PRIVATE_KEY_FILE=/path/to/jwt-private.pem
 **Check:**
 ```bash
 # Current connections
-SELECT count(*) FROM pg_stat_activity WHERE datname = 'ironmesh';
+docker compose exec postgres psql -U ironmesh -c "SELECT count(*) FROM pg_stat_activity WHERE datname = 'ironmesh';"
 ```
 
 **Fix:** Lower `DB_MAX_OPEN_CONNS` or increase PostgreSQL `max_connections`.
+
+### Redis connection errors
+
+**Cause:** Redis is not running or `REDIS_URL` is misconfigured.
+
+**Check:**
+```bash
+docker compose ps redis
+docker compose logs redis
+```
+
+**Note:** Redis is optional. The system falls back to in-memory cache if Redis is unavailable.
+
+### MinIO connection errors
+
+**Cause:** MinIO is not running or credentials are wrong.
+
+**Check:**
+```bash
+docker compose ps minio
+docker compose logs minio
+# Test MinIO health
+curl http://localhost:9000/minio/health/live
+```
+
+**Fix:** Verify `S3_ACCESS_KEY` and `S3_SECRET_KEY` in `.env` match MinIO configuration.
+
+### PgBouncer errors
+
+**Symptoms:** `could not connect to server: Connection refused`, `no pg_hba.conf entry`
+
+**Check:**
+```bash
+docker compose logs pgbouncer
+```
+
+**Fix:** Ensure PostgreSQL is healthy before PgBouncer starts:
+```bash
+docker compose restart pgbouncer
+```
+
+### Firmware Analyzer not responding
+
+**Cause:** The Python FastAPI service failed to start or crashed.
+
+**Check:**
+```bash
+docker compose logs firmware-analyzer
+# Test directly
+curl http://localhost:8001/health
+```
+
+**Fix:** Ensure `DATABASE_URL` env var is set for the firmware-analyzer. The service may take 10-15 seconds to start due to dependency installation.
+
+### Frontend shows blank page
+
+**Cause:** JavaScript error during load, or API unreachable.
+
+**Check:**
+```bash
+# Browser dev console for errors
+# Check API connectivity
+curl http://localhost:8080/api/v1/health
+# Check frontend is serving
+curl http://localhost:3000
+```
+
+**Fix:** Clear browser cache and reload. If API is unreachable, check backend logs.
+
+---
 
 ## Debug Mode
 
@@ -103,6 +193,8 @@ Check specific request IDs in logs:
 ```bash
 docker compose logs backend | grep <request-id>
 ```
+
+---
 
 ## Health Check
 
@@ -121,3 +213,40 @@ Response:
 ```
 
 If `db_ok` is `false`, the DB health monitor has detected connectivity issues and is attempting to reconnect (5 retries, 2s apart).
+
+---
+
+## Container Status
+
+Check all services:
+```bash
+docker compose ps
+docker compose logs --tail=50
+```
+
+Check resource usage:
+```bash
+docker stats
+```
+
+---
+
+## Kubernetes
+
+### Pod not starting
+```bash
+kubectl describe pod -n security-tools -l app=seagles-backend
+kubectl logs -n security-tools -l app=seagles-backend
+```
+
+### Secrets not found
+```bash
+kubectl get secrets -n security-tools
+kubectl describe secret seagles-db-secrets -n security-tools
+```
+
+### Ingress not working
+```bash
+kubectl describe ingress seagles-ingress -n security-tools
+kubectl get events -n security-tools
+```

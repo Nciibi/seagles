@@ -20,7 +20,7 @@ def lookup_cve(vendor: str, version: str, api_key: str = None) -> list[dict]:
     if not keyword or keyword == " ":
         return []
 
-    headers = {"User-Agent": "IronMesh-Security-Scanner/1.0"}
+    headers = {"User-Agent": "Seagles-Security-Scanner/1.0"}
     if api_key:
         headers["apiKey"] = api_key
 

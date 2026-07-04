@@ -50,7 +50,7 @@ func FetchKEV(cacheFilePath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create KEV request: %v", err)
 	}
-	req.Header.Set("User-Agent", "IronMesh-Security-Scanner/2.0")
+	req.Header.Set("User-Agent", "Seagles-Security-Scanner/2.0")
 
 	var resp *http.Response
 	err = kevBreaker.Execute(func() error {

@@ -205,7 +205,7 @@ func UploadFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		tempDir := "/tmp/ironmesh-uploads"
+		tempDir := "/tmp/seagles-uploads"
 		os.MkdirAll(tempDir, 0750)
 		tempPath := filepath.Join(tempDir, filepath.Base(header.Filename))
 
@@ -241,7 +241,7 @@ func UploadFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 			if mErr == nil {
 				bucketName := cfg.S3Bucket
 				if bucketName == "" {
-					bucketName = "ironmesh-firmware"
+					bucketName = "seagles-firmware"
 				}
 
 				ctx := context.Background()

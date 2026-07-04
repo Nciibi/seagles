@@ -1,6 +1,6 @@
 {
-  "name": "IronMesh IoT Security",
-  "short_name": "IronMesh",
+  "name": "Seagles IoT Security",
+  "short_name": "Seagles",
   "description": "IoT Security Platform - Discover vulnerable devices before attackers do",
   "start_url": "/",
   "display": "standalone",

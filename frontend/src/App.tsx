@@ -97,7 +97,7 @@ export default function App() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <img
                   src="/seagles-logo.png"
-                  alt="IronMesh Logo"
+                  alt="Seagles Logo"
                   style={{
                     width: '36px',
                     height: '36px',
@@ -107,7 +107,7 @@ export default function App() {
                 />
                 <div>
                   <h1 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent)', lineHeight: 1.2 }}>
-                    IronMesh
+                    Seagles
                   </h1>
                   <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
                     IoT Security
@@ -152,7 +152,7 @@ export default function App() {
                 </div>
               )}
               <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                IronMesh v2.1.0
+                Seagles v2.1.0
               </div>
             </div>
           </aside>

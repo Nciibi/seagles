@@ -6,16 +6,16 @@ RUN apt-get update && apt-get install -y \
     binutils \
     && rm -rf /var/lib/apt/lists/*
 
-RUN addgroup -S ironmesh && adduser -S -G ironmesh ironmesh
+RUN addgroup -S seagles && adduser -S -G seagles seagles
 
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-RUN chown -R ironmesh:ironmesh /app
+RUN chown -R seagles:seagles /app
 
-USER ironmesh
+USER seagles
 
 EXPOSE 8001
 

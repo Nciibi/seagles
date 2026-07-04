@@ -1,4 +1,4 @@
-# IronMesh API Documentation
+# Seagles API Documentation
 
 Base URL: `/api/v1`
 
@@ -762,7 +762,7 @@ Returns the role, permission list, and hierarchy level for the current user.
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "IronMesh API",
+    "title": "Seagles API",
     "version": "2.1.0"
   },
   "paths": {

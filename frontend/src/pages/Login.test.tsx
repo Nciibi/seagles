@@ -26,7 +26,7 @@ describe('Login Page', () => {
     expect(screen.getByText('Sign In')).toBeInTheDocument()
   })
 
-  it('renders IronMesh heading', () => {
+  it('renders Seagles heading', () => {
     render(
       <BrowserRouter>
         <Login />

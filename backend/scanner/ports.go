@@ -2,7 +2,7 @@ package scanner
 
 // IoT-specific port definitions for scanning
 
-// CommonIoTPorts lists the ports IronMesh scans for IoT devices.
+// CommonIoTPorts lists the ports Seagles scans for IoT devices.
 var CommonIoTPorts = []int{
 	22,    // SSH
 	23,    // Telnet (immediate red flag)

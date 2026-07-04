@@ -1,7 +1,7 @@
-# IronMesh
+# Seagles
 
 <p align="center">
-  <img src="banner.png" alt="IronMesh Banner" width="100%">
+  <img src="banner.png" alt="Seagles Banner" width="100%">
 </p>
 
 **Open-source IoT security platform. Find vulnerable devices before attackers do.**
@@ -19,7 +19,7 @@
 
 820,000 IoT attacks happen every day. Most are through default credentials that nobody changed. Most companies have no idea what IoT devices are on their network, let alone whether they're secure.
 
-IronMesh discovers every IoT device on your network, scans them for real CVEs, tests for default credentials (admin/admin, root/root — the ones botnets use), analyzes firmware for malware indicators, and scores each device's risk from 0 to 10. When something is wrong, you know immediately.
+Seagles discovers every IoT device on your network, scans them for real CVEs, tests for default credentials (admin/admin, root/root — the ones botnets use), analyzes firmware for malware indicators, and scores each device's risk from 0 to 10. When something is wrong, you know immediately.
 
 ---
 
@@ -82,7 +82,7 @@ make lint          # Run all linters
 
 ## What it detects
 
-| Threat | Real-world Example | How IronMesh Catches It |
+| Threat | Real-world Example | How Seagles Catches It |
 |---|---|---|
 | **Default credentials** | Mirai botnet (820K attacks/day) | Tests top-100 credential pairs per device, scores 9.5 CVSS if found |
 | **Telnet exposure** | Aisuru botnet (20+ Tbps DDoS) | Detects open port 23, creates Critical alert immediately |
@@ -244,7 +244,7 @@ Includes: Deployments, Service, Ingress, HPA, NetworkPolicy, PVC, RBAC.
 
 ## Responsible Use
 
-**IronMesh performs active network scanning and credential testing.** Only use it on networks you own or have explicit written permission to test. Unauthorized scanning may be illegal in your jurisdiction.
+**Seagles performs active network scanning and credential testing.** Only use it on networks you own or have explicit written permission to test. Unauthorized scanning may be illegal in your jurisdiction.
 
 Built-in safety measures:
 
@@ -262,4 +262,4 @@ MIT — see [LICENSE](LICENSE) for details.
 
 ---
 
-*IronMesh — built to be real, built to find threats before attackers do.*
+*Seagles — built to be real, built to find threats before attackers do.*

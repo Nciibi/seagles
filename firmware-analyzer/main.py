@@ -1,5 +1,5 @@
 """
-IronMesh Firmware Analyzer — FastAPI microservice.
+Seagles Firmware Analyzer — FastAPI microservice.
 Performs entropy analysis, string extraction, binwalk scanning,
 and CVE lookup on firmware images.
 """
@@ -20,7 +20,7 @@ from cve_lookup import lookup_cve
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="IronMesh Firmware Analyzer", version="2.0.0")
+app = FastAPI(title="Seagles Firmware Analyzer", version="2.0.0")
 
 DB_URL = os.environ.get("DATABASE_URL", "")
 NVD_API_KEY = os.environ.get("NVD_API_KEY", "")

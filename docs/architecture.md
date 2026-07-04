@@ -2,7 +2,7 @@
 
 ## Overview
 
-IronMesh is an IoT security platform that discovers devices on a network, scans them for vulnerabilities, analyzes firmware, and provides risk scoring. It consists of three main components: a Go backend, a React frontend with PWA support, and a Python firmware analysis microservice.
+Seagles is an IoT security platform that discovers devices on a network, scans them for vulnerabilities, analyzes firmware, and provides risk scoring. It consists of three main components: a Go backend, a React frontend with PWA support, and a Python firmware analysis microservice.
 
 ```mermaid
 graph TB

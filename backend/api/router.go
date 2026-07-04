@@ -134,7 +134,7 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 
 			hs := HealthStatus{
 				Status:  "ok",
-				Service: "ironmesh-api",
+				Service: "seagles-api",
 				Version: "2.1.0",
 				DBOK:    dbOk,
 				RedisOK: cfg.RedisURL == "",

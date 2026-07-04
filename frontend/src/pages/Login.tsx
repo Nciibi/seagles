@@ -47,7 +47,7 @@ export default function Login() {
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
           <img
             src="/seagles-logo.png"
-            alt="IronMesh Logo"
+            alt="Seagles Logo"
             className="animate-float"
             style={{
               width: '80px',
@@ -59,7 +59,7 @@ export default function Login() {
             }}
           />
           <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--accent)', marginBottom: '4px' }}>
-            IronMesh
+            Seagles
           </h1>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.15em' }}>
             IoT Security Platform
@@ -138,7 +138,7 @@ export default function Login() {
         </div>
 
         <p style={{ textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '24px' }}>
-          IronMesh v2.0.0 · Protected by Zero Trust Authentication
+          Seagles v2.0.0 · Protected by Zero Trust Authentication
         </p>
       </div>
     </div>

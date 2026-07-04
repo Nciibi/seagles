@@ -66,7 +66,7 @@ func FetchEPSSScores(cveIDs []string) (map[string]EPSSScore, error) {
 			if reqErr != nil {
 				return reqErr
 			}
-			req.Header.Set("User-Agent", "IronMesh-Security-Scanner/2.0")
+			req.Header.Set("User-Agent", "Seagles-Security-Scanner/2.0")
 
 			resp, reqErr := client.Do(req)
 			if reqErr != nil {

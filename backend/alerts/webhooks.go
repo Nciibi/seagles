@@ -131,7 +131,7 @@ func deliverWebhook(db *sql.DB, wh WebhookConfig, alertID, severity, title, desc
 		return 0, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "IronMesh-Webhook/2.0")
+	req.Header.Set("User-Agent", "Seagles-Webhook/2.0")
 
 	if len(wh.Headers) > 0 {
 		var headers map[string]string
@@ -185,7 +185,7 @@ func buildSlackPayload(severity, title, description, deviceID string) ([]byte, e
 	}
 
 	msg := map[string]interface{}{
-		"text": fmt.Sprintf("%s *[%s] IronMesh Alert*", emoji, strings.ToUpper(severity)),
+		"text": fmt.Sprintf("%s *[%s] Seagles Alert*", emoji, strings.ToUpper(severity)),
 		"blocks": []map[string]interface{}{
 			{
 				"type": "header",
@@ -204,7 +204,7 @@ func buildSlackPayload(severity, title, description, deviceID string) ([]byte, e
 			{
 				"type": "context",
 				"elements": []map[string]string{
-					{"type": "mrkdwn", "text": fmt.Sprintf("IronMesh Security Platform · %s", time.Now().Format(time.RFC3339))},
+					{"type": "mrkdwn", "text": fmt.Sprintf("Seagles Security Platform · %s", time.Now().Format(time.RFC3339))},
 				},
 			},
 		},
@@ -246,7 +246,7 @@ func buildTeamsPayload(severity, title, description, deviceID string) ([]byte, e
 func buildGenericPayload(alertID, severity, title, description, deviceID string) ([]byte, error) {
 	msg := map[string]interface{}{
 		"event_type": "security_alert",
-		"source":     "ironmesh",
+		"source":     "seagles",
 		"version":    "1.0",
 		"alert": map[string]string{
 			"id":          alertID,
@@ -256,7 +256,7 @@ func buildGenericPayload(alertID, severity, title, description, deviceID string)
 			"device_id":   deviceID,
 			"timestamp":   time.Now().Format(time.RFC3339),
 		},
-		"cef": fmt.Sprintf("CEF:0|IronMesh|SecurityPlatform|1.0|%s|%s|%s|dst=%s msg=%s",
+		"cef": fmt.Sprintf("CEF:0|Seagles|SecurityPlatform|1.0|%s|%s|%s|dst=%s msg=%s",
 			"IoTAlert", title, severityCEF(severity), deviceID, description),
 	}
 	return json.Marshal(msg)

@@ -53,7 +53,7 @@ type SignedToken struct {
 var (
 	globalKeyPair   *KeyPair
 	globalKeyPairMu sync.RWMutex
-	tokenIssuer     = "ironmesh"
+	tokenIssuer     = "seagles"
 )
 
 func LoadOrGenerateKeys(privateKeyPEM string) error {
@@ -118,7 +118,7 @@ func signRS256(claims *Claims) (string, error) {
 		return "", errors.New("key pair not initialized")
 	}
 
-	header := `{"alg":"RS256","typ":"JWT","kid":"ironmesh-v1"}`
+	header := `{"alg":"RS256","typ":"JWT","kid":"seagles-v1"}`
 	headerB64 := base64.RawURLEncoding.EncodeToString([]byte(header))
 
 	payload, err := json.Marshal(claims)

@@ -1,11 +1,11 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "IronMesh API",
+    "title": "Seagles API",
     "description": "IoT Security Platform API",
     "version": "2.1.0",
     "contact": {
-      "name": "IronMesh Team",
+      "name": "Seagles Team",
       "email": "security@ironmesh.io"
     }
   },

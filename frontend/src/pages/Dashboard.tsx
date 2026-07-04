@@ -1,16 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { getStats, getAlerts, triggerNetworkScan, type Stats, type Alert } from '../api/client'
 import AlertFeed from '../components/AlertFeed'
 import RiskScore from '../components/RiskScore'
+import { Loading, LoadingCard } from '../components/Loading'
 
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [lastRefresh, setLastRefresh] = useState(new Date())
   const [scanning, setScanning] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
+      setError(null)
       const [statsRes, alertsRes] = await Promise.all([
         getStats(),
         getAlerts({ is_acknowledged: 'false' }),
@@ -20,14 +24,17 @@ export default function Dashboard() {
       setLastRefresh(new Date())
     } catch (e) {
       console.error('Failed to fetch dashboard data:', e)
+      setError('Failed to load dashboard data')
+    } finally {
+      setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     fetchData()
     const interval = setInterval(fetchData, 30000)
     return () => clearInterval(interval)
-  }, [])
+  }, [fetchData])
 
   const handleNetworkScan = async () => {
     setScanning(true)
@@ -42,6 +49,34 @@ export default function Dashboard() {
     }, 3000)
   }
 
+  if (loading) {
+    return (
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
+          <LoadingCard height={40} />
+          <LoadingCard width="160px" height={40} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '28px' }}>
+          {[1, 2, 3, 4].map((i) => <LoadingCard key={i} height={100} />)}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+          <LoadingCard height={300} />
+          <LoadingCard height={300} />
+        </div>
+      </div>
+    )
+  }
+
+  if (error && !stats) {
+    return (
+      <div className="card" style={{ padding: '40px', textAlign: 'center' }}>
+        <div style={{ fontSize: '2rem', marginBottom: '12px' }}>⚠️</div>
+        <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>{error}</p>
+        <button className="btn btn-primary" onClick={fetchData}>Retry</button>
+      </div>
+    )
+  }
+
   const severityColor = (score: number) => {
     if (score >= 8) return '#e03131'
     if (score >= 6) return '#f08c00'
@@ -51,7 +86,6 @@ export default function Dashboard() {
 
   return (
     <div>
-      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
         <div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 700 }}>Security Dashboard</h1>
@@ -64,7 +98,6 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Metric Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '28px' }}>
         <div className="metric-card" style={{ borderTopColor: 'var(--accent)' }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
@@ -110,15 +143,16 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Two-column layout */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-        {/* Alert Feed */}
         <div className="card" style={{ padding: '20px' }}>
           <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px' }}>🔔 Recent Alerts</h2>
-          <AlertFeed alerts={alerts} onAck={fetchData} showDevice />
+          {alerts.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No unacknowledged alerts</p>
+          ) : (
+            <AlertFeed alerts={alerts} onAck={fetchData} showDevice />
+          )}
         </div>
 
-        {/* Risk Distribution */}
         <div className="card" style={{ padding: '20px' }}>
           <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px' }}>📊 Risk Distribution</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '20px' }}>

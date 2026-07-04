@@ -218,10 +218,10 @@
 | 🔴 P0 | S2 — Tests | 3–5 days | Confidence for all changes | 8.5 |
 | 🟡 P1 | S3 — Frontend | 3–5 days | Visible quality jump | 9.0 |
 | 🟡 P1 | S4 — Infra/CI | 2–3 days | Collaboration enabler | 9.5 ✅ |
-| 🟢 P2 | S5 — Docs | 1–2 days | Onboarding clarity | 9.7 |
+| 🟢 P2 | S5 — Docs | 1–2 days | Onboarding clarity | 9.7 ✅ |
 | 🔵 P3 | S6 — Enterprise | 1–2 weeks | Market differentiator | 10.0 |
 
-**Highest ROI:** S1 + S2 takes ~1 week and raises from 6.5 → 8.5. The biggest visible impact is S3 (Frontend Overhaul).
+**Highest ROI:** S1 + S2 takes ~1 week and raises from 6.5 → 8.5. S4 + S5 raise to 9.7 with minimal effort. The biggest remaining impact is S3 (Frontend Overhaul).
 
 ---
 
@@ -243,4 +243,4 @@ Key audit dimensions:
 - Testing: Unit, integration, E2E coverage per package
 - Frontend: Error handling, loading states, a11y, responsive, performance, types
 - Infrastructure: CI/CD, Docker best practices, K8s, monitoring, dependency mgmt
-- Documentation: Complet
+- Documentation: Completeness, accuracy, consistency, discoverability

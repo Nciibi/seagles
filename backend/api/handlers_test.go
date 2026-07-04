@@ -802,7 +802,6 @@ func TestScanProfileHandler_Success(t *testing.T) {
 
 func TestListFirmwareHandler_Success(t *testing.T) {
 	router, mock, _ := setupTestRouter(t)
-	now := time.Now()
 
 	rows := sqlmock.NewRows([]string{
 		"f.id", "f.device_id", "f.version", "f.vendor", "f.checksum",

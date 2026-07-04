@@ -58,6 +58,67 @@ func SetJWTSecret(secret string) {
 	}
 }
 
+func HashPassword(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(hash), err
+}
+
+func CheckPassword(password, hash string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
+}
+
+func storeRefreshToken(db *sql.DB, userID, tokenID string, expiresAt time.Time) error {
+	tokenHash := sha256.Sum256([]byte(tokenID))
+	_, err := db.Exec(
+		`INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
+		userID, hex.EncodeToString(tokenHash[:]), expiresAt,
+	)
+	return err
+}
+
+func validateRefreshToken(db *sql.DB, refreshToken string) (*User, error) {
+	parts := strings.SplitN(refreshToken, ".", 2)
+	if len(parts) != 2 {
+		return nil, errors.New("invalid refresh token format")
+	}
+
+	tokenID := parts[0]
+	tokenHash := sha256.Sum256([]byte(tokenID))
+	tokenHashHex := hex.EncodeToString(tokenHash[:])
+
+	var user User
+	var expiresAt time.Time
+	var revoked bool
+	err := db.QueryRow(
+		`SELECT u.id, u.username, u.email, u.role, rt.expires_at, rt.revoked
+		 FROM refresh_tokens rt JOIN users u ON u.id = rt.user_id
+		 WHERE rt.token_hash = $1 AND rt.revoked = FALSE AND rt.expires_at > NOW()`,
+		tokenHashHex,
+	).Scan(&user.ID, &user.Username, &user.Email, &user.Role, &expiresAt, &revoked)
+	if err == sql.ErrNoRows {
+		return nil, errors.New("invalid or expired refresh token")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to query refresh token: %w", err)
+	}
+
+	return &user, nil
+}
+
+func revokeAllRefreshTokens(db *sql.DB, userID string) error {
+	_, err := db.Exec(`UPDATE refresh_tokens SET revoked = TRUE WHERE user_id = $1 AND revoked = FALSE`, userID)
+	return err
+}
+
+func revokeRefreshTokenByID(db *sql.DB, tokenID string) error {
+	tokenHash := sha256.Sum256([]byte(tokenID))
+	_, err := db.Exec(
+		`UPDATE refresh_tokens SET revoked = TRUE WHERE token_hash = $1`,
+		hex.EncodeToString(tokenHash[:]),
+	)
+	return err
+}
+
 func LoginHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req LoginRequest
@@ -92,14 +153,31 @@ func LoginHandler(db *sql.DB) gin.HandlerFunc {
 
 		db.Exec(`UPDATE users SET last_login = NOW() WHERE id = $1`, user.ID)
 
-		token, expiresAt := GenerateToken(user)
+		accessToken, err := GenerateAccessToken(user)
+		if err != nil {
+			slog.Error("token_generation_failed", "error", err.Error())
+			c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Failed to generate token"})
+			return
+		}
+
+		refreshTokenID := generateTokenID()
+		refreshExpiry := time.Now().Add(RefreshTokenTTL)
+		if err := storeRefreshToken(db, user.ID, refreshTokenID, refreshExpiry); err != nil {
+			slog.Error("refresh_token_store_failed", "error", err.Error())
+			c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Failed to generate refresh token"})
+			return
+		}
+
+		refreshToken := refreshTokenID + "." + user.ID
+
 		slog.Info("login_success", "username", user.Username, "role", user.Role)
 
 		c.JSON(http.StatusOK, gin.H{
 			"data": LoginResponse{
-				Token:     token,
-				ExpiresIn: int64(time.Until(expiresAt).Seconds()),
-				User:      user,
+				Token:        accessToken.Token,
+				ExpiresIn:    int64(time.Until(time.Unix(accessToken.Claims.Exp, 0)).Seconds()),
+				RefreshToken: refreshToken,
+				User:         user,
 			},
 			"error": nil,
 		})

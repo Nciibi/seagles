@@ -2,7 +2,6 @@ package scanner
 
 import (
 	"crypto/tls"
-	"fmt"
 	"net"
 	"strconv"
 	"time"

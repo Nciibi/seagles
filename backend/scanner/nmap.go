@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -187,6 +188,10 @@ func releaseWorker() {
 }
 
 func DiscoverHosts(cidr string) ([]string, error) {
+	if err := sanitizeCIDR(cidr); err != nil {
+		return nil, fmt.Errorf("invalid CIDR: %w", err)
+	}
+
 	slog.Info("Starting network discovery", "cidr", cidr)
 	start := time.Now()
 
@@ -228,6 +233,10 @@ func DiscoverHosts(cidr string) ([]string, error) {
 }
 
 func DeepScan(ip string) (*ScanResult, error) {
+	if err := sanitizeIP(ip); err != nil {
+		return nil, fmt.Errorf("invalid target IP: %w", err)
+	}
+
 	acquireWorker()
 	defer releaseWorker()
 

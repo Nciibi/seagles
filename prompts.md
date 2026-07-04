@@ -22,7 +22,7 @@ You are building Seagles, an open-source IoT security platform. Your job in this
 
 Create the following directory structure exactly:
 
-ironmesh/
+seagles/
 ├── README.md
 ├── THREAT_MODEL.md
 ├── docker-compose.yml
@@ -99,7 +99,7 @@ ironmesh/
 
 Then do the following:
 
-1. Run: go mod init github.com/yourusername/ironmesh inside the backend/ directory
+1. Run: go mod init github.com/yourusername/seagles inside the backend/ directory
 2. Add these Go dependencies to go.mod:
    - github.com/gin-gonic/gin v1.10.0
    - github.com/lib/pq v1.10.9
@@ -293,8 +293,8 @@ Update backend/main.go to:
 - Call db.RunMigrations()
 - Print "Migrations complete" and exit
 
-Test by running: docker run -e POSTGRES_PASSWORD=test -e POSTGRES_DB=ironmesh -p 5432:5432 postgres:16-alpine
-Then: DATABASE_URL="postgres://postgres:test@localhost:5432/ironmesh?sslmode=disable" go run main.go
+Test by running: docker run -e POSTGRES_PASSWORD=test -e POSTGRES_DB=seagles -p 5432:5432 postgres:16-alpine
+Then: DATABASE_URL="postgres://postgres:test@localhost:5432/seagles?sslmode=disable" go run main.go
 
 Confirm all 5 migration files execute without errors.
 ```
@@ -1303,13 +1303,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ironmesh
-      POSTGRES_USER: ironmesh
+      POSTGRES_DB: seagles
+      POSTGRES_USER: seagles
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ironmesh"]
+      test: ["CMD-SHELL", "pg_isready -U seagles"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -1321,7 +1321,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://ironmesh:${DB_PASSWORD}@postgres:5432/ironmesh?sslmode=disable
+      DATABASE_URL: postgres://seagles:${DB_PASSWORD}@postgres:5432/seagles?sslmode=disable
       PORT: 8080
       NETWORK_CIDR: ${NETWORK_CIDR:-192.168.1.0/24}
       NVD_API_KEY: ${NVD_API_KEY:-}
@@ -1342,7 +1342,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://ironmesh:${DB_PASSWORD}@postgres:5432/ironmesh?sslmode=disable
+      DATABASE_URL: postgres://seagles:${DB_PASSWORD}@postgres:5432/seagles?sslmode=disable
       NVD_API_KEY: ${NVD_API_KEY:-}
     volumes:
       - firmware_data:/firmware
@@ -1373,17 +1373,17 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o ironmesh .
+RUN CGO_ENABLED=0 GOOS=linux go build -o seagles .
 
 FROM alpine:3.19
 RUN apk add --no-cache nmap ca-certificates tzdata
 
 WORKDIR /app
-COPY --from=builder /app/ironmesh .
+COPY --from=builder /app/seagles .
 COPY --from=builder /app/data ./data
 
 EXPOSE 8080
-CMD ["./ironmesh"]
+CMD ["./seagles"]
 
 --- Verify network_mode: host for nmap ---
 The backend service must use network_mode: host so nmap can see the local network.
@@ -1453,8 +1453,8 @@ Write a README with these sections in order:
 3. A "What this does" section (3-4 sentences): explain it finds IoT devices on your network, scans them for real CVEs, tests for default credentials, analyzes firmware for malware, and scores risk 0-10. Lead with the problem (820K IoT attacks per day), not the technology.
 
 4. A "Setup in 5 minutes" section — exact commands:
-   git clone https://github.com/yourusername/ironmesh
-   cd ironmesh
+   git clone https://github.com/yourusername/seagles
+   cd seagles
    cp .env.example .env
    # Edit .env: set your network CIDR (e.g. 192.168.1.0/24)
    docker compose up -d

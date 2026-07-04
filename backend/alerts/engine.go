@@ -3,11 +3,11 @@ package alerts
 import (
 	"database/sql"
 	"encoding/json"
-	"log"
 	"time"
+
+	"github.com/yourusername/seagles/slog"
 )
 
-// Alert type constants
 const (
 	AlertDefaultCreds       = "default_creds"
 	AlertKEVMatch           = "kev_match"
@@ -25,30 +25,26 @@ const (
 	AlertFirmwareReview     = "firmware_review_due"
 )
 
-// AlertRequest contains the data needed to create an alert.
 type AlertRequest struct {
 	DeviceID    string          `json:"device_id"`
 	AlertType   string          `json:"alert_type"`
 	Severity    string          `json:"severity"`
 	Title       string          `json:"title"`
-	Description string          `json:"description"`
+	Description string          `json:"description,omitempty"`
 	Metadata    json.RawMessage `json:"metadata,omitempty"`
 }
 
-// CreateAlert creates an alert with 24-hour deduplication and dispatches webhooks.
 func CreateAlert(db *sql.DB, req AlertRequest) error {
-	// Deduplication check: same type + device + unacknowledged within 24 hours
 	var existing int
 	err := db.QueryRow(`SELECT COUNT(*) FROM alerts
 		WHERE device_id = $1 AND alert_type = $2 AND is_acknowledged = FALSE
 		AND triggered_at > NOW() - INTERVAL '24 hours'`,
 		req.DeviceID, req.AlertType).Scan(&existing)
 	if err == nil && existing > 0 {
-		log.Printf("Alert deduplicated: %s for device %s", req.AlertType, req.DeviceID)
+		slog.Debug("alert_deduplicated", "type", req.AlertType, "device", req.DeviceID)
 		return nil
 	}
 
-	// Insert alert
 	metadata := req.Metadata
 	if metadata == nil {
 		metadata = json.RawMessage(`{}`)
@@ -59,19 +55,17 @@ func CreateAlert(db *sql.DB, req AlertRequest) error {
 		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
 		req.DeviceID, req.Severity, req.AlertType, req.Title, req.Description, metadata).Scan(&alertID)
 	if err != nil {
-		log.Printf("Failed to create alert: %v", err)
+		slog.Error("Failed to create alert", "error", err.Error())
 		return err
 	}
 
-	log.Printf("[ALERT] %s | %s | %s | device: %s", req.Severity, req.AlertType, req.Title, req.DeviceID)
+	slog.Info("alert_created", "severity", req.Severity, "type", req.AlertType, "device", req.DeviceID, "title", req.Title)
 
-	// Dispatch webhooks asynchronously
 	go DispatchWebhooks(db, alertID, req.Severity, req.Title, req.Description, req.DeviceID)
 
 	return nil
 }
 
-// StartAlertMonitor runs background checks every 60 seconds.
 func StartAlertMonitor(db *sql.DB) {
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
@@ -83,18 +77,17 @@ func StartAlertMonitor(db *sql.DB) {
 	}
 }
 
-// checkOfflineDevices alerts for devices not seen in 30+ minutes.
 func checkOfflineDevices(db *sql.DB) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("checkOfflineDevices panic: %v", r)
+			slog.Error("checkOfflineDevices panic", "recover", r)
 		}
 	}()
 
 	rows, err := db.Query(`SELECT id, ip_address FROM devices
 		WHERE is_active = TRUE AND last_seen < NOW() - INTERVAL '30 minutes'`)
 	if err != nil {
-		log.Printf("Offline device check failed: %v", err)
+		slog.Error("Offline device check failed", "error", err.Error())
 		return
 	}
 	defer rows.Close()
@@ -114,18 +107,17 @@ func checkOfflineDevices(db *sql.DB) {
 	}
 }
 
-// checkFirmwareOverdue alerts for firmware not analyzed in 90+ days.
 func checkFirmwareOverdue(db *sql.DB) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("checkFirmwareOverdue panic: %v", r)
+			slog.Error("checkFirmwareOverdue panic", "recover", r)
 		}
 	}()
 
 	rows, err := db.Query(`SELECT device_id FROM firmware
 		WHERE analyzed_at < NOW() - INTERVAL '90 days' OR analyzed_at IS NULL`)
 	if err != nil {
-		log.Printf("Firmware review check failed: %v", err)
+		slog.Error("Firmware review check failed", "error", err.Error())
 		return
 	}
 	defer rows.Close()
@@ -145,11 +137,10 @@ func checkFirmwareOverdue(db *sql.DB) {
 	}
 }
 
-// checkUnresolvedCritical alerts for critical vulnerabilities unresolved for 7+ days.
 func checkUnresolvedCritical(db *sql.DB) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("checkUnresolvedCritical panic: %v", r)
+			slog.Error("checkUnresolvedCritical panic", "recover", r)
 		}
 	}()
 
@@ -157,7 +148,7 @@ func checkUnresolvedCritical(db *sql.DB) {
 		WHERE severity = 'critical' AND is_resolved = FALSE
 		AND discovered_at < NOW() - INTERVAL '7 days'`)
 	if err != nil {
-		log.Printf("Unresolved critical check failed: %v", err)
+		slog.Error("Unresolved critical check failed", "error", err.Error())
 		return
 	}
 	defer rows.Close()

@@ -1,6 +1,6 @@
 {
   "title": "Security Overview",
-  "uid": "ironmesh-security-overview",
+  "uid": "seagles-security-overview",
   "schemaVersion": 39,
   "version": 1,
   "timezone": "utc",
@@ -9,7 +9,7 @@
       "title": "Total Devices",
       "type": "stat",
       "gridPos": {"x": 0, "y": 0, "w": 3, "h": 4},
-      "targets": [{"expr": "ironmesh_uptime_seconds", "legendFormat": ""}],
+      "targets": [{"expr": "seagles_uptime_seconds", "legendFormat": ""}],
       "fieldConfig": {
         "defaults": {
           "color": {"mode": "fixed"},
@@ -60,25 +60,25 @@
       "title": "Request Rate",
       "type": "graph",
       "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
-      "targets": [{"expr": "rate(ironmesh_requests_total[5m])", "legendFormat": "{{endpoint}}"}]
+      "targets": [{"expr": "rate(seagles_requests_total[5m])", "legendFormat": "{{endpoint}}"}]
     },
     {
       "title": "Error Rate by Status",
       "type": "graph",
       "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
-      "targets": [{"expr": "rate(ironmesh_errors_total[5m])", "legendFormat": "{{error}}"}]
+      "targets": [{"expr": "rate(seagles_errors_total[5m])", "legendFormat": "{{error}}"}]
     },
     {
       "title": "Active Requests",
       "type": "gauge",
       "gridPos": {"x": 0, "y": 20, "w": 4, "h": 5},
-      "targets": [{"expr": "ironmesh_requests_active", "legendFormat": "active"}]
+      "targets": [{"expr": "seagles_requests_active", "legendFormat": "active"}]
     },
     {
       "title": "Request Latency (avg)",
       "type": "graph",
       "gridPos": {"x": 4, "y": 20, "w": 8, "h": 5},
-      "targets": [{"expr": "ironmesh_request_latency_seconds", "legendFormat": "{{endpoint}}"}]
+      "targets": [{"expr": "seagles_request_latency_seconds", "legendFormat": "{{endpoint}}"}]
     }
   ],
   "rows": [],

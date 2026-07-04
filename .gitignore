@@ -6,7 +6,7 @@
 *.swo
 
 # Go
-backend/ironmesh
+backend/seagles
 backend/seagles
 backend/data/cisa-kev.json
 

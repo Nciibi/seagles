@@ -196,7 +196,7 @@ Authenticate with username/password.
     "user": {
       "id": "uuid",
       "username": "admin",
-      "email": "admin@ironmesh.local",
+      "email": "admin@seagles.local",
       "role": "admin"
     }
   },
@@ -275,7 +275,7 @@ Returns current user info.
   "data": {
     "id": "uuid",
     "username": "admin",
-    "email": "admin@ironmesh.local",
+    "email": "admin@seagles.local",
     "role": "admin"
   },
   "error": null
@@ -784,7 +784,7 @@ GET /api/v1/ws
 Upgrade: websocket
 Connection: Upgrade
 Authorization: Bearer <access_token>
-Origin: https://your-ironmesh-instance.com
+Origin: https://your-seagles-instance.com
 ```
 
 **Authentication:** The WebSocket route is behind the same JWT middleware as other protected endpoints. Unauthenticated connections are rejected before the upgrade.

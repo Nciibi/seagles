@@ -1,4 +1,4 @@
-# Contributing to IronMesh
+# Contributing to Seagles
 
 Thank you for your interest in making IoT security more accessible. Here's how to contribute.
 

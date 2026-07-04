@@ -3,13 +3,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ironmesh
-      POSTGRES_USER: ironmesh
+      POSTGRES_DB: seagles
+      POSTGRES_USER: seagles
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ironmesh"]
+      test: ["CMD-SHELL", "pg_isready -U seagles"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -18,13 +18,13 @@ services:
         limits:
           memory: 512M
     networks:
-      - ironmesh-internal
+      - seagles-internal
 
   pgbouncer:
     image: edoburu/pgbouncer:1.23
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://ironmesh:${DB_PASSWORD}@postgres:5432/ironmesh
+      DATABASE_URL: postgres://seagles:${DB_PASSWORD}@postgres:5432/seagles
       MAX_CLIENT_CONN: 1000
       DEFAULT_POOL_SIZE: 20
     depends_on:
@@ -35,7 +35,7 @@ services:
         limits:
           memory: 128M
     networks:
-      - ironmesh-internal
+      - seagles-internal
 
   redis:
     image: redis:7-alpine
@@ -52,7 +52,7 @@ services:
         limits:
           memory: 128M
     networks:
-      - ironmesh-internal
+      - seagles-internal
 
   minio:
     image: minio/minio:RELEASE.2024-07-01T01-30-04Z
@@ -77,7 +77,7 @@ services:
         limits:
           memory: 512M
     networks:
-      - ironmesh-internal
+      - seagles-internal
 
   backend:
     build: ./backend
@@ -90,7 +90,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://ironmesh:${DB_PASSWORD}@pgbouncer:5432/ironmesh?sslmode=disable
+      DATABASE_URL: postgres://seagles:${DB_PASSWORD}@pgbouncer:5432/seagles?sslmode=disable
       PORT: 8080
       NETWORK_CIDR: ${NETWORK_CIDR:-192.168.1.0/24}
       NVD_API_KEY: ${NVD_API_KEY:-}
@@ -99,7 +99,7 @@ services:
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
       TEAMS_WEBHOOK_URL: ${TEAMS_WEBHOOK_URL:-}
       S3_ENDPOINT: minio:9000
-      S3_BUCKET: ironmesh-firmware
+      S3_BUCKET: seagles-firmware
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-admin}
       S3_SECRET_KEY: ${S3_SECRET_KEY:-password123}
       REDIS_URL: redis://redis:6379
@@ -133,7 +133,7 @@ services:
         max-size: "10m"
         max-file: "3"
     networks:
-      - ironmesh-internal
+      - seagles-internal
 
   firmware-analyzer:
     build: ./firmware-analyzer
@@ -142,7 +142,7 @@ services:
       pgbouncer:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://ironmesh:${DB_PASSWORD}@pgbouncer:5432/ironmesh?sslmode=disable
+      DATABASE_URL: postgres://seagles:${DB_PASSWORD}@pgbouncer:5432/seagles?sslmode=disable
       NVD_API_KEY: ${NVD_API_KEY:-}
     volumes:
       - firmware_uploads:/firmware
@@ -164,7 +164,7 @@ services:
         max-size: "10m"
         max-file: "3"
     networks:
-      - ironmesh-internal
+      - seagles-internal
 
   frontend:
     build: ./frontend
@@ -186,7 +186,7 @@ services:
         limits:
           memory: 128M
     networks:
-      - ironmesh-internal
+      - seagles-internal
 
   prometheus:
     image: prom/prometheus:v2.53.0
@@ -204,7 +204,7 @@ services:
         limits:
           memory: 256M
     networks:
-      - ironmesh-internal
+      - seagles-internal
 
   grafana:
     image: grafana/grafana:11.1.0
@@ -226,7 +226,7 @@ services:
         limits:
           memory: 256M
     networks:
-      - ironmesh-internal
+      - seagles-internal
 
 volumes:
   postgres_data:
@@ -237,7 +237,7 @@ volumes:
   grafana_data:
 
 networks:
-  ironmesh-internal:
+  seagles-internal:
     driver: bridge
     ipam:
       config:

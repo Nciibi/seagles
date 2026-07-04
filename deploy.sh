@@ -1,10 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-# IronMesh IoT Security Platform — Production Deployment Script
+# Seagles IoT Security Platform — Production Deployment Script
 # Usage: ./deploy.sh [--env production|staging] [--skip-build] [--skip-migrate]
 
-APP_NAME="ironmesh"
+APP_NAME="seagles"
 ENV="${ENV:-production}"
 SKIP_BUILD=false
 SKIP_MIGRATE=false
@@ -51,8 +51,8 @@ if [ "$SKIP_MIGRATE" = false ]; then
 	for f in backend/db/migrations/*.sql; do
 		echo "  Applying: $(basename "$f")"
 		PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST:-localhost}" \
-			-U "${DB_USER:-ironmesh}" \
-			-d "${DB_NAME:-ironmesh}" \
+			-U "${DB_USER:-seagles}" \
+			-d "${DB_NAME:-seagles}" \
 			-f "$f"
 	done
 fi

@@ -1,4 +1,4 @@
-# IronMesh (Seagles) Implementation Checklist
+# Seagles (Seagles) Implementation Checklist
 
 ## Completed
 

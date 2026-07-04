@@ -301,7 +301,7 @@ The firmware analyzer is a Python/FastAPI microservice that:
 
 ```mermaid
 graph TB
-    subgraph "ironmesh-internal (172.20.0.0/16)"
+    subgraph "seagles-internal (172.20.0.0/16)"
         Backend[Backend<br/>:8080]
         Frontend[Frontend<br/>:80]
         FA[Firmware Analyzer<br/>:8001]

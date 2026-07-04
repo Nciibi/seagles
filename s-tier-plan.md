@@ -1,4 +1,4 @@
-# S+ Tier Plan — IronMesh/Seagles IoT Security Platform
+# S+ Tier Plan — Seagles/Seagles IoT Security Platform
 
 **Current Score: ~10/10** *(Phase S1 + S2 + S4 + S5 + S6 — ALL COMPLETE)*
 
@@ -151,18 +151,18 @@
 | Docker HEALTHCHECK + non-root | `backend/Dockerfile`, `frontend/Dockerfile`, `firmware-analyzer/Dockerfile` | ✅ |
 | `.dockerignore` | `backend/.dockerignore`, `frontend/.dockerignore` | ✅ |
 | Pin Docker tags | `docker-compose.yml` — replaced all `:latest` with specific versions | ✅ |
-| Docker healthchecks + networks | `docker-compose.yml` — healthchecks on all services, isolated `ironmesh-internal` bridge network | ✅ |
+| Docker healthchecks + networks | `docker-compose.yml` — healthchecks on all services, isolated `seagles-internal` bridge network | ✅ |
 | K8s completeness | `k8s/` — Deployment (backend+frontend), Service, Ingress, HPA, NetworkPolicy, PVC, RBAC | ✅ |
 | Makefile | `Makefile` — build, test, lint, docker, security targets | ✅ |
 | `.gitattributes` | `.gitattributes` — LF/CRLF normalization | ✅ |
 
 ### ~~Phase S5 — Documentation Overhaul (~1–2 days)~~ ✅ COMPLETE
 
-> **Result:** Full documentation suite — API reference with RBAC matrix, WS handshake, pagination/filtering, all request/response schemas. Setup guide with Windows steps, MinIO, PgBouncer, frontend proxy. Troubleshooting with CORS, WS, Redis, MinIO, PgBouncer, firmware analyzer, K8s. 6 new ADRs (WS, React Router, Recharts, Tailwind, nginx, service worker). Mermaid architecture diagrams. CHANGELOG. Brand: "IronMesh" = product, "seagles" = repo/module. OpenAPI validation in CI.
+> **Result:** Full documentation suite — API reference with RBAC matrix, WS handshake, pagination/filtering, all request/response schemas. Setup guide with Windows steps, MinIO, PgBouncer, frontend proxy. Troubleshooting with CORS, WS, Redis, MinIO, PgBouncer, firmware analyzer, K8s. 6 new ADRs (WS, React Router, Recharts, Tailwind, nginx, service worker). Mermaid architecture diagrams. CHANGELOG. Brand: "Seagles" = product, "seagles" = repo/module. OpenAPI validation in CI.
 
 | Task | Status |
 |------|--------|
-| Brand consistency — "IronMesh" product, "seagles" repo/module | ✅ |
+| Brand consistency — "Seagles" product, "seagles" repo/module | ✅ |
 | Architecture diagram — Mermaid in `docs/architecture.md` | ✅ |
 | API docs completeness — pagination, filters, RBAC matrix, WS handshake, all schemas | ✅ |
 | Setup docs — Windows, MinIO, frontend proxy, PgBouncer | ✅ |

@@ -14,12 +14,12 @@ docker compose logs postgres
 
 **Fix:** Ensure `DATABASE_URL` in `.env` matches `docker-compose.yml`. Default:
 ```
-postgres://ironmesh:changeme_strong_password_here@pgbouncer:5432/ironmesh?sslmode=disable
+postgres://seagles:changeme_strong_password_here@pgbouncer:5432/seagles?sslmode=disable
 ```
 
 If using direct PostgreSQL connection (bypassing PgBouncer):
 ```
-postgres://ironmesh:changeme_strong_password_here@postgres:5432/ironmesh
+postgres://seagles:changeme_strong_password_here@postgres:5432/seagles
 ```
 
 ### "Rate limit exceeded" on login
@@ -116,7 +116,7 @@ Then restart the backend.
 **Check:**
 ```bash
 # Current connections
-docker compose exec postgres psql -U ironmesh -c "SELECT count(*) FROM pg_stat_activity WHERE datname = 'ironmesh';"
+docker compose exec postgres psql -U seagles -c "SELECT count(*) FROM pg_stat_activity WHERE datname = 'seagles';"
 ```
 
 **Fix:** Lower `DB_MAX_OPEN_CONNS` or increase PostgreSQL `max_connections`. Alternatively, PgBouncer may need a larger pool size.
@@ -235,7 +235,7 @@ docker-compose up -d
 **Fix:** Use the individual commands instead:
 ```bash
 # Instead of make build
-cd backend && go build -o ironmesh .
+cd backend && go build -o seagles .
 cd frontend && npm run build
 
 # Instead of make test
@@ -270,7 +270,7 @@ Response:
 ```json
 {
   "status": "ok",
-  "service": "ironmesh-api",
+  "service": "seagles-api",
   "version": "2.1.0",
   "db_ok": true
 }

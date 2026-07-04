@@ -3,7 +3,7 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: 'ironmesh-api'
+  - job_name: 'seagles-api'
     static_configs:
       - targets: ['backend:8080']
     metrics_path: '/api/v1/metrics'

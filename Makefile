@@ -9,11 +9,11 @@ all: lint test build
 # === Build ===
 
 build:
-	cd $(GO_DIR) && go build -o ironmesh .
+	cd $(GO_DIR) && go build -o seagles .
 	cd $(FRONTEND_DIR) && npm run build
 
 build-backend:
-	cd $(GO_DIR) && go build -o ironmesh .
+	cd $(GO_DIR) && go build -o seagles .
 
 build-frontend:
 	cd $(FRONTEND_DIR) && npm run build
@@ -71,7 +71,7 @@ security-scan:
 # === Clean ===
 
 clean:
-	rm -f $(GO_DIR)/ironmesh
+	rm -f $(GO_DIR)/seagles
 	rm -rf $(FRONTEND_DIR)/dist
 	rm -rf $(FRONTEND_DIR)/node_modules/.vite
 

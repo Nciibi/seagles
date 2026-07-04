@@ -150,7 +150,7 @@ See `.env.example` for the complete list. Key variables:
 | `SLACK_WEBHOOK_URL` | No | — | Slack webhook for alerts |
 | `TEAMS_WEBHOOK_URL` | No | — | Microsoft Teams webhook |
 | `S3_ENDPOINT` | No | `minio:9000` | S3-compatible storage endpoint |
-| `S3_BUCKET` | No | `ironmesh-firmware` | S3 bucket for firmware files |
+| `S3_BUCKET` | No | `seagles-firmware` | S3 bucket for firmware files |
 | `S3_ACCESS_KEY` | No | `admin` | S3 access key |
 | `S3_SECRET_KEY` | No | `password123` | S3 secret key |
 | `DB_MAX_OPEN_CONNS` | No | `25` | Max open database connections |
@@ -187,7 +187,7 @@ MinIO is used as S3-compatible storage for firmware uploads. Default access:
 - **Access Key:** `admin` (configurable via `S3_ACCESS_KEY`)
 - **Secret Key:** `password123` (configurable via `S3_SECRET_KEY`)
 
-If the default `ironmesh-firmware` bucket does not exist, it is created automatically on first firmware upload.
+If the default `seagles-firmware` bucket does not exist, it is created automatically on first firmware upload.
 
 ---
 
@@ -204,13 +204,13 @@ PgBouncer provides connection pooling for PostgreSQL. Default settings:
 The backend connects to PgBouncer:
 
 ```
-postgres://ironmesh:${DB_PASSWORD}@pgbouncer:5432/ironmesh?sslmode=disable
+postgres://seagles:${DB_PASSWORD}@pgbouncer:5432/seagles?sslmode=disable
 ```
 
 To bypass PgBouncer (e.g., for running migrations directly), connect to PostgreSQL directly:
 
 ```
-postgres://ironmesh:${DB_PASSWORD}@postgres:5432/ironmesh
+postgres://seagles:${DB_PASSWORD}@postgres:5432/seagles
 ```
 
 ---
@@ -300,7 +300,7 @@ cd frontend && npm run test:watch
 docker compose up -d postgres
 
 # Run tests pointing at test DB
-DATABASE_URL=postgres://ironmesh:password@localhost:5432/ironmesh?sslmode=disable go test -v ./api/
+DATABASE_URL=postgres://seagles:password@localhost:5432/seagles?sslmode=disable go test -v ./api/
 ```
 
 ---
@@ -342,7 +342,7 @@ docker build -t seagles-backend:latest -f backend/Dockerfile backend/
 docker build -t seagles-frontend:latest -f frontend/Dockerfile frontend/
 
 # Backend binary (without Docker)
-cd backend && go build -o ironmesh .
+cd backend && go build -o seagles .
 
 # Frontend (without Docker)
 cd frontend && npm run build

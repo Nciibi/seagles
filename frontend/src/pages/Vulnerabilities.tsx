@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getVulnerabilities, resolveVuln, type Vulnerability } from '../api/client'
 import { timeAgo, epssColor } from '../utils/helpers'
+import { LoadingCard } from '../components/Loading'
 
 export default function Vulnerabilities() {
   const [vulns, setVulns] = useState<Vulnerability[]>([])
@@ -9,8 +10,10 @@ export default function Vulnerabilities() {
   const [unresolvedOnly, setUnresolvedOnly] = useState(true)
   const [searchCVE, setSearchCVE] = useState('')
   const [sortByEPSS, setSortByEPSS] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   const fetchVulns = async () => {
+    setLoading(true)
     try {
       const params: Record<string, string> = {}
       if (severity) params.severity = severity
@@ -20,6 +23,8 @@ export default function Vulnerabilities() {
       setVulns(res.data as unknown as Vulnerability[])
     } catch (e) {
       console.error('Failed to fetch vulns:', e)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -38,6 +43,15 @@ export default function Vulnerabilities() {
   // Sort by EPSS if toggled
   if (sortByEPSS) {
     filtered = [...filtered].sort((a, b) => (b.epss_score || 0) - (a.epss_score || 0))
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '20px' }}>Vulnerabilities</h1>
+        <LoadingCard height={400} />
+      </div>
+    )
   }
 
   return (
@@ -72,7 +86,7 @@ export default function Vulnerabilities() {
       </div>
 
       {/* Table */}
-      <div className="card" style={{ overflow: 'hidden' }}>
+      <div className="card table-wrapper" style={{ overflow: 'hidden' }}>
         <table className="data-table">
           <thead>
             <tr>

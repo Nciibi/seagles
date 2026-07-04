@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import { getAlerts, ackAlert, type Alert } from '../api/client'
 import { timeAgo, getSeverityIcon } from '../utils/helpers'
+import { LoadingCard } from '../components/Loading'
 
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [severity, setSeverity] = useState('')
   const [showAcked, setShowAcked] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   const fetchAlerts = async () => {
+    setLoading(true)
     try {
       const params: Record<string, string> = {}
       if (severity) params.severity = severity
@@ -16,12 +19,14 @@ export default function AlertsPage() {
       setAlerts(res.data as unknown as Alert[])
     } catch (e) {
       console.error('Failed to fetch alerts:', e)
+    } finally {
+      setLoading(false)
     }
   }
 
   useEffect(() => { fetchAlerts() }, [severity, showAcked])
   useEffect(() => {
-    const interval = setInterval(fetchAlerts, 15000) // Auto-refresh every 15s
+    const interval = setInterval(fetchAlerts, 15000)
     return () => clearInterval(interval)
   }, [severity, showAcked])
 
@@ -40,6 +45,15 @@ export default function AlertsPage() {
   const critCount = alerts.filter(a => a.severity === 'critical' && !a.is_acknowledged).length
   const highCount = alerts.filter(a => a.severity === 'high' && !a.is_acknowledged).length
   const totalUnacked = alerts.filter(a => !a.is_acknowledged).length
+
+  if (loading) {
+    return (
+      <div>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '20px' }}>Alert Center</h1>
+        <LoadingCard height={400} />
+      </div>
+    )
+  }
 
   return (
     <div>

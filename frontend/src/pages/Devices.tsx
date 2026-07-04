@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getDevices, triggerScan, type Device } from '../api/client'
 import { severityBadge, timeAgo } from '../utils/helpers'
+import { LoadingCard } from '../components/Loading'
 
 export default function Devices() {
   const [devices, setDevices] = useState<Device[]>([])
@@ -9,6 +10,7 @@ export default function Devices() {
   const [typeFilter, setTypeFilter] = useState('')
   const [riskFilter, setRiskFilter] = useState('')
   const [scanningId, setScanningId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -16,11 +18,14 @@ export default function Devices() {
   }, [])
 
   const fetchDevices = async () => {
+    setLoading(true)
     try {
       const res = await getDevices()
       setDevices(res.data as unknown as Device[])
     } catch (e) {
       console.error('Failed to fetch devices:', e)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -52,6 +57,15 @@ export default function Devices() {
 
   const deviceTypes = [...new Set(devices.map((d) => d.device_type).filter(Boolean))]
 
+  if (loading) {
+    return (
+      <div>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '20px' }}>Device Inventory</h1>
+        <LoadingCard height={400} />
+      </div>
+    )
+  }
+
   return (
     <div>
       <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '20px' }}>Device Inventory</h1>
@@ -79,7 +93,7 @@ export default function Devices() {
       </div>
 
       {/* Table */}
-      <div className="card" style={{ overflow: 'hidden' }}>
+      <div className="card table-wrapper" style={{ overflow: 'hidden' }}>
         <table className="data-table">
           <thead>
             <tr>

@@ -1,19 +1,24 @@
 import { useEffect, useState } from 'react'
 import { getFirmware, analyzeFirmware, uploadFirmware, type Firmware } from '../api/client'
 import { entropyColor, entropyLabel } from '../utils/helpers'
+import { LoadingCard } from '../components/Loading'
 
 export default function FirmwarePage() {
   const [firmware, setFirmware] = useState<Firmware[]>([])
   const [analyzingId, setAnalyzingId] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadMsg, setUploadMsg] = useState('')
+  const [loading, setLoading] = useState(true)
 
   const fetchFirmware = async () => {
+    setLoading(true)
     try {
       const res = await getFirmware()
       setFirmware(res.data as unknown as Firmware[])
     } catch (e) {
       console.error('Failed to fetch firmware:', e)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -48,6 +53,15 @@ export default function FirmwarePage() {
 
   const user = JSON.parse(localStorage.getItem('ironmesh_user') || '{}')
   const isAdmin = user.role === 'admin'
+
+  if (loading) {
+    return (
+      <div>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '20px' }}>Firmware Analysis</h1>
+        <LoadingCard height={300} />
+      </div>
+    )
+  }
 
   return (
     <div>

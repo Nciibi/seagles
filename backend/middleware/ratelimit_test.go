@@ -48,22 +48,16 @@ func TestRateLimiter_Allow_ExceedsLimit(t *testing.T) {
 func TestRateLimiter_DifferentIPs(t *testing.T) {
 	rl := NewRateLimiter(2, time.Minute)
 	rl.Allow("192.168.1.1", "", "GET", "/test")
-	rl.Allow("192.168.1.2", "", "GET", "/test")
-	rl.Allow("192.168.1.3", "", "GET", "/test")
+	rl.Allow("192.168.1.1", "", "GET", "/test")
 
 	allowed, _, _ := rl.Allow("192.168.1.1", "", "GET", "/test")
 	if allowed {
-		t.Fatal("expected 192.168.1.1 to be rate limited")
+		t.Fatal("expected 192.168.1.1 to be rate limited (3rd call, limit=2)")
 	}
 
 	allowed2, _, _ := rl.Allow("192.168.1.2", "", "GET", "/test")
-	if allowed2 {
-		t.Fatal("expected 192.168.1.2 to be rate limited")
-	}
-
-	allowed3, _, _ := rl.Allow("192.168.1.3", "", "GET", "/test")
-	if allowed3 != false {
-		t.Fatal("expected 192.168.1.3 to NOT be rate limited yet (only 1 request)")
+	if !allowed2 {
+		t.Fatal("expected 192.168.1.2 to NOT be rate limited (first call)")
 	}
 }
 

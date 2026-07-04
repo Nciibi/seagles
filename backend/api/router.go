@@ -67,7 +67,17 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 	})
 
 	r.Use(func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
+		origin := c.Request.Header.Get("Origin")
+		allowedOrigin := ""
+		for _, o := range cfg.AllowedOrigins {
+			if o == origin {
+				allowedOrigin = o
+				break
+			}
+		}
+		if allowedOrigin != "" {
+			c.Header("Access-Control-Allow-Origin", allowedOrigin)
+		}
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID, X-CSRF-Token")
 		c.Header("Access-Control-Max-Age", "86400")
@@ -113,9 +123,8 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 			})
 		})
 
-		v1.GET("/ws", WSHandler())
-
 		protected := v1.Group("")
+		protected.GET("/ws", auth.AuthMiddleware(), WSHandler(cfg.AllowedOrigins))
 		protected.Use(auth.AuthMiddleware())
 		{
 			protected.GET("/auth/me", auth.MeHandler())

@@ -156,6 +156,7 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 	v1 := r.Group("/api/v1")
 	{
 		v1.POST("/auth/login", auth.LoginHandler(db))
+		v1.POST("/auth/refresh", auth.RefreshTokenHandler(db))
 
 		v1.GET("/health", func(c *gin.Context) {
 			c.JSON(200, gin.H{

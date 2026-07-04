@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/yourusername/seagles/slog"
+	"github.com/Nciibi/seagles/slog"
 )
 
 type TLSResult struct {

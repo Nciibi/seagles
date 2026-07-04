@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/yourusername/seagles/slog"
+	"github.com/Nciibi/seagles/slog"
 )
 
 type AuditEntry struct {

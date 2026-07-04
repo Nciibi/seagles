@@ -7,13 +7,13 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/yourusername/seagles/alerts"
-	"github.com/yourusername/seagles/config"
-	"github.com/yourusername/seagles/kev"
-	"github.com/yourusername/seagles/models"
-	"github.com/yourusername/seagles/risk"
-	"github.com/yourusername/seagles/scanner"
-	"github.com/yourusername/seagles/slog"
+	"github.com/Nciibi/seagles/alerts"
+	"github.com/Nciibi/seagles/config"
+	"github.com/Nciibi/seagles/kev"
+	"github.com/Nciibi/seagles/models"
+	"github.com/Nciibi/seagles/risk"
+	"github.com/Nciibi/seagles/scanner"
+	"github.com/Nciibi/seagles/slog"
 )
 
 type TriggerScanRequest struct {

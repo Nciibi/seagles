@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/yourusername/seagles/breaker"
-	"github.com/yourusername/seagles/slog"
+	"github.com/Nciibi/seagles/breaker"
+	"github.com/Nciibi/seagles/slog"
 )
 
 const epssAPIURL = "https://api.first.org/data/v1/epss"

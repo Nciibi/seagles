@@ -8,12 +8,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/yourusername/seagles/auth"
-	"github.com/yourusername/seagles/config"
-	"github.com/yourusername/seagles/kev"
-	dbpkg "github.com/yourusername/seagles/db"
-	"github.com/yourusername/seagles/middleware"
-	"github.com/yourusername/seagles/slog"
+	"github.com/Nciibi/seagles/auth"
+	"github.com/Nciibi/seagles/config"
+	"github.com/Nciibi/seagles/kev"
+	dbpkg "github.com/Nciibi/seagles/db"
+	"github.com/Nciibi/seagles/middleware"
+	"github.com/Nciibi/seagles/slog"
 )
 
 func success(c *gin.Context, data interface{}) {

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/yourusername/seagles/kev"
+	"github.com/Nciibi/seagles/kev"
 )
 
 // KEVStatusHandler returns the KEV catalog status.

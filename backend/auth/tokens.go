@@ -16,8 +16,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yourusername/seagles/cache"
-	"github.com/yourusername/seagles/slog"
+	"github.com/Nciibi/seagles/cache"
+	"github.com/Nciibi/seagles/slog"
 )
 
 type TokenType string

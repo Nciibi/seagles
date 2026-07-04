@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/yourusername/seagles/auth"
+	"github.com/Nciibi/seagles/auth"
 )
 
 const (

@@ -4,7 +4,7 @@ import (
 	"database/sql"
 
 	"github.com/gin-gonic/gin"
-	"github.com/yourusername/seagles/slog"
+	"github.com/Nciibi/seagles/slog"
 )
 
 func StatsHandler(db *sql.DB) gin.HandlerFunc {

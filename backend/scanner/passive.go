@@ -7,8 +7,8 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
-	"github.com/yourusername/seagles/alerts"
-	"github.com/yourusername/seagles/slog"
+	"github.com/Nciibi/seagles/alerts"
+	"github.com/Nciibi/seagles/slog"
 )
 
 type PassiveMonitor struct {

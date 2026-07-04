@@ -12,7 +12,7 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
-	"github.com/yourusername/seagles/slog"
+	"github.com/Nciibi/seagles/slog"
 )
 
 type DBMonitor struct {

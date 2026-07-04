@@ -16,11 +16,11 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/yourusername/seagles/api"
-	"github.com/yourusername/seagles/auth"
-	"github.com/yourusername/seagles/config"
-	"github.com/yourusername/seagles/db"
-	"github.com/yourusername/seagles/kev"
+	"github.com/Nciibi/seagles/api"
+	"github.com/Nciibi/seagles/auth"
+	"github.com/Nciibi/seagles/config"
+	"github.com/Nciibi/seagles/db"
+	"github.com/Nciibi/seagles/kev"
 )
 
 var (

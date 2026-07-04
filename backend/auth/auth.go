@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/yourusername/seagles/cache"
-	"github.com/yourusername/seagles/slog"
+	"github.com/Nciibi/seagles/cache"
+	"github.com/Nciibi/seagles/slog"
 	"golang.org/x/crypto/bcrypt"
 )
 

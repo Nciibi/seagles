@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yourusername/seagles/slog"
+	"github.com/Nciibi/seagles/slog"
 )
 
 type ProtocolFinding struct {

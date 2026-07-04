@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yourusername/seagles/breaker"
-	"github.com/yourusername/seagles/slog"
+	"github.com/Nciibi/seagles/breaker"
+	"github.com/Nciibi/seagles/slog"
 )
 
 type KEVEntry struct {

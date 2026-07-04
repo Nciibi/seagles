@@ -17,11 +17,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/yourusername/seagles/alerts"
-	"github.com/yourusername/seagles/config"
-	"github.com/yourusername/seagles/middleware"
-	"github.com/yourusername/seagles/models"
-	"github.com/yourusername/seagles/slog"
+	"github.com/Nciibi/seagles/alerts"
+	"github.com/Nciibi/seagles/config"
+	"github.com/Nciibi/seagles/middleware"
+	"github.com/Nciibi/seagles/models"
+	"github.com/Nciibi/seagles/slog"
 )
 
 const maxUploadSize = 256 << 20

@@ -342,6 +342,31 @@ func ChangePasswordHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
+func PermissionsHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, exists := c.Get("user_role")
+		if !exists {
+			c.JSON(http.StatusForbidden, gin.H{"data": nil, "error": "No role assigned"})
+			return
+		}
+
+		roleStr := role.(string)
+		permissions := RolePermissions[roleStr]
+		if permissions == nil {
+			permissions = []string{}
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"data": gin.H{
+				"role":        roleStr,
+				"permissions": permissions,
+				"level":       RoleHierarchy[roleStr],
+			},
+			"error": nil,
+		})
+	}
+}
+
 func MeHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, exists := c.Get("user")

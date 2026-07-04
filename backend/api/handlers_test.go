@@ -654,14 +654,19 @@ func TestWebhookHandlers(t *testing.T) {
 		router, mock, _ := setupTestRouter(t)
 		id := uuid.NewString()
 
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer ts.Close()
+
 		mock.ExpectQuery(`SELECT url, webhook_type FROM webhooks`).
 			WithArgs(id).
 			WillReturnRows(sqlmock.NewRows([]string{"url", "webhook_type"}).
-				AddRow("https://hooks.example.com", "slack"))
+				AddRow(ts.URL, "slack"))
 
 		w := request(router, "POST", "/api/v1/webhooks/"+id+"/test", nil)
 		if w.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d", w.Code)
+			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 		}
 	})
 

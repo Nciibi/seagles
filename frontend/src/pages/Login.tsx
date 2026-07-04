@@ -45,20 +45,19 @@ export default function Login() {
       }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <div className="animate-float" style={{
-            width: '72px',
-            height: '72px',
-            borderRadius: '20px',
-            background: 'linear-gradient(135deg, #5c7cfa 0%, #4c6ef5 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 16px',
-            fontSize: '2rem',
-            boxShadow: '0 8px 32px rgba(92, 124, 250, 0.3)',
-          }}>
-            🛡️
-          </div>
+          <img
+            src="/seagles-logo.png"
+            alt="IronMesh Logo"
+            className="animate-float"
+            style={{
+              width: '80px',
+              height: '80px',
+              borderRadius: '20px',
+              objectFit: 'cover',
+              margin: '0 auto 16px',
+              boxShadow: '0 8px 32px rgba(92, 124, 250, 0.3)',
+            }}
+          />
           <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--accent)', marginBottom: '4px' }}>
             IronMesh
           </h1>

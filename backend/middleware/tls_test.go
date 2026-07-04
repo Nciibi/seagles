@@ -9,7 +9,6 @@ import (
 	"crypto/x509/pkix"
 	"fmt"
 	"math/big"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"

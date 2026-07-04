@@ -45,7 +45,7 @@ func TestAuditLogger_WritesToDB(t *testing.T) {
 
 func TestAuditLogger_SkipsReadMethods(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	db, mock, err := sqlmock.New()
+	db, _, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("failed to create sqlmock: %v", err)
 	}
@@ -68,7 +68,7 @@ func TestAuditLogger_SkipsReadMethods(t *testing.T) {
 
 func TestAuditLogger_SkipsConfiguredPaths(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	db, mock, err := sqlmock.New()
+	db, _, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("failed to create sqlmock: %v", err)
 	}
@@ -181,7 +181,7 @@ func TestListAuditLogsHandler_DBError(t *testing.T) {
 	r.GET("/audit-log", ListAuditLogsHandler(db))
 
 	mock.ExpectQuery(`SELECT id, user_id, username, action, resource, resource_id, detail`).
-		WillReturnError(assertAnError("connection refused"))
+		WillReturnError(&testError{"connection refused"})
 
 	req := httptest.NewRequest("GET", "/audit-log", nil)
 	w := httptest.NewRecorder()

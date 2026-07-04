@@ -1,6 +1,6 @@
 # S+ Tier Plan — IronMesh/Seagles IoT Security Platform
 
-**Current Score: ~6.5/10**
+**Current Score: ~7.0/10** *(Phase S1 — Critical Bugs — COMPLETE)*
 
 > This document captures the complete audit findings and execution plan to bring the project to 10/10 — enterprise-grade security, testing, frontend quality, infrastructure, documentation, and advanced features.
 
@@ -76,22 +76,22 @@
 
 ## Execution Plan — 6 Phases to 10/10
 
-### Phase S1 — Fix Critical Bugs (~1–2 days)
+### ~~Phase S1 — Fix Critical Bugs (~1–2 days)~~ ✅ COMPLETE
 
-| Task | Files | Description |
-|------|-------|-------------|
-| Fix WebSocket security | `api/ws.go` | Add `CheckOrigin` with configured origin whitelist, add auth middleware to WS route, fix data race (change `RLock` to `Lock` for map mutation) |
-| Fix type assertion panics | `auth/auth.go` | Add ok-checks on all `c.Get()` type assertions, return 401/500 on failure |
-| Fix `slog.Fatal` | `slog/slog.go:82` | Add `os.Exit(1)` after log output, matching standard `log.Fatal` semantics |
-| Remove default DB password | `config/config.go:38` | Replace hardcoded password with empty sentinel, require env var to be set |
-| Fix CORS | `api/router.go:70` | Replace `*` with configured origin list, deny by default |
-| Fix firmware upload path | `api/firmware.go:200` | Use `filepath.Base(header.Filename)` to strip directory components |
-| Remove dead code | `middleware/sanitize.go:176` | Delete unreachable `_ = matchFound` and final `return nil` |
-| Fix cert pinning logic | `middleware/tls.go` | Use `InsecureSkipVerify: true`, do all verification in `VerifyPeerCertificate` callback |
-| Replace custom itoa | `middleware/ratelimit.go` | Use `strconv.Itoa` instead of reinvention |
-| Fix import paths | All backend files | Replace `github.com/yourusername/seagles` with actual module path |
+| Task | Files | Status |
+|------|-------|--------|
+| Fix WebSocket security | `api/ws.go` | ✅ |
+| Fix type assertion panics | `auth/auth.go` | ✅ |
+| Fix `slog.Fatal` | `slog/slog.go:82` | ✅ |
+| Remove default DB password | `config/config.go:38` | ✅ |
+| Fix CORS | `api/router.go:70` | ✅ |
+| Fix firmware upload path | `api/firmware.go:200` | ✅ |
+| Remove dead code | `middleware/sanitize.go:176` | ✅ |
+| Fix cert pinning logic | `middleware/tls.go` | ✅ |
+| Replace custom itoa | `middleware/ratelimit.go` | ✅ |
+| Fix import paths | All backend files | ✅ |
 
-### Phase S2 — Testing to 80%+ (~3–5 days)
+### Phase S2 — Testing to 80%+ (~3–5 days) 🔴 IN PROGRESS
 
 #### Backend Tests
 

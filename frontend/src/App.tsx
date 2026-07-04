@@ -30,7 +30,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const location = useLocation()
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<Record<string, string> | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {

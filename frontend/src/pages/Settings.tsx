@@ -177,8 +177,8 @@ function ProfilesTab() {
   useEffect(() => { getScanProfiles().then(r => setProfiles(r.data ?? [])).catch(() => {}) }, [])
 
   return (
-    <div className="card" style={{ overflow: 'hidden' }}>
-      <table className="data-table">
+      <div className="card table-wrapper" style={{ overflow: 'hidden' }}>
+        <table className="data-table">
         <thead><tr><th>Name</th><th>Description</th><th>Cred Testing</th><th>Protocol Probe</th><th>Timeout</th><th>Default</th></tr></thead>
         <tbody>
           {profiles.length === 0 ? (

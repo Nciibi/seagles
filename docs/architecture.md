@@ -308,7 +308,7 @@ graph TB
         Postgres[PostgreSQL<br/>:5432]
         PgB[PgBouncer<br/>:5432]
         Redis[Redis<br/>:6379]
-        MinIO[MinIO<br/>:9000 + :9001]
+        MinIO[MinIO Storage<br/>:9000 API / :9001 Console]
         Prom[Prometheus<br/>:9090]
         Grafana[Grafana<br/>:3000]
 
@@ -322,11 +322,11 @@ graph TB
     end
 
     subgraph "Host Ports"
-        H80[":80"] --> Frontend
-        H3000[":3000"] --> Grafana
-        H9000[":9000"] --> MinIO
-        H9001[":9001"] -->|Console| MinIO
-        H9090[":9090"] --> Prom
+        H80["Port :80"] --> Frontend
+        H3000["Port :3000"] --> Grafana
+        H9000["Port :9000"] --> MinIO
+        H9001["Port :9001"] --> MinIO
+        H9090["Port :9090"] --> Prom
     end
 
     Internet --> H80

@@ -102,7 +102,7 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 				"status":  "ok",
 				"service": "ironmesh-api",
 				"version": "2.1.0",
-				"db_ok":   db.Stats().OpenConnections > 0,
+				"db_ok":   db.IsHealthy(),
 			})
 		})
 

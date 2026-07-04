@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -33,15 +34,25 @@ type KeyPair struct {
 	PublicKey  *rsa.PublicKey
 }
 
+type Claims struct {
+	Sub       string    `json:"sub"`
+	Name      string    `json:"name"`
+	Role      string    `json:"role"`
+	JTI       string    `json:"jti"`
+	TokenType TokenType `json:"type"`
+	IAT       int64     `json:"iat"`
+	Exp       int64     `json:"exp"`
+}
+
 var (
-	keyPair     *KeyPair
-	keyPairMu   sync.RWMutex
-	tokenIssuer = "ironmesh"
+	globalKeyPair   *KeyPair
+	globalKeyPairMu sync.RWMutex
+	tokenIssuer     = "ironmesh"
 )
 
 func LoadOrGenerateKeys(privateKeyPEM string) error {
-	mu.Lock()
-	defer mu.Unlock()
+	globalKeyPairMu.Lock()
+	defer globalKeyPairMu.Unlock()
 
 	if privateKeyPEM != "" {
 		block, _ := pem.Decode([]byte(privateKeyPEM))
@@ -52,7 +63,7 @@ func LoadOrGenerateKeys(privateKeyPEM string) error {
 		if err != nil {
 			return fmt.Errorf("failed to parse RSA private key: %w", err)
 		}
-		keyPair = &KeyPair{
+		globalKeyPair = &KeyPair{
 			PrivateKey: priv,
 			PublicKey:  &priv.PublicKey,
 		}
@@ -64,7 +75,7 @@ func LoadOrGenerateKeys(privateKeyPEM string) error {
 	if err != nil {
 		return fmt.Errorf("failed to generate RSA key: %w", err)
 	}
-	keyPair = &KeyPair{
+	globalKeyPair = &KeyPair{
 		PrivateKey: priv,
 		PublicKey:  &priv.PublicKey,
 	}
@@ -73,14 +84,14 @@ func LoadOrGenerateKeys(privateKeyPEM string) error {
 }
 
 func GetPublicKeyPEM() (string, error) {
-	keyPairMu.RLock()
-	defer keyPairMu.RUnlock()
+	globalKeyPairMu.RLock()
+	defer globalKeyPairMu.RUnlock()
 
-	if keyPair == nil {
+	if globalKeyPair == nil {
 		return "", errors.New("key pair not initialized")
 	}
 
-	pubBytes, err := x509.MarshalPKIXPublicKey(keyPair.PublicKey)
+	pubBytes, err := x509.MarshalPKIXPublicKey(globalKeyPair.PublicKey)
 	if err != nil {
 		return "", err
 	}
@@ -92,38 +103,23 @@ func GetPublicKeyPEM() (string, error) {
 	return string(pem.EncodeToMemory(block)), nil
 }
 
-type Claims struct {
-	UserID    string
-	Username  string
-	Role      string
-	TokenID   string
-	TokenType TokenType
-	IssuedAt  time.Time
-	ExpiresAt time.Time
-}
-
-type SignedToken struct {
-	Token  string
-	Claims *Claims
-}
-
 func signRS256(claims *Claims) (string, error) {
-	keyPairMu.RLock()
-	priv := keyPair.PrivateKey
-	keyPairMu.RUnlock()
+	globalKeyPairMu.RLock()
+	priv := globalKeyPair.PrivateKey
+	globalKeyPairMu.RUnlock()
 
 	if priv == nil {
 		return "", errors.New("key pair not initialized")
 	}
 
-	header := fmt.Sprintf(`{"alg":"RS256","typ":"JWT","kid":"ironmesh-v1"}`)
+	header := `{"alg":"RS256","typ":"JWT","kid":"ironmesh-v1"}`
 	headerB64 := base64.RawURLEncoding.EncodeToString([]byte(header))
 
-	payload := fmt.Sprintf(`{"sub":%q,"name":%q,"role":%q,"jti":%q,"type":%q,"iat":%d,"exp":%d}`,
-		claims.UserID, claims.Username, claims.Role,
-		claims.TokenID, string(claims.TokenType),
-		claims.IssuedAt.Unix(), claims.ExpiresAt.Unix())
-	payloadB64 := base64.RawURLEncoding.EncodeToString([]byte(payload))
+	payload, err := json.Marshal(claims)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal claims: %w", err)
+	}
+	payloadB64 := base64.RawURLEncoding.EncodeToString(payload)
 
 	signingInput := headerB64 + "." + payloadB64
 	hashed := sha256.Sum256([]byte(signingInput))
@@ -138,9 +134,9 @@ func signRS256(claims *Claims) (string, error) {
 }
 
 func verifyRS256(tokenStr string) (*Claims, error) {
-	keyPairMu.RLock()
-	pub := keyPair.PublicKey
-	keyPairMu.RUnlock()
+	globalKeyPairMu.RLock()
+	pub := globalKeyPair.PublicKey
+	globalKeyPairMu.RUnlock()
 
 	if pub == nil {
 		return nil, errors.New("key pair not initialized")
@@ -169,262 +165,72 @@ func verifyRS256(tokenStr string) (*Claims, error) {
 	}
 
 	var claims Claims
-	if err := parseJSONClaims(payloadBytes, &claims); err != nil {
-		return nil, err
+	if err := json.Unmarshal(payloadBytes, &claims); err != nil {
+		return nil, fmt.Errorf("failed to parse claims: %w", err)
 	}
 
-	if time.Now().After(claims.ExpiresAt) {
+	if claims.Sub == "" {
+		return nil, errors.New("missing subject claim")
+	}
+	if claims.JTI == "" {
+		return nil, errors.New("missing jti claim")
+	}
+	if claims.TokenType == "" {
+		return nil, errors.New("missing token type claim")
+	}
+
+	if time.Now().After(time.Unix(claims.Exp, 0)) {
 		return nil, errors.New("token expired")
 	}
 
 	return &claims, nil
 }
 
-func parseJSONClaims(data []byte, claims *Claims) error {
-	var raw struct {
-		Sub   string `json:"sub"`
-		Name  string `json:"name"`
-		Role  string `json:"role"`
-		JTI   string `json:"jti"`
-		Type  string `json:"type"`
-		IAT   int64  `json:"iat"`
-		Exp   int64  `json:"exp"`
+func GenerateAccessToken(user User) (*SignedToken, error) {
+	tokenID := generateTokenID()
+	now := time.Now()
+	exp := now.Add(AccessTokenTTL)
+
+	claims := &Claims{
+		Sub:       user.ID,
+		Name:      user.Username,
+		Role:      user.Role,
+		JTI:       tokenID,
+		TokenType: AccessToken,
+		IAT:       now.Unix(),
+		Exp:       exp.Unix(),
 	}
 
-	if err := jsonUnmarshal(data, &raw); err != nil {
-		return fmt.Errorf("failed to parse claims: %w", err)
+	token, err := signRS256(claims)
+	if err != nil {
+		return nil, err
 	}
 
-	claims.UserID = raw.Sub
-	claims.Username = raw.Name
-	claims.Role = raw.Role
-	claims.TokenID = raw.JTI
-	claims.TokenType = TokenType(raw.Type)
-	claims.IssuedAt = time.Unix(raw.IAT, 0)
-	claims.ExpiresAt = time.Unix(raw.Exp, 0)
-
-	if claims.UserID == "" {
-		return errors.New("missing subject claim")
-	}
-	if claims.TokenID == "" {
-		return errors.New("missing jti claim")
-	}
-	if claims.TokenType == "" {
-		return errors.New("missing token type claim")
-	}
-
-	return nil
+	return &SignedToken{
+		Token:  token,
+		Claims: claims,
+	}, nil
 }
 
-func jsonUnmarshal(data []byte, v interface{}) error {
-	stack := make([]byte, 0, len(data))
-	for _, b := range data {
-		if b == '\n' || b == '\r' || b == '\t' {
-			continue
-		}
-		stack = append(stack, b)
+func ValidateAccessToken(tokenStr string) (*User, error) {
+	claims, err := verifyRS256(tokenStr)
+	if err != nil {
+		return nil, err
 	}
 
-	var i int
-	if err := skipWhitespace(stack, &i); err != nil {
-		return err
-	}
-	if i >= len(stack) || stack[i] != '{' {
-		return errors.New("expected {")
-	}
-	i++
-
-	for i < len(stack) {
-		if err := skipWhitespace(stack, &i); err != nil {
-			return err
-		}
-		if stack[i] == '}' {
-			break
-		}
-
-		var key string
-		if err := parseString(stack, &i, &key); err != nil {
-			return err
-		}
-		if err := skipWhitespace(stack, &i); err != nil {
-			return err
-		}
-		if i >= len(stack) || stack[i] != ':' {
-			return errors.New("expected :")
-		}
-		i++
-		if err := skipWhitespace(stack, &i); err != nil {
-			return err
-		}
-
-		switch key {
-		case "sub":
-			parseString(stack, &i, &rawField(v, "Sub"))
-		case "name":
-			parseString(stack, &i, &rawField(v, "Name"))
-		case "role":
-			parseString(stack, &i, &rawField(v, "Role"))
-		case "jti":
-			parseString(stack, &i, &rawField(v, "JTI"))
-		case "type":
-			parseString(stack, &i, &rawField(v, "Type"))
-		case "iat":
-			rawNum := parseInt64(stack, &i)
-			*rawInt64Field(v, "IAT") = rawNum
-		case "exp":
-			rawNum := parseInt64(stack, &i)
-			*rawInt64Field(v, "Exp") = rawNum
-		default:
-			skipValue(stack, &i)
-		}
-
-		if err := skipWhitespace(stack, &i); err != nil {
-			return err
-		}
-		if stack[i] == ',' {
-			i++
-		}
+	if claims.TokenType != AccessToken {
+		return nil, errors.New("not an access token")
 	}
 
-	return nil
-}
+	if IsTokenBlacklisted(claims.JTI) {
+		return nil, errors.New("token has been revoked")
+	}
 
-func skipWhitespace(data []byte, i *int) error {
-	for *i < len(data) {
-		b := data[*i]
-		if b == ' ' || b == '\n' || b == '\r' || b == '\t' {
-			*i++
-		} else {
-			return nil
-		}
-	}
-	return errors.New("unexpected end of data")
-}
-
-func parseString(data []byte, i *int, dest *string) error {
-	if *i >= len(data) || data[*i] != '"' {
-		return errors.New("expected \"")
-	}
-	*i++
-	start := *i
-	for *i < len(data) && data[*i] != '"' {
-		if data[*i] == '\\' {
-			*i += 2
-		} else {
-			*i++
-		}
-	}
-	if *i >= len(data) {
-		return errors.New("unterminated string")
-	}
-	*dest = string(data[start:*i])
-	*i++
-	return nil
-}
-
-func parseInt64(data []byte, i *int) int64 {
-	neg := false
-	if *i < len(data) && data[*i] == '-' {
-		neg = true
-		*i++
-	}
-	var n int64
-	for *i < len(data) && data[*i] >= '0' && data[*i] <= '9' {
-		n = n*10 + int64(data[*i]-'0')
-		*i++
-	}
-	if neg {
-		n = -n
-	}
-	return n
-}
-
-func skipValue(data []byte, i *int) {
-	if *i >= len(data) {
-		return
-	}
-	switch data[*i] {
-	case '"':
-		*i++
-		for *i < len(data) && data[*i] != '"' {
-			if data[*i] == '\\' {
-				*i += 2
-			} else {
-				*i++
-			}
-		}
-		*i++
-	case '{':
-		depth := 1
-		*i++
-		for *i < len(data) && depth > 0 {
-			if data[*i] == '{' {
-				depth++
-			} else if data[*i] == '}' {
-				depth--
-			}
-			*i++
-		}
-	case '[':
-		depth := 1
-		*i++
-		for *i < len(data) && depth > 0 {
-			if data[*i] == '[' {
-				depth++
-			} else if data[*i] == ']' {
-				depth--
-			}
-			*i++
-		}
-	default:
-		for *i < len(data) && data[*i] != ',' && data[*i] != '}' && data[*i] != ']' {
-			*i++
-		}
-	}
-}
-
-func rawField(v interface{}, name string) *string {
-	m := v.(*struct {
-		Sub   string `json:"sub"`
-		Name  string `json:"name"`
-		Role  string `json:"role"`
-		JTI   string `json:"jti"`
-		Type  string `json:"type"`
-		IAT   int64  `json:"iat"`
-		Exp   int64  `json:"exp"`
-	})
-	switch name {
-	case "Sub":
-		return &m.Sub
-	case "Name":
-		return &m.Name
-	case "Role":
-		return &m.Role
-	case "JTI":
-		return &m.JTI
-	case "Type":
-		return &m.Type
-	}
-	return nil
-}
-
-func rawInt64Field(v interface{}, name string) *int64 {
-	m := v.(*struct {
-		Sub   string `json:"sub"`
-		Name  string `json:"name"`
-		Role  string `json:"role"`
-		JTI   string `json:"jti"`
-		Type  string `json:"type"`
-		IAT   int64  `json:"iat"`
-		Exp   int64  `json:"exp"`
-	})
-	switch name {
-	case "IAT":
-		return &m.IAT
-	case "Exp":
-		return &m.Exp
-	}
-	return nil
+	return &User{
+		ID:       claims.Sub,
+		Username: claims.Name,
+		Role:     claims.Role,
+	}, nil
 }
 
 func generateTokenID() string {

@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -15,60 +14,6 @@ import (
 	"github.com/yourusername/seagles/middleware"
 	"github.com/yourusername/seagles/slog"
 )
-
-type rateLimiter struct {
-	mu       sync.Mutex
-	visitors map[string]*visitor
-	limit    int
-	window   time.Duration
-}
-
-type visitor struct {
-	count    int
-	lastSeen time.Time
-}
-
-func newRateLimiter(limit int, window time.Duration) *rateLimiter {
-	rl := &rateLimiter{
-		visitors: make(map[string]*visitor),
-		limit:    limit,
-		window:   window,
-	}
-	go rl.cleanup()
-	return rl
-}
-
-func (rl *rateLimiter) cleanup() {
-	ticker := time.NewTicker(5 * time.Minute)
-	defer ticker.Stop()
-	for range ticker.C {
-		rl.mu.Lock()
-		now := time.Now()
-		for k, v := range rl.visitors {
-			if now.Sub(v.lastSeen) > rl.window {
-				delete(rl.visitors, k)
-			}
-		}
-		rl.mu.Unlock()
-	}
-}
-
-func (rl *rateLimiter) allow(key string) bool {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-
-	v, exists := rl.visitors[key]
-	now := time.Now()
-
-	if !exists || now.Sub(v.lastSeen) > rl.window {
-		rl.visitors[key] = &visitor{count: 1, lastSeen: now}
-		return true
-	}
-
-	v.count++
-	v.lastSeen = now
-	return v.count <= rl.limit
-}
 
 func success(c *gin.Context, data interface{}) {
 	c.JSON(http.StatusOK, gin.H{"data": data, "error": nil})
@@ -84,7 +29,7 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 	r := gin.New()
 	r.Use(gin.Recovery())
 
-	rl := newRateLimiter(cfg.RateLimitPerMin, 1*time.Minute)
+	rl := middleware.NewRateLimiter(cfg.RateLimitPerMin, 1*time.Minute)
 
 	r.Use(func(c *gin.Context) {
 		start := time.Now()
@@ -143,17 +88,7 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 		c.Next()
 	})
 
-	r.Use(func(c *gin.Context) {
-		clientIP := c.ClientIP()
-		if !rl.allow(clientIP) {
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
-				"data": nil, "error": "Rate limit exceeded. Try again later.",
-			})
-			return
-		}
-		c.Next()
-	})
-
+	r.Use(middleware.RateLimitMiddleware(rl))
 	r.Use(middleware.SanitizeInput(middleware.DefaultXSSConfig))
 	r.Use(middleware.AuditLogger(db, "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/health", "/api/v1/ws"))
 

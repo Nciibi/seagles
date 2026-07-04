@@ -2,24 +2,28 @@ package api
 
 import (
 	"bytes"
+	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/yourusername/seagles/alerts"
 	"github.com/yourusername/seagles/config"
 	"github.com/yourusername/seagles/models"
 	"github.com/yourusername/seagles/slog"
 )
 
-type AnalyzeFirmwareRequest struct {
-	Filepath string `json:"filepath" binding:"omitempty,min=1"`
-	Vendor   string `json:"vendor" binding:"omitempty,min=1,max=200"`
-	Version  string `json:"version" binding:"omitempty,min=1,max=100"`
-}
+const maxUploadSize = 256 << 20
 
 func ListFirmwareHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -203,12 +207,12 @@ func UploadFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 
 		if cfg.S3Endpoint != "" && cfg.S3AccessKey != "" {
 			useSSL := false
-			minioClient, err := minio.New(cfg.S3Endpoint, &minio.Options{
+			minioClient, mErr := minio.New(cfg.S3Endpoint, &minio.Options{
 				Creds:  credentials.NewStaticV4(cfg.S3AccessKey, cfg.S3SecretKey, ""),
 				Secure: useSSL,
 			})
 
-			if err == nil {
+			if mErr == nil {
 				bucketName := cfg.S3Bucket
 				if bucketName == "" {
 					bucketName = "ironmesh-firmware"
@@ -233,7 +237,7 @@ func UploadFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 					slog.Warn("S3 upload failed, falling back to local storage", "error", err.Error())
 				}
 			} else {
-				slog.Warn("MinIO client init failed, falling back to local storage", "error", err.Error())
+				slog.Warn("MinIO client init failed, falling back to local storage", "error", mErr.Error())
 			}
 		}
 

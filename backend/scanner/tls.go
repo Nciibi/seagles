@@ -3,110 +3,88 @@ package scanner
 import (
 	"crypto/tls"
 	"fmt"
-	"log"
 	"net"
-	"strings"
 	"time"
+
+	"github.com/yourusername/seagles/slog"
 )
 
-// TLSResult contains the results of a TLS configuration check.
 type TLSResult struct {
-	Host          string    `json:"host"`
-	Port          int       `json:"port"`
-	SupportsTLS10 bool      `json:"supports_tls10"`
-	SupportsTLS11 bool      `json:"supports_tls11"`
-	SupportsTLS12 bool      `json:"supports_tls12"`
-	SupportsTLS13 bool      `json:"supports_tls13"`
-	CertExpiry    time.Time `json:"cert_expiry"`
-	CertExpired   bool      `json:"cert_expired"`
-	SelfSigned    bool      `json:"self_signed"`
-	WeakCiphers   []string  `json:"weak_ciphers"`
+	SupportsTLS10 bool
+	SupportsTLS11 bool
+	SupportsTLS12 bool
+	SupportsTLS13 bool
+	WeakCiphers   []string
+	CertExpired   bool
+	CertError     string
 }
 
-// CheckTLS tests TLS configuration on a given host and port.
-func CheckTLS(host string, port int) TLSResult {
-	addr := fmt.Sprintf("%s:%d", host, port)
-	result := TLSResult{
-		Host:        host,
-		Port:        port,
-		WeakCiphers: []string{},
-	}
+var weakCiphers = map[uint16]string{
+	tls.TLS_RSA_WITH_RC4_128_SHA:        "RC4-SHA",
+	tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA:  "3DES-EDE-CBC-SHA",
+	tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA: "ECDHE-RSA-RC4-SHA",
+	0x0005:                              "RC4-SHA (SSLv3)",
+	0x000a:                              "DES-CBC3-SHA",
+	0x0016:                              "DHE-RSA-DES-CBC3-SHA",
+	0xc007:                              "ECDHE-ECDSA-RC4-SHA",
+	0xc011:                              "ECDHE-RSA-RC4-SHA",
+	0xc012:                              "ECDHE-RSA-DES-CBC3-SHA",
+}
 
-	// Test each TLS version
+func CheckTLS(ip string, port int) TLSResult {
+	result := TLSResult{}
+	addr := fmt.Sprintf("%s:%d", ip, port)
+
 	versions := []struct {
-		version uint16
-		name    string
+		name   string
+		ver    uint16
+		target *bool
 	}{
-		{tls.VersionTLS10, "TLS 1.0"},
-		{tls.VersionTLS11, "TLS 1.1"},
-		{tls.VersionTLS12, "TLS 1.2"},
-		{tls.VersionTLS13, "TLS 1.3"},
+		{"TLS 1.0", tls.VersionTLS10, &result.SupportsTLS10},
+		{"TLS 1.1", tls.VersionTLS11, &result.SupportsTLS11},
+		{"TLS 1.2", tls.VersionTLS12, &result.SupportsTLS12},
+		{"TLS 1.3", tls.VersionTLS13, &result.SupportsTLS13},
 	}
 
 	for _, v := range versions {
-		cfg := &tls.Config{
+		conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 3 * time.Second}, "tcp", addr, &tls.Config{
 			InsecureSkipVerify: true,
-			MinVersion:         v.version,
-			MaxVersion:         v.version,
+			MinVersion:         v.ver,
+			MaxVersion:         v.ver,
+		})
+		if err != nil {
+			continue
 		}
 
-		conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 5 * time.Second}, "tcp", addr, cfg)
-		if conn != nil {
-			conn.Close()
+		*v.target = true
+
+		if v.ver < tls.VersionTLS12 {
+			result.SupportsTLS10 = true
 		}
 
-		if err == nil {
-			switch v.version {
-			case tls.VersionTLS10:
-				result.SupportsTLS10 = true
-				log.Printf("[TLS] %s supports deprecated TLS 1.0", addr)
-			case tls.VersionTLS11:
-				result.SupportsTLS11 = true
-				log.Printf("[TLS] %s supports deprecated TLS 1.1", addr)
-			case tls.VersionTLS12:
-				result.SupportsTLS12 = true
-			case tls.VersionTLS13:
-				result.SupportsTLS13 = true
+		state := conn.ConnectionState()
+		for _, cipher := range state.CipherSuite {
+			if name, ok := weakCiphers[cipher]; ok {
+				result.WeakCiphers = append(result.WeakCiphers, name)
 			}
 		}
-	}
 
-	// Attempt a full TLS connection to inspect certificate and cipher
-	cfg := &tls.Config{
-		InsecureSkipVerify: true,
-	}
-
-	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 5 * time.Second}, "tcp", addr, cfg)
-	if err != nil {
-		return result
-	}
-	defer conn.Close()
-
-	state := conn.ConnectionState()
-
-	// Check cipher suite
-	cipherName := tls.CipherSuiteName(state.CipherSuite)
-	weakPatterns := []string{"RC4", "DES", "3DES", "MD5"}
-	for _, pattern := range weakPatterns {
-		if strings.Contains(strings.ToUpper(cipherName), pattern) {
-			result.WeakCiphers = append(result.WeakCiphers, cipherName)
-			break
+		certs := state.PeerCertificates
+		if len(certs) > 0 {
+			if time.Now().After(certs[0].NotAfter) {
+				result.CertExpired = true
+			}
 		}
+
+		conn.Close()
+		break
 	}
 
-	// Inspect certificate chain
-	if len(state.PeerCertificates) > 0 {
-		cert := state.PeerCertificates[0]
-		result.CertExpiry = cert.NotAfter
-		result.CertExpired = time.Now().After(cert.NotAfter)
-
-		// Check if self-signed: issuer == subject
-		result.SelfSigned = cert.Issuer.String() == cert.Subject.String()
-
-		// Also check if cert is expiring within 30 days
-		if !result.CertExpired && time.Until(cert.NotAfter) < 30*24*time.Hour {
-			log.Printf("[TLS] Certificate on %s expiring within 30 days", addr)
-		}
+	if result.SupportsTLS10 || result.SupportsTLS11 || len(result.WeakCiphers) > 0 {
+		slog.Warn("Weak TLS detected", "ip", ip, "port", port,
+			"tls10", result.SupportsTLS10,
+			"tls11", result.SupportsTLS11,
+			"weak_ciphers", len(result.WeakCiphers))
 	}
 
 	return result

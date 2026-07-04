@@ -7,11 +7,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/yourusername/seagles/models"
+	"github.com/yourusername/seagles/slog"
 )
 
-// ListAlertsHandler returns alerts with optional filters.
 func ListAlertsHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		requestID, _ := c.Get("request_id")
+
 		query := `SELECT id, device_id, severity, alert_type, title, description,
 			triggered_at, acknowledged_at, is_acknowledged, metadata
 			FROM alerts WHERE 1=1`
@@ -39,6 +41,7 @@ func ListAlertsHandler(db *sql.DB) gin.HandlerFunc {
 
 		rows, err := db.Query(query, args...)
 		if err != nil {
+			slog.Error("Failed to query alerts", "request_id", requestID, "error", err.Error())
 			fail(c, 500, "Failed to query alerts: "+err.Error())
 			return
 		}
@@ -53,17 +56,21 @@ func ListAlertsHandler(db *sql.DB) gin.HandlerFunc {
 			}
 			alertList = append(alertList, a.ToJSON())
 		}
-		if alertList == nil { alertList = []models.AlertJSON{} }
+		if alertList == nil {
+			alertList = []models.AlertJSON{}
+		}
 		success(c, alertList)
 	}
 }
 
-// AckAlertHandler acknowledges an alert.
 func AckAlertHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		requestID, _ := c.Get("request_id")
 		id := c.Param("id")
+
 		result, err := db.Exec(`UPDATE alerts SET is_acknowledged=true, acknowledged_at=NOW() WHERE id=$1`, id)
 		if err != nil {
+			slog.Error("Failed to acknowledge alert", "request_id", requestID, "alert_id", id, "error", err.Error())
 			fail(c, 500, "Failed to acknowledge alert: "+err.Error())
 			return
 		}
@@ -72,6 +79,7 @@ func AckAlertHandler(db *sql.DB) gin.HandlerFunc {
 			fail(c, 404, "Alert not found")
 			return
 		}
+		slog.Info("Alert acknowledged", "request_id", requestID, "alert_id", id)
 		success(c, gin.H{"message": "Alert acknowledged"})
 	}
 }

@@ -7,15 +7,21 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/yourusername/seagles/models"
+	"github.com/yourusername/seagles/slog"
 )
 
-// ListDevicesHandler returns all devices with optional filters.
 func ListDevicesHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		requestID, _ := c.Get("request_id")
+
 		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
-		if page < 1 { page = 1 }
-		if limit < 1 || limit > 200 { limit = 50 }
+		if page < 1 {
+			page = 1
+		}
+		if limit < 1 || limit > 200 {
+			limit = 50
+		}
 		offset := (page - 1) * limit
 
 		query := `SELECT id, ip_address, mac_address, hostname, vendor, device_type,
@@ -48,6 +54,7 @@ func ListDevicesHandler(db *sql.DB) gin.HandlerFunc {
 
 		rows, err := db.Query(query, args...)
 		if err != nil {
+			slog.Error("Failed to query devices", "request_id", requestID, "error", err.Error())
 			fail(c, 500, "Failed to query devices: "+err.Error())
 			return
 		}
@@ -64,15 +71,18 @@ func ListDevicesHandler(db *sql.DB) gin.HandlerFunc {
 			}
 			devices = append(devices, d.ToJSON())
 		}
-		if devices == nil { devices = []models.DeviceJSON{} }
+		if devices == nil {
+			devices = []models.DeviceJSON{}
+		}
 		success(c, devices)
 	}
 }
 
-// GetDeviceHandler returns a single device with latest scan and open vuln count.
 func GetDeviceHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		requestID, _ := c.Get("request_id")
 		id := c.Param("id")
+
 		var d models.Device
 		err := db.QueryRow(`SELECT id, ip_address, mac_address, hostname, vendor, device_type,
 			os_fingerprint, firmware_version, first_seen, last_seen, risk_score,
@@ -85,6 +95,7 @@ func GetDeviceHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		if err != nil {
+			slog.Error("Failed to query device", "request_id", requestID, "device_id", id, "error", err.Error())
 			fail(c, 500, "Failed to query device: "+err.Error())
 			return
 		}
@@ -109,12 +120,14 @@ func GetDeviceHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-// DeleteDeviceHandler soft-deletes a device.
 func DeleteDeviceHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		requestID, _ := c.Get("request_id")
 		id := c.Param("id")
+
 		result, err := db.Exec(`UPDATE devices SET is_active = false WHERE id = $1`, id)
 		if err != nil {
+			slog.Error("Failed to delete device", "request_id", requestID, "device_id", id, "error", err.Error())
 			fail(c, 500, "Failed to delete device: "+err.Error())
 			return
 		}
@@ -123,6 +136,7 @@ func DeleteDeviceHandler(db *sql.DB) gin.HandlerFunc {
 			fail(c, 404, "Device not found")
 			return
 		}
+		slog.Info("Device deactivated", "request_id", requestID, "device_id", id)
 		success(c, gin.H{"message": "Device deactivated"})
 	}
 }

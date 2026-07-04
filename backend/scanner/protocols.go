@@ -3,6 +3,7 @@ package scanner
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -64,7 +65,7 @@ func DetectProtocols(ip string, openPorts []int) []ProtocolFinding {
 }
 
 func detectTelnet(ip string, port int) *ProtocolFinding {
-	addr := fmt.Sprintf("%s:%d", ip, port)
+	addr := net.JoinHostPort(ip, strconv.Itoa(port))
 	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
 	if err != nil {
 		return nil
@@ -98,7 +99,7 @@ func detectTelnet(ip string, port int) *ProtocolFinding {
 }
 
 func detectADB(ip string, port int) *ProtocolFinding {
-	addr := fmt.Sprintf("%s:%d", ip, port)
+	addr := net.JoinHostPort(ip, strconv.Itoa(port))
 	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
 	if err != nil {
 		return nil
@@ -125,7 +126,7 @@ func detectADB(ip string, port int) *ProtocolFinding {
 }
 
 func detectMQTT(ip string, port int) *ProtocolFinding {
-	addr := fmt.Sprintf("%s:%d", ip, port)
+	addr := net.JoinHostPort(ip, strconv.Itoa(port))
 	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
 	if err != nil {
 		return nil
@@ -169,7 +170,7 @@ func detectMQTT(ip string, port int) *ProtocolFinding {
 }
 
 func detectModbus(ip string, port int) *ProtocolFinding {
-	addr := fmt.Sprintf("%s:%d", ip, port)
+	addr := net.JoinHostPort(ip, strconv.Itoa(port))
 	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
 	if err != nil {
 		return nil
@@ -209,7 +210,7 @@ func detectModbus(ip string, port int) *ProtocolFinding {
 }
 
 func detectRTSP(ip string, port int) *ProtocolFinding {
-	addr := fmt.Sprintf("%s:%d", ip, port)
+	addr := net.JoinHostPort(ip, strconv.Itoa(port))
 	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
 	if err != nil {
 		return nil

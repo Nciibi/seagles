@@ -122,4 +122,11 @@ describe('API Client', () => {
     await client.getAlerts({ severity: 'high' })
     expect(mockAxiosInstance.get).toHaveBeenCalledWith('/alerts', { params: { severity: 'high' } })
   })
+
+  it('getScanScopes calls correct endpoint', async () => {
+    const client = await import('./client')
+    vi.mocked(mockAxiosInstance.get).mockResolvedValue({ data: { data: [] } })
+    await client.getScanScopes()
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith('/scan-scopes')
+  })
 })

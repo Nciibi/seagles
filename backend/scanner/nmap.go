@@ -101,6 +101,83 @@ type scanJob struct {
 
 var scanWorkerPool = make(chan struct{}, 20)
 
+var (
+	errInvalidCIDR  = fmt.Errorf("invalid CIDR notation")
+	errInvalidIP    = fmt.Errorf("invalid IP address")
+	errSuspicious   = fmt.Errorf("suspicious input detected")
+)
+
+var suspiciousPatterns = []string{
+	"`", "$(", ";", "|", "&&", "||",
+	"\n", "\r", ">", "<", "..",
+}
+
+func sanitizeCIDR(cidr string) error {
+	if len(cidr) > 50 {
+		return errInvalidCIDR
+	}
+
+	for _, p := range suspiciousPatterns {
+		if strings.Contains(cidr, p) {
+			return errSuspicious
+		}
+	}
+
+	parts := strings.Split(cidr, "/")
+	if len(parts) != 2 {
+		return errInvalidCIDR
+	}
+
+	ipParts := strings.Split(parts[0], ".")
+	if len(ipParts) != 4 {
+		return errInvalidCIDR
+	}
+
+	for _, p := range ipParts {
+		n, err := strconv.Atoi(p)
+		if err != nil || n < 0 || n > 255 {
+			return errInvalidCIDR
+		}
+	}
+
+	prefix, err := strconv.Atoi(parts[1])
+	if err != nil || prefix < 0 || prefix > 32 {
+		return errInvalidCIDR
+	}
+
+	return nil
+}
+
+func sanitizeIP(ip string) error {
+	if len(ip) > 45 {
+		return errInvalidIP
+	}
+
+	for _, p := range suspiciousPatterns {
+		if strings.Contains(ip, p) {
+			return errSuspicious
+		}
+	}
+
+	if strings.Contains(ip, ":") {
+		return nil
+	}
+
+	parts := strings.Split(ip, ".")
+	if len(parts) != 4 {
+		return errInvalidIP
+	}
+
+	for _, p := range parts {
+		n, err := strconv.Atoi(p)
+		if err != nil || n < 0 || n > 255 {
+			return errInvalidIP
+		}
+	}
+
+	return nil
+}
+
 func acquireWorker() {
 	scanWorkerPool <- struct{}{}
 }

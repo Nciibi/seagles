@@ -95,7 +95,16 @@ export default function App() {
           }}>
             <div style={{ padding: '24px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ fontSize: '1.5rem' }}>🛡️</span>
+                <img
+                  src="/seagles-logo.png"
+                  alt="IronMesh Logo"
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    objectFit: 'cover',
+                  }}
+                />
                 <div>
                   <h1 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--accent)', lineHeight: 1.2 }}>
                     IronMesh

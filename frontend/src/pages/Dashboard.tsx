@@ -3,6 +3,7 @@ import { getStats, getAlerts, triggerNetworkScan, type Stats, type Alert } from 
 import AlertFeed from '../components/AlertFeed'
 import RiskScore from '../components/RiskScore'
 import { Loading, LoadingCard } from '../components/Loading'
+import { severityColor } from '../utils/helpers'
 
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null)
@@ -75,13 +76,6 @@ export default function Dashboard() {
         <button className="btn btn-primary" onClick={fetchData}>Retry</button>
       </div>
     )
-  }
-
-  const severityColor = (score: number) => {
-    if (score >= 8) return '#e03131'
-    if (score >= 6) return '#f08c00'
-    if (score >= 3) return '#1c7ed6'
-    return '#2f9e44'
   }
 
   return (

@@ -1,19 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getAlerts, ackAlert, type Alert } from '../api/client'
-
-const severityIcon: Record<string, string> = {
-  critical: '🔴', high: '🟠', medium: '🔵', low: '⚪',
-}
-
-const timeAgo = (dateStr: string) => {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
-}
+import { timeAgo, getSeverityIcon } from '../utils/helpers'
 
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState<Alert[]>([])
@@ -105,7 +92,7 @@ export default function AlertsPage() {
               borderLeft: `3px solid ${alert.severity === 'critical' ? '#e03131' : alert.severity === 'high' ? '#f08c00' : alert.severity === 'medium' ? '#1c7ed6' : '#6b7280'}`,
             }}
           >
-            <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>{severityIcon[alert.severity] || '⚪'}</span>
+            <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>{getSeverityIcon(alert.severity)}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                 <span className={`badge badge-${alert.severity}`}>{alert.severity}</span>

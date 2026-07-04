@@ -1,15 +1,9 @@
 import { type Device } from '../api/client'
+import { riskColor } from '../utils/helpers'
 
 interface NetworkMapProps {
   devices: Device[]
   onSelect?: (id: string) => void
-}
-
-const riskColor = (score: number) => {
-  if (score >= 8) return '#e03131'
-  if (score >= 6) return '#f08c00'
-  if (score >= 3) return '#1c7ed6'
-  return '#2f9e44'
 }
 
 export default function NetworkMap({ devices, onSelect }: NetworkMapProps) {

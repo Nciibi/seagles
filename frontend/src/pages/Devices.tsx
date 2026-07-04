@@ -1,24 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getDevices, triggerScan, type Device } from '../api/client'
-
-const severityBadge = (score: number) => {
-  if (score >= 8) return { cls: 'badge badge-critical', text: `Critical ${score.toFixed(1)}` }
-  if (score >= 6) return { cls: 'badge badge-high', text: `High ${score.toFixed(1)}` }
-  if (score >= 3) return { cls: 'badge badge-medium', text: `Medium ${score.toFixed(1)}` }
-  return { cls: 'badge badge-low', text: `Low ${score.toFixed(1)}` }
-}
-
-const timeAgo = (dateStr: string) => {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
+import { severityBadge, timeAgo } from '../utils/helpers'
 
 export default function Devices() {
   const [devices, setDevices] = useState<Device[]>([])

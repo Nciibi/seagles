@@ -1,17 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getFirmware, analyzeFirmware, uploadFirmware, type Firmware } from '../api/client'
-
-const entropyColor = (score: number) => {
-  if (score > 7.2) return '#e03131'
-  if (score > 6.5) return '#f08c00'
-  return '#2f9e44'
-}
-
-const entropyLabel = (score: number) => {
-  if (score > 7.2) return 'Suspicious'
-  if (score > 6.5) return 'Elevated'
-  return 'Normal'
-}
+import { entropyColor, entropyLabel } from '../utils/helpers'
 
 export default function FirmwarePage() {
   const [firmware, setFirmware] = useState<Firmware[]>([])

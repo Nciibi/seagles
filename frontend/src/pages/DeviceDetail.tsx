@@ -2,16 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { getDevice, getRiskBreakdown, getVulnerabilities, getScans, resolveVuln, triggerScan, type Device, type Vulnerability, type Scan, type RiskBreakdown } from '../api/client'
 import RiskScore from '../components/RiskScore'
-
-const timeAgo = (dateStr: string) => {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
-}
+import { timeAgo } from '../utils/helpers'
 
 export default function DeviceDetail() {
   const { id } = useParams<{ id: string }>()

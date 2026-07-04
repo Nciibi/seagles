@@ -1,21 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getVulnerabilities, resolveVuln, type Vulnerability } from '../api/client'
-
-const timeAgo = (dateStr: string) => {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
-}
-
-const epssColor = (score: number | null) => {
-  if (!score) return 'var(--text-muted)'
-  if (score >= 0.5) return '#e03131'
-  if (score >= 0.1) return '#f08c00'
-  return '#2f9e44'
-}
+import { timeAgo, epssColor } from '../utils/helpers'
 
 export default function Vulnerabilities() {
   const [vulns, setVulns] = useState<Vulnerability[]>([])

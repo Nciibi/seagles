@@ -1,27 +1,11 @@
 import { ackAlert, type Alert } from '../api/client'
+import { timeAgo, getSeverityIcon } from '../utils/helpers'
 
 interface AlertFeedProps {
   alerts: Alert[]
   onAck?: () => void
   showDevice?: boolean
   limit?: number
-}
-
-const severityIcon: Record<string, string> = {
-  critical: '🔴',
-  high: '🟠',
-  medium: '🔵',
-  low: '⚪',
-}
-
-const timeAgo = (dateStr: string) => {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
 }
 
 export default function AlertFeed({ alerts, onAck, showDevice, limit }: AlertFeedProps) {
@@ -58,7 +42,7 @@ export default function AlertFeed({ alerts, onAck, showDevice, limit }: AlertFee
               transition: 'background 0.15s',
             }}
           >
-            <span style={{ fontSize: '1rem', flexShrink: 0 }}>{severityIcon[alert.severity] || '⚪'}</span>
+            <span style={{ fontSize: '1rem', flexShrink: 0 }}>{getSeverityIcon(alert.severity)}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: '0.8rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {alert.title}

@@ -1,6 +1,7 @@
 package slog
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -28,6 +29,7 @@ var levelNames = map[Level]string{
 }
 
 var currentLevel Level = LevelInfo
+var format string = "kv"
 var mu sync.Mutex
 
 func SetLevel(l Level) {
@@ -36,15 +38,31 @@ func SetLevel(l Level) {
 	currentLevel = l
 }
 
+func SetFormat(f string) {
+	mu.Lock()
+	defer mu.Unlock()
+	format = f
+}
+
 func logf(level Level, msg string, keysAndValues ...interface{}) {
 	mu.Lock()
 	lvl := currentLevel
+	fmt := format
 	mu.Unlock()
 
 	if level < lvl {
 		return
 	}
 
+	switch fmt {
+	case "json":
+		log.Println(buildJSON(level, msg, keysAndValues...))
+	default:
+		log.Println(buildKV(level, msg, keysAndValues...))
+	}
+}
+
+func buildKV(level Level, msg string, keysAndValues ...interface{}) string {
 	var b strings.Builder
 	b.WriteString(time.Now().Format(time.RFC3339))
 	b.WriteString(" [")
@@ -60,8 +78,23 @@ func logf(level Level, msg string, keysAndValues ...interface{}) {
 			b.WriteString(fmt.Sprintf("%v=<missing>", keysAndValues[i]))
 		}
 	}
+	return b.String()
+}
 
-	log.Println(b.String())
+func buildJSON(level Level, msg string, keysAndValues ...interface{}) string {
+	entry := map[string]interface{}{
+		"timestamp": time.Now().Format(time.RFC3339),
+		"level":     levelNames[level],
+		"message":   msg,
+	}
+	for i := 0; i < len(keysAndValues); i += 2 {
+		if i+1 < len(keysAndValues) {
+			key := fmt.Sprintf("%v", keysAndValues[i])
+			entry[key] = keysAndValues[i+1]
+		}
+	}
+	b, _ := json.Marshal(entry)
+	return string(b)
 }
 
 func Debug(msg string, keysAndValues ...interface{}) {

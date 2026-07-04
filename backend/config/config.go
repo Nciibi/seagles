@@ -27,10 +27,33 @@ type Config struct {
 	RateLimitPerMin     int
 	ScanMaxConcurrent   int
 	LogLevel            string
+	LogFormat           string
 	DBMaxOpenConns      int
 	DBMaxIdleConns      int
 	DBConnMaxLifetime   time.Duration
 	AllowedOrigins      []string
+
+	// Data retention (days, 0 = disabled)
+	RetentionScansDays         int
+	RetentionAlertsDays        int
+	RetentionAuditLogDays      int
+	RetentionWebhookDelivDays  int
+
+	// Webhook retry
+	WebhookRetryMaxAttempts int
+	WebhookRetryBaseDelayMs int
+
+	// SMTP / Email
+	SMTPServer  string
+	SMTPPort    int
+	SMTPUser    string
+	SMTPPass    string
+	SMTPFrom    string
+
+	// TLS
+	TLSEnabled  bool
+	TLSCertFile string
+	TLSKeyFile  string
 }
 
 func Load() (*Config, error) {
@@ -54,10 +77,29 @@ func Load() (*Config, error) {
 		RateLimitPerMin:     getEnvInt("RATE_LIMIT_PER_MIN", 60),
 		ScanMaxConcurrent:   getEnvInt("SCAN_MAX_CONCURRENT", 20),
 		LogLevel:            getEnv("LOG_LEVEL", "info"),
+		LogFormat:           getEnv("LOG_FORMAT", "kv"),
 		DBMaxOpenConns:      getEnvInt("DB_MAX_OPEN_CONNS", 25),
 		DBMaxIdleConns:      getEnvInt("DB_MAX_IDLE_CONNS", 5),
 		DBConnMaxLifetime:   time.Duration(getEnvInt("DB_CONN_MAX_LIFETIME_MINUTES", 5)) * time.Minute,
 		AllowedOrigins:      getAllowedOrigins(getEnv("ALLOWED_ORIGINS", "")),
+
+		RetentionScansDays:        getEnvInt("RETENTION_SCANS_DAYS", 90),
+		RetentionAlertsDays:       getEnvInt("RETENTION_ALERTS_DAYS", 90),
+		RetentionAuditLogDays:     getEnvInt("RETENTION_AUDIT_LOG_DAYS", 90),
+		RetentionWebhookDelivDays: getEnvInt("RETENTION_WEBHOOK_DELIV_DAYS", 30),
+
+		WebhookRetryMaxAttempts: getEnvInt("WEBHOOK_RETRY_MAX_ATTEMPTS", 3),
+		WebhookRetryBaseDelayMs: getEnvInt("WEBHOOK_RETRY_BASE_DELAY_MS", 1000),
+
+		SMTPServer: getEnv("SMTP_SERVER", ""),
+		SMTPPort:   getEnvInt("SMTP_PORT", 587),
+		SMTPUser:   getEnv("SMTP_USER", ""),
+		SMTPPass:   getEnv("SMTP_PASS", ""),
+		SMTPFrom:   getEnv("SMTP_FROM", ""),
+
+		TLSEnabled:  getEnv("TLS_ENABLED", "") == "true",
+		TLSCertFile: getEnv("TLS_CERT_FILE", ""),
+		TLSKeyFile:  getEnv("TLS_KEY_FILE", ""),
 	}
 
 	return cfg, nil

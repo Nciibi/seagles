@@ -2,11 +2,11 @@ package config
 
 import (
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 )
 
-// Config holds all configuration values for the application.
 type Config struct {
 	DatabaseURL         string
 	Port                string
@@ -20,9 +20,15 @@ type Config struct {
 	S3Bucket            string
 	S3AccessKey         string
 	S3SecretKey         string
+	RedisURL            string
+	RateLimitPerMin     int
+	ScanMaxConcurrent   int
+	LogLevel            string
+	DBMaxOpenConns      int
+	DBMaxIdleConns      int
+	DBConnMaxLifetime   time.Duration
 }
 
-// Load reads configuration from environment variables and .env files.
 func Load() (*Config, error) {
 	_ = godotenv.Load(".env", "../.env")
 
@@ -39,6 +45,13 @@ func Load() (*Config, error) {
 		S3Bucket:            getEnv("S3_BUCKET", "ironmesh-firmware"),
 		S3AccessKey:         getEnv("S3_ACCESS_KEY", ""),
 		S3SecretKey:         getEnv("S3_SECRET_KEY", ""),
+		RedisURL:            getEnv("REDIS_URL", ""),
+		RateLimitPerMin:     getEnvInt("RATE_LIMIT_PER_MIN", 60),
+		ScanMaxConcurrent:   getEnvInt("SCAN_MAX_CONCURRENT", 20),
+		LogLevel:            getEnv("LOG_LEVEL", "info"),
+		DBMaxOpenConns:      getEnvInt("DB_MAX_OPEN_CONNS", 25),
+		DBMaxIdleConns:      getEnvInt("DB_MAX_IDLE_CONNS", 5),
+		DBConnMaxLifetime:   time.Duration(getEnvInt("DB_CONN_MAX_LIFETIME_MINUTES", 5)) * time.Minute,
 	}
 
 	return cfg, nil
@@ -47,6 +60,16 @@ func Load() (*Config, error) {
 func getEnv(key, fallback string) string {
 	if value, exists := os.LookupEnv(key); exists {
 		return value
+	}
+	return fallback
+}
+
+func getEnvInt(key string, fallback int) int {
+	if value, exists := os.LookupEnv(key); exists {
+		var i int
+		if _, err := fmt.Sscanf(value, "%d", &i); err == nil {
+			return i
+		}
 	}
 	return fallback
 }

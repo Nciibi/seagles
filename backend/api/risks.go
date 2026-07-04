@@ -4,11 +4,13 @@ import (
 	"database/sql"
 
 	"github.com/gin-gonic/gin"
+	"github.com/yourusername/seagles/slog"
 )
 
-// StatsHandler returns aggregated platform statistics.
 func StatsHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		requestID, _ := c.Get("request_id")
+
 		var totalDevices, onlineDevices int
 		var avgRiskScore sql.NullFloat64
 
@@ -20,6 +22,7 @@ func StatsHandler(db *sql.DB) gin.HandlerFunc {
 			FROM devices
 		`).Scan(&totalDevices, &onlineDevices, &avgRiskScore)
 		if err != nil {
+			slog.Error("Failed to query stats", "request_id", requestID, "error", err.Error())
 			fail(c, 500, "Failed to query stats: "+err.Error())
 			return
 		}
@@ -39,30 +42,29 @@ func StatsHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		success(c, gin.H{
-			"total_devices":      totalDevices,
-			"online_devices":     onlineDevices,
-			"avg_risk_score":     avg,
-			"critical_vulns":     criticalVulns,
-			"high_vulns":         highVulns,
-			"medium_vulns":       mediumVulns,
-			"kev_vulns":          kevVulns,
-			"open_alerts":        openAlerts,
+			"total_devices":       totalDevices,
+			"online_devices":      onlineDevices,
+			"avg_risk_score":      avg,
+			"critical_vulns":      criticalVulns,
+			"high_vulns":          highVulns,
+			"medium_vulns":        mediumVulns,
+			"kev_vulns":           kevVulns,
+			"open_alerts":         openAlerts,
 			"suspicious_firmware": suspiciousFirmware,
 		})
 	}
 }
 
-// RiskBreakdownHandler returns the risk score breakdown for a specific device.
 func RiskBreakdownHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		requestID, _ := c.Get("request_id")
 		deviceID := c.Param("id")
 
-		// Import risk package functionality inline to avoid circular dependency
-		// Build risk factors by querying vulnerabilities
 		var factors = make(map[string]bool)
 		rows, err := db.Query(
 			`SELECT title FROM vulnerabilities WHERE device_id=$1 AND is_resolved=FALSE`, deviceID)
 		if err != nil {
+			slog.Error("Failed to query vulnerabilities for risk", "request_id", requestID, "device_id", deviceID, "error", err.Error())
 			fail(c, 500, "Failed to query vulnerabilities: "+err.Error())
 			return
 		}
@@ -106,7 +108,6 @@ func RiskBreakdownHandler(db *sql.DB) gin.HandlerFunc {
 		var entropyScore sql.NullFloat64
 		db.QueryRow(`SELECT entropy_score FROM firmware WHERE device_id=$1 ORDER BY analyzed_at DESC LIMIT 1`, deviceID).Scan(&entropyScore)
 
-		// Calculate score
 		score := 0.0
 		breakdown := make(map[string]float64)
 
@@ -174,9 +175,9 @@ func RiskBreakdownHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		success(c, gin.H{
-			"total_score":    score,
-			"severity":       severity,
-			"factors":        factors,
+			"total_score":     score,
+			"severity":        severity,
+			"factors":         factors,
 			"score_breakdown": breakdown,
 		})
 	}

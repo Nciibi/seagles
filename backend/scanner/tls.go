@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/yourusername/seagles/slog"
@@ -45,7 +46,7 @@ func scanTLSVersion(addr string, version uint16) (bool, *tls.ConnectionState) {
 
 func CheckTLS(ip string, port int) TLSResult {
 	result := TLSResult{}
-	addr := fmt.Sprintf("%s:%d", ip, port)
+	addr := net.JoinHostPort(ip, strconv.Itoa(port))
 
 	supported10, state10 := scanTLSVersion(addr, tls.VersionTLS10)
 	if supported10 {

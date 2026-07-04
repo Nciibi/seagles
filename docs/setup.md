@@ -2,16 +2,77 @@
 
 ## Prerequisites
 
-- Go 1.25+
-- Node.js 22+
-- Docker & Docker Compose
+- Go 1.22+
+- Node.js 20+
+- Docker & Docker Compose v2+
 - Make (optional)
 
-## Quick Start
+---
+
+## Quick Start (Linux / macOS)
 
 ```bash
 # 1. Clone the repository
-git clone <repo-url>
+git clone https://github.com/Nciibi/seagles
+cd seagles
+
+# 2. Copy environment config
+cp .env.example .env
+# Edit .env: set your network CIDR (e.g. 192.168.1.0/24)
+
+# 3. Start infrastructure (PostgreSQL, Redis, MinIO)
+docker compose up -d
+
+# 4. The backend + frontend will start automatically
+open http://localhost:3000
+
+# Default credentials: admin / changeme
+```
+
+---
+
+## Quick Start (Windows)
+
+### Prerequisites
+- [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/) with WSL2 backend
+- [Go](https://go.dev/dl/) 1.22+
+- [Node.js](https://nodejs.org/) 20+
+- PowerShell 5.1+ or PowerShell Core
+
+### Steps
+
+```powershell
+# 1. Clone the repository
+git clone https://github.com/Nciibi/seagles
+cd seagles
+
+# 2. Copy environment config
+Copy-Item .env.example .env
+# Edit .env: set your network CIDR (e.g. 192.168.1.0/24)
+# Note: On Windows, use PowerShell ISE or VS Code to edit
+
+# 3. Start all services (Docker Desktop must be running)
+docker compose up -d
+
+# 4. Open browser
+start http://localhost:3000
+```
+
+### Windows-Specific Notes
+
+- **Linux containers mode** must be enabled in Docker Desktop (right-click tray icon → "Switch to Linux containers")
+- If `docker compose` command is not found, use `docker-compose` (with hyphen)
+- For full nmap scanner functionality, use a Linux VM or WSL2. Basic scanning works on Windows but `network_mode: host` behaves differently
+- File sharing: ensure `C:\` is shared in Docker Desktop Settings → Resources → File Sharing
+- PowerShell execution policy: if you see script execution errors, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
+
+---
+
+## Manual Setup (Without Docker)
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/Nciibi/seagles
 cd seagles
 
 # 2. Copy environment config
@@ -33,13 +94,17 @@ npm run dev
 
 The API will be available at `http://localhost:8080` and the frontend at `http://localhost:5173`.
 
+---
+
 ## Default Credentials
 
 | Username | Password | Role |
 |----------|----------|------|
 | `admin` | `changeme` | admin |
 
-**Important:** Change the password on first login via `POST /auth/change-password`.
+**Important:** Change the password on first login via `POST /auth/change-password` or the Settings page.
+
+---
 
 ## Environment Variables
 
@@ -47,27 +112,79 @@ See `.env.example` for all options. Key variables:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `DATABASE_URL` | Yes | postgres://... | PostgreSQL connection string |
-| `JWT_SECRET` | No | auto-generated | RSA private key PEM |
-| `JWT_PRIVATE_KEY_FILE` | No | — | Path to PEM file |
-| `NETWORK_CIDR` | No | 192.168.1.0/24 | Scan target subnet |
-| `RATE_LIMIT_PER_MIN` | No | 60 | Default rate limit |
-| `LOG_LEVEL` | No | info | debug/info/warn/error |
-| `REDIS_URL` | No | — | Redis for distributed caching |
+| `DATABASE_URL` | Yes | — | PostgreSQL connection string |
+| `DB_PASSWORD` | Yes | — | PostgreSQL password (used in docker-compose) |
+| `JWT_SECRET` | No | auto-generated | RSA private key PEM string |
+| `JWT_PRIVATE_KEY_FILE` | No | — | Path to PEM private key file |
+| `NETWORK_CIDR` | No | `192.168.1.0/24` | Target subnet for network scan |
+| `ALLOWED_ORIGINS` | No | — | Comma-separated CORS/WS origins |
+| `RATE_LIMIT_PER_MIN` | No | `60` | Default rate limit per IP |
+| `LOG_LEVEL` | No | `info` | `debug`, `info`, `warn`, `error` |
+| `REDIS_URL` | No | — | Redis connection string |
+| `NVD_API_KEY` | No | — | NIST NVD API key (free at nvd.nist.gov) |
+| `SLACK_WEBHOOK_URL` | No | — | Slack webhook for alerts |
+| `TEAMS_WEBHOOK_URL` | No | — | Microsoft Teams webhook |
+| `S3_ENDPOINT` | No | `minio:9000` | S3-compatible storage endpoint |
+| `S3_ACCESS_KEY` | No | `admin` | S3 access key |
+| `S3_SECRET_KEY` | No | `password123` | S3 secret key |
+| `S3_BUCKET` | No | `ironmesh-firmware` | S3 bucket for firmware files |
 
-## Makefile Commands
+---
 
-```bash
-make up              # Start all services
-make down            # Stop all services
-make dev             # Start deps + run backend directly
-make build-backend   # Compile Go binary
-make build-frontend  # Build frontend
-make test            # Run all backend tests
-make vet             # Run go vet
-make health          # Check API health
-make login           # Test login endpoint
+## Frontend Proxy Configuration
+
+When running the frontend in development mode (`npm run dev`), the Vite dev server proxies API requests to the backend:
+
+```typescript
+// vite.config.ts
+proxy: {
+  '/api': {
+    target: 'http://localhost:8080',
+    changeOrigin: true,
+  },
+}
 ```
+
+This means the frontend dev server at `localhost:5173` forwards all `/api/*` requests to the backend at `localhost:8080`, avoiding CORS issues during development.
+
+In production (Docker), the nginx container handles this proxy instead.
+
+---
+
+## MinIO Configuration
+
+MinIO is used as S3-compatible storage for firmware uploads. Default access:
+
+- **Console URL:** `http://localhost:9001`
+- **API URL:** `http://localhost:9000`
+- **Access Key:** `admin` (configurable via `S3_ACCESS_KEY`)
+- **Secret Key:** `password123` (configurable via `S3_SECRET_KEY`)
+
+If the default `ironmesh-firmware` bucket does not exist, it is created automatically on first firmware upload.
+
+---
+
+## PgBouncer Configuration
+
+PgBouncer provides connection pooling for PostgreSQL. Default settings:
+
+| Setting | Value |
+|---------|-------|
+| Max client connections | 1000 |
+| Default pool size | 20 |
+| Pool mode | Transaction |
+
+PgBouncer sits between the backend and PostgreSQL. The backend connects to:
+```
+postgres://ironmesh:${DB_PASSWORD}@pgbouncer:5432/ironmesh?sslmode=disable
+```
+
+To bypass PgBouncer (e.g., for running migrations directly), connect to PostgreSQL directly:
+```
+postgres://ironmesh:${DB_PASSWORD}@postgres:5432/ironmesh
+```
+
+---
 
 ## Testing
 
@@ -87,6 +204,18 @@ go test -v -count=1 ./auth/
 go test -race ./...
 ```
 
+### Frontend Tests
+```bash
+cd frontend
+npm test
+```
+
+### Frontend tests in watch mode
+```bash
+cd frontend
+npm run test:watch
+```
+
 ### Integration Tests (requires Docker)
 ```bash
 # Start test DB
@@ -94,6 +223,8 @@ docker compose up -d postgres
 # Run tests pointing at test DB
 DATABASE_URL=postgres://... go test -v ./api/
 ```
+
+---
 
 ## Adding Migrations
 
@@ -106,6 +237,8 @@ CREATE INDEX ...
 
 Migrations run automatically on startup in sorted order.
 
+---
+
 ## Adding an API Endpoint
 
 1. Create handler in `backend/api/` (or add to existing file)
@@ -114,16 +247,23 @@ Migrations run automatically on startup in sorted order.
 4. Add OpenAPI spec to `backend/api/swagger.json`
 5. Add API docs in `docs/api.md`
 6. Add permission check in `backend/auth/auth.go` (RolePermissions map)
+7. Add audit logging if it's a write operation
+
+---
 
 ## Building for Production
 
 ```bash
-# Backend binary
+# Docker images
+make docker-build
+
+# Or build individually:
+docker build -t seagles-backend:latest -f backend/Dockerfile backend/
+docker build -t seagles-frontend:latest -f frontend/Dockerfile frontend/
+
+# Backend binary (without Docker)
 cd backend && go build -o bin/ironmesh .
 
-# Docker image
-docker build -t ironmesh-backend:latest -f backend/Dockerfile backend/
-
-# Frontend
+# Frontend (without Docker)
 cd frontend && npm run build
 ```

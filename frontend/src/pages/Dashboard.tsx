@@ -83,7 +83,7 @@ export default function Dashboard() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
         <div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 700 }}>Security Dashboard</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '4px' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '4px' }} aria-live="polite">
             Last updated: {lastRefresh.toLocaleTimeString()}
           </p>
         </div>

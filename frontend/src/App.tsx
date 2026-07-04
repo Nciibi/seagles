@@ -54,9 +54,11 @@ export default function App() {
   if (location.pathname === '/login') {
     return (
       <ErrorBoundary>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-        </Routes>
+        <Suspense fallback={<Loading />}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+          </Routes>
+        </Suspense>
       </ErrorBoundary>
     )
   }
@@ -123,7 +125,8 @@ export default function App() {
 
           <main style={{ marginLeft: '240px', flex: 1, padding: '24px 32px', minWidth: 0 }}>
             <ErrorBoundary>
-              <Routes>
+              <Suspense fallback={<Loading text="Loading page..." />}>
+                <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/devices" element={<Devices />} />
                 <Route path="/devices/:id" element={<DeviceDetail />} />
@@ -133,6 +136,7 @@ export default function App() {
                 <Route path="/settings" element={<Settings />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
+              </Suspense>
             </ErrorBoundary>
           </main>
         </div>

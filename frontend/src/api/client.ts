@@ -244,7 +244,13 @@ export interface ScanScope {
 // --- Auth ---
 export const login = (username: string, password: string) =>
   api.post('/auth/login', { username, password })
+export const refreshToken = (refreshToken: string) =>
+  api.post('/auth/refresh', { refresh_token: refreshToken })
+export const logout = () => api.post('/auth/logout')
+export const changePassword = (currentPassword: string, newPassword: string) =>
+  api.post('/auth/change-password', { current_password: currentPassword, new_password: newPassword })
 export const getMe = () => api.get<AuthUser>('/auth/me')
+export const getPermissions = () => api.get('/auth/permissions')
 
 // --- Stats ---
 export const getStats = () => api.get<Stats>('/stats')
@@ -298,6 +304,9 @@ export const createWebhook = (wh: { name: string; url: string; webhook_type: str
   api.post('/webhooks', wh)
 export const deleteWebhook = (id: string) => api.delete(`/webhooks/${id}`)
 export const testWebhook = (id: string) => api.post(`/webhooks/${id}/test`)
+
+// --- Audit Log ---
+export const getAuditLog = () => api.get('/audit-log')
 
 // --- Users ---
 export const getUsers = () => api.get('/users')

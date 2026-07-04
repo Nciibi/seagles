@@ -1,3 +1,4 @@
+import axios from 'axios'
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import Dashboard from './pages/Dashboard'

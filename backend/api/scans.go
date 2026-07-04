@@ -44,6 +44,10 @@ func ListScansHandler(db *sql.DB) gin.HandlerFunc {
 			}
 			scans = append(scans, s.ToJSON())
 		}
+		if err := rows.Err(); err != nil {
+			fail(c, 500, "Failed to iterate scans: "+err.Error())
+			return
+		}
 		if scans == nil {
 			scans = []models.ScanJSON{}
 		}

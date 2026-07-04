@@ -56,6 +56,10 @@ func ListAlertsHandler(db *sql.DB) gin.HandlerFunc {
 			}
 			alertList = append(alertList, a.ToJSON())
 		}
+		if err := rows.Err(); err != nil {
+			fail(c, 500, "Failed to iterate alerts: "+err.Error())
+			return
+		}
 		if alertList == nil {
 			alertList = []models.AlertJSON{}
 		}

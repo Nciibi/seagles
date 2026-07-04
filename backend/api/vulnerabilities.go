@@ -63,6 +63,10 @@ func ListVulnerabilitiesHandler(db *sql.DB) gin.HandlerFunc {
 			}
 			vulns = append(vulns, v.ToJSON())
 		}
+		if err := rows.Err(); err != nil {
+			fail(c, 500, "Failed to iterate vulnerabilities: "+err.Error())
+			return
+		}
 		if vulns == nil {
 			vulns = []models.VulnerabilityJSON{}
 		}

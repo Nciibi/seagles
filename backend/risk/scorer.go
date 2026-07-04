@@ -169,6 +169,9 @@ func BuildRiskFactors(db *sql.DB, deviceID string) (RiskFactors, error) {
 			factors.HasWeakTLS = true
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return factors, fmt.Errorf("iterate scans: %w", err)
+	}
 
 	// Count known CVEs
 	db.QueryRow(`SELECT COUNT(*) FROM vulnerabilities WHERE device_id=$1 AND cve_id IS NOT NULL AND is_resolved=FALSE`,

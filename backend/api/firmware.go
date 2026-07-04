@@ -71,6 +71,10 @@ func ListFirmwareHandler(db *sql.DB) gin.HandlerFunc {
 			}
 			firmwareList = append(firmwareList, entry)
 		}
+		if err := rows.Err(); err != nil {
+			fail(c, 500, "Failed to iterate firmware: "+err.Error())
+			return
+		}
 		if firmwareList == nil {
 			firmwareList = []FirmwareWithDevice{}
 		}

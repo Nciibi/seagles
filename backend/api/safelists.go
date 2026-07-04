@@ -56,6 +56,10 @@ func ListSafelistHandler(db *sql.DB) gin.HandlerFunc {
 			}
 			entries = append(entries, e)
 		}
+		if err := rows.Err(); err != nil {
+			fail(c, 500, "Failed to iterate safelists: "+err.Error())
+			return
+		}
 		if entries == nil {
 			entries = []SafelistEntry{}
 		}
@@ -147,6 +151,10 @@ func ListScanProfilesHandler(db *sql.DB) gin.HandlerFunc {
 			}
 			profiles = append(profiles, p)
 		}
+		if err := rows.Err(); err != nil {
+			fail(c, 500, "Failed to iterate scan profiles")
+			return
+		}
 		if profiles == nil {
 			profiles = []ScanProfile{}
 		}
@@ -181,6 +189,10 @@ func ListScanScopesHandler(db *sql.DB) gin.HandlerFunc {
 				s.Label = label.String
 			}
 			scopes = append(scopes, s)
+		}
+		if err := rows.Err(); err != nil {
+			fail(c, 500, "Failed to iterate scan scopes")
+			return
 		}
 		if scopes == nil {
 			scopes = []ScanScope{}
@@ -262,6 +274,10 @@ func ListWebhooksHandler(db *sql.DB) gin.HandlerFunc {
 				w.LastTriggered = &lastTriggered.String
 			}
 			webhooks = append(webhooks, w)
+		}
+		if err := rows.Err(); err != nil {
+			fail(c, 500, "Failed to iterate webhooks")
+			return
 		}
 		if webhooks == nil {
 			webhooks = []WebhookInfo{}

@@ -60,14 +60,14 @@ spec:
       protocol: TCP
     - port: 80
       protocol: TCP
-    - ports:
-        - port: 53
-          protocol: UDP
-      to:
-        - namespaceSelector: {}
-          podSelector:
-            matchLabels:
-              k8s-app: kube-dns
+  - ports:
+      - port: 53
+        protocol: UDP
+    to:
+      - namespaceSelector: {}
+        podSelector:
+          matchLabels:
+            k8s-app: kube-dns
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -97,11 +97,11 @@ spec:
     ports:
     - port: 8080
       protocol: TCP
-    - ports:
-        - port: 53
-          protocol: UDP
-      to:
-        - namespaceSelector: {}
-          podSelector:
-            matchLabels:
-              k8s-app: kube-dns
+  - ports:
+      - port: 53
+        protocol: UDP
+    to:
+      - namespaceSelector: {}
+        podSelector:
+          matchLabels:
+            k8s-app: kube-dns

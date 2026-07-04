@@ -105,6 +105,10 @@ func checkOfflineDevices(db *sql.DB) {
 			Description: "Device has not been seen for more than 30 minutes",
 		})
 	}
+	if err := rows.Err(); err != nil {
+		log.Printf("Error iterating alerts for engine: %v", err)
+		return
+	}
 }
 
 func checkFirmwareOverdue(db *sql.DB) {
@@ -134,6 +138,10 @@ func checkFirmwareOverdue(db *sql.DB) {
 			Title:       "Firmware analysis overdue",
 			Description: "Firmware has not been analyzed in 90+ days",
 		})
+	}
+	if err := rows.Err(); err != nil {
+		log.Printf("Error iterating alerts for engine: %v", err)
+		return
 	}
 }
 
@@ -165,5 +173,9 @@ func checkUnresolvedCritical(db *sql.DB) {
 			Title:       "Critical vulnerability unresolved for 7+ days",
 			Description: "A critical severity vulnerability has been open for more than 7 days",
 		})
+	}
+	if err := rows.Err(); err != nil {
+		log.Printf("Error iterating alerts for engine: %v", err)
+		return
 	}
 }

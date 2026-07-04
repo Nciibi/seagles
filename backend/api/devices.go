@@ -71,6 +71,10 @@ func ListDevicesHandler(db *sql.DB) gin.HandlerFunc {
 			}
 			devices = append(devices, d.ToJSON())
 		}
+		if err := rows.Err(); err != nil {
+			fail(c, 500, "Failed to iterate devices: "+err.Error())
+			return
+		}
 		if devices == nil {
 			devices = []models.DeviceJSON{}
 		}

@@ -67,6 +67,10 @@ func DispatchWebhooks(db *sql.DB, alertID, severity, title, description, deviceI
 
 		go deliverWebhookWithRetry(db, wh, alertID, severity, title, description, deviceID)
 	}
+	if err := rows.Err(); err != nil {
+		log.Printf("Error iterating webhooks: %v", err)
+		return
+	}
 }
 
 func deliverWebhookWithRetry(db *sql.DB, wh WebhookConfig, alertID, severity, title, description, deviceID string) {

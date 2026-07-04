@@ -136,6 +136,10 @@ func ListAuditLogsHandler(db *sql.DB) gin.HandlerFunc {
 			}
 			entries = append(entries, e)
 		}
+		if err := rows.Err(); err != nil {
+			log.Printf("Error iterating audit logs: %v", err)
+			return
+		}
 		if entries == nil {
 			entries = []AuditLogEntry{}
 		}

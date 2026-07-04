@@ -14,7 +14,12 @@ docker compose logs postgres
 
 **Fix:** Ensure `DATABASE_URL` in `.env` matches `docker-compose.yml`. Default:
 ```
-postgres://ironmesh:changeme_strong_password_here@localhost:5432/ironmesh?sslmode=disable
+postgres://ironmesh:changeme_strong_password_here@pgbouncer:5432/ironmesh?sslmode=disable
+```
+
+If using direct PostgreSQL connection (bypassing PgBouncer):
+```
+postgres://ironmesh:changeme_strong_password_here@postgres:5432/ironmesh
 ```
 
 ### "Rate limit exceeded" on login
@@ -32,6 +37,7 @@ postgres://ironmesh:changeme_strong_password_here@localhost:5432/ironmesh?sslmod
 **Fix:** The frontend auto-refreshes via `POST /auth/refresh`. If refresh fails:
 - User needs to re-login
 - Refresh token may have been revoked (password change, admin action)
+- Admin can check active sessions via `GET /sessions`
 
 ### "Cannot find migrations directory"
 
@@ -49,7 +55,7 @@ cd backend && go run .
 **Check:**
 - `client.send` channel buffer (256) may be full
 - Client must send `pong` within 60s of receiving `ping`
-- Unauthenticated connections are rejected
+- Unauthenticated connections are rejected before upgrade
 - Check `ALLOWED_ORIGINS` env var includes your frontend URL
 
 **Fix:**
@@ -82,7 +88,7 @@ ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
 
 ### Auth fails after deployment
 
-**Cause:** RSA key pair was auto-generated and differs from previous instance.
+**Cause:** RSA key pair was auto-generated and differs from previous instance. All existing tokens are now invalid.
 
 **Fix:** Set `JWT_SECRET` or `JWT_PRIVATE_KEY_FILE` in `.env` to persist keys:
 ```bash
@@ -91,6 +97,7 @@ openssl genrsa -out jwt-private.pem 2048
 # Reference in .env
 JWT_PRIVATE_KEY_FILE=/path/to/jwt-private.pem
 ```
+Then restart the backend.
 
 ### Firmware upload: "Invalid firmware file"
 
@@ -99,6 +106,8 @@ JWT_PRIVATE_KEY_FILE=/path/to/jwt-private.pem
 **Valid extensions:** `.bin`, `.elf`, `.gz`, `.tar`, `.bz2`, `.xz`, `.zip`, `.rar`, `.7z`, `.img`, `.fw`, `.rom`, `.squashfs`, `.ubifs`, `.jffs2`, `.cramfs`
 
 **Max size:** 256 MB
+
+**Note:** The first 512 bytes are checked for magic byte signatures. If the file passes extension check but fails magic byte check, the file may be corrupted or renamed.
 
 ### Database connection pool exhausted
 
@@ -110,7 +119,7 @@ JWT_PRIVATE_KEY_FILE=/path/to/jwt-private.pem
 docker compose exec postgres psql -U ironmesh -c "SELECT count(*) FROM pg_stat_activity WHERE datname = 'ironmesh';"
 ```
 
-**Fix:** Lower `DB_MAX_OPEN_CONNS` or increase PostgreSQL `max_connections`.
+**Fix:** Lower `DB_MAX_OPEN_CONNS` or increase PostgreSQL `max_connections`. Alternatively, PgBouncer may need a larger pool size.
 
 ### Redis connection errors
 
@@ -122,7 +131,7 @@ docker compose ps redis
 docker compose logs redis
 ```
 
-**Note:** Redis is optional. The system falls back to in-memory cache if Redis is unavailable.
+**Note:** Redis is optional. The system falls back to in-memory cache if Redis is unavailable. Token blacklist, rate limiter, and data cache all work without Redis.
 
 ### MinIO connection errors
 
@@ -136,7 +145,9 @@ docker compose logs minio
 curl http://localhost:9000/minio/health/live
 ```
 
-**Fix:** Verify `S3_ACCESS_KEY` and `S3_SECRET_KEY` in `.env` match MinIO configuration.
+**Fix:** Verify `S3_ACCESS_KEY` and `S3_SECRET_KEY` in `.env` match MinIO configuration. Default:
+- Access Key: `admin`
+- Secret Key: `password123`
 
 ### PgBouncer errors
 
@@ -151,6 +162,7 @@ docker compose logs pgbouncer
 ```bash
 docker compose restart pgbouncer
 ```
+If the backend connects directly to PostgreSQL (bypassing PgBouncer), ensure `DATABASE_URL` points to `postgres:5432` not `pgbouncer:5432`.
 
 ### Firmware Analyzer not responding
 
@@ -163,7 +175,7 @@ docker compose logs firmware-analyzer
 curl http://localhost:8001/health
 ```
 
-**Fix:** Ensure `DATABASE_URL` env var is set for the firmware-analyzer. The service may take 10-15 seconds to start due to dependency installation.
+**Fix:** Ensure `FIRMWARE_ANALYZER_URL` env var is set correctly. The service may take 10-15 seconds to start on first run due to Python dependency installation. On resource-constrained hosts, consider increasing the startup timeout.
 
 ### Frontend shows blank page
 
@@ -178,7 +190,59 @@ curl http://localhost:8080/api/v1/health
 curl http://localhost:3000
 ```
 
-**Fix:** Clear browser cache and reload. If API is unreachable, check backend logs.
+**Fix:** Clear browser cache and reload. If API is unreachable, check backend logs. If using a different port, ensure `ALLOWED_ORIGINS` includes the correct frontend URL.
+
+### Grafana dashboards not showing data
+
+**Cause:** Prometheus target unreachable or dashboards not loaded.
+
+**Check:**
+```bash
+# Check Prometheus targets
+curl http://localhost:9090/api/v1/targets
+# Check Grafana datasource
+curl http://localhost:3000/api/datasources
+```
+
+**Fix:** Ensure Prometheus is scraping the backend at `backend:8080/metrics`. Dashboards are loaded from `docker/grafana/dashboards/` via provisioning.
+
+### Prometheus metrics not accessible
+
+**Cause:** Backend metrics endpoint not exposed or blocked.
+
+**Check:**
+```bash
+curl http://localhost:8080/api/v1/metrics
+```
+
+**Fix:** The metrics endpoint is public (no auth required). If behind a reverse proxy, ensure `/metrics` is not blocked.
+
+### Docker Compose "service not found"
+
+**Cause:** Running an older version of Docker Compose that doesn't support the v2 format.
+
+**Fix:** Use `docker-compose` (with hyphen) instead of `docker compose`, or upgrade to Docker Compose v2+:
+```bash
+docker compose version
+# If not found:
+docker-compose up -d
+```
+
+### Makefile targets fail on Windows
+
+**Cause:** Make is not available on Windows by default.
+
+**Fix:** Use the individual commands instead:
+```bash
+# Instead of make build
+cd backend && go build -o ironmesh .
+cd frontend && npm run build
+
+# Instead of make test
+cd backend && go test -v -count=1 ./...
+cd frontend && npm test
+```
+Or install Make via Chocolatey: `choco install make`
 
 ---
 
@@ -249,4 +313,16 @@ kubectl describe secret seagles-db-secrets -n security-tools
 ```bash
 kubectl describe ingress seagles-ingress -n security-tools
 kubectl get events -n security-tools
+```
+
+### HPA not scaling
+```bash
+kubectl describe hpa seagles-hpa -n security-tools
+kubectl top pods -n security-tools
+```
+
+### Network policy blocking traffic
+```bash
+kubectl describe networkpolicy -n security-tools
+kubetl logs -n security-tools -l app=seagles-backend --tail=50
 ```

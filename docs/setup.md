@@ -1,11 +1,11 @@
-# Development Setup
+# Setup Guide
 
 ## Prerequisites
 
 - Go 1.22+
 - Node.js 20+
 - Docker & Docker Compose v2+
-- Make (optional)
+- Make (optional, for Makefile targets)
 
 ---
 
@@ -20,10 +20,10 @@ cd seagles
 cp .env.example .env
 # Edit .env: set your network CIDR (e.g. 192.168.1.0/24)
 
-# 3. Start infrastructure (PostgreSQL, Redis, MinIO)
+# 3. Start all services
 docker compose up -d
 
-# 4. The backend + frontend will start automatically
+# 4. Open browser
 open http://localhost:3000
 
 # Default credentials: admin / changeme
@@ -34,12 +34,21 @@ open http://localhost:3000
 ## Quick Start (Windows)
 
 ### Prerequisites
+
 - [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/) with WSL2 backend
 - [Go](https://go.dev/dl/) 1.22+
 - [Node.js](https://nodejs.org/) 20+
 - PowerShell 5.1+ or PowerShell Core
 
-### Steps
+### Scaffold Script (Recommended)
+
+```powershell
+.\scaffold.ps1
+```
+
+This script handles: environment file setup, configuration prompts, Docker Desktop checks.
+
+### Manual Steps
 
 ```powershell
 # 1. Clone the repository
@@ -49,7 +58,6 @@ cd seagles
 # 2. Copy environment config
 Copy-Item .env.example .env
 # Edit .env: set your network CIDR (e.g. 192.168.1.0/24)
-# Note: On Windows, use PowerShell ISE or VS Code to edit
 
 # 3. Start all services (Docker Desktop must be running)
 docker compose up -d
@@ -65,6 +73,23 @@ start http://localhost:3000
 - For full nmap scanner functionality, use a Linux VM or WSL2. Basic scanning works on Windows but `network_mode: host` behaves differently
 - File sharing: ensure `C:\` is shared in Docker Desktop Settings → Resources → File Sharing
 - PowerShell execution policy: if you see script execution errors, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
+
+---
+
+## Makefile Usage
+
+```bash
+make help          # List all targets
+make all           # Lint + test + build
+make build         # Build backend binary + frontend bundle
+make test          # Run all tests
+make lint          # Run all linters
+make docker-build  # Build all Docker images
+make docker-up     # Start Docker Compose services
+make docker-down   # Stop all services
+make security-scan # Run Trivy vulnerability scan
+make clean         # Remove build artifacts
+```
 
 ---
 
@@ -99,7 +124,7 @@ The API will be available at `http://localhost:8080` and the frontend at `http:/
 ## Default Credentials
 
 | Username | Password | Role |
-|----------|----------|------|
+|---|---|---|
 | `admin` | `changeme` | admin |
 
 **Important:** Change the password on first login via `POST /auth/change-password` or the Settings page.
@@ -108,26 +133,30 @@ The API will be available at `http://localhost:8080` and the frontend at `http:/
 
 ## Environment Variables
 
-See `.env.example` for all options. Key variables:
+See `.env.example` for the complete list. Key variables:
 
 | Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `DATABASE_URL` | Yes | — | PostgreSQL connection string |
-| `DB_PASSWORD` | Yes | — | PostgreSQL password (used in docker-compose) |
+|---|---|---|---|
+| `DB_PASSWORD` | Yes | `changeme_strong_password_here` | PostgreSQL password |
+| `NETWORK_CIDR` | No | `192.168.1.0/24` | Target subnet for network scan |
 | `JWT_SECRET` | No | auto-generated | RSA private key PEM string |
 | `JWT_PRIVATE_KEY_FILE` | No | — | Path to PEM private key file |
-| `NETWORK_CIDR` | No | `192.168.1.0/24` | Target subnet for network scan |
-| `ALLOWED_ORIGINS` | No | — | Comma-separated CORS/WS origins |
+| `ALLOWED_ORIGINS` | No | `http://localhost:3000` | Comma-separated CORS/WS origins |
 | `RATE_LIMIT_PER_MIN` | No | `60` | Default rate limit per IP |
 | `LOG_LEVEL` | No | `info` | `debug`, `info`, `warn`, `error` |
-| `REDIS_URL` | No | — | Redis connection string |
+| `SCAN_MAX_CONCURRENT` | No | `20` | Max concurrent network scans |
+| `REDIS_URL` | No | — | Redis connection string (optional, falls back to in-memory cache) |
 | `NVD_API_KEY` | No | — | NIST NVD API key (free at nvd.nist.gov) |
 | `SLACK_WEBHOOK_URL` | No | — | Slack webhook for alerts |
 | `TEAMS_WEBHOOK_URL` | No | — | Microsoft Teams webhook |
 | `S3_ENDPOINT` | No | `minio:9000` | S3-compatible storage endpoint |
+| `S3_BUCKET` | No | `ironmesh-firmware` | S3 bucket for firmware files |
 | `S3_ACCESS_KEY` | No | `admin` | S3 access key |
 | `S3_SECRET_KEY` | No | `password123` | S3 secret key |
-| `S3_BUCKET` | No | `ironmesh-firmware` | S3 bucket for firmware files |
+| `DB_MAX_OPEN_CONNS` | No | `25` | Max open database connections |
+| `DB_MAX_IDLE_CONNS` | No | `5` | Max idle database connections |
+| `DB_CONN_MAX_LIFETIME_MINUTES` | No | `5` | Max connection lifetime |
+| `GRAFANA_PASSWORD` | No | `admin` | Grafana admin password |
 
 ---
 
@@ -144,8 +173,6 @@ proxy: {
   },
 }
 ```
-
-This means the frontend dev server at `localhost:5173` forwards all `/api/*` requests to the backend at `localhost:8080`, avoiding CORS issues during development.
 
 In production (Docker), the nginx container handles this proxy instead.
 
@@ -169,59 +196,111 @@ If the default `ironmesh-firmware` bucket does not exist, it is created automati
 PgBouncer provides connection pooling for PostgreSQL. Default settings:
 
 | Setting | Value |
-|---------|-------|
+|---|---|
 | Max client connections | 1000 |
 | Default pool size | 20 |
 | Pool mode | Transaction |
 
-PgBouncer sits between the backend and PostgreSQL. The backend connects to:
+The backend connects to PgBouncer:
+
 ```
 postgres://ironmesh:${DB_PASSWORD}@pgbouncer:5432/ironmesh?sslmode=disable
 ```
 
 To bypass PgBouncer (e.g., for running migrations directly), connect to PostgreSQL directly:
+
 ```
 postgres://ironmesh:${DB_PASSWORD}@postgres:5432/ironmesh
 ```
 
 ---
 
+## Monitoring Stack
+
+Grafana dashboards are pre-configured in `docker/grafana/dashboards/`:
+
+| Dashboard | Description |
+|---|---|
+| `security-overview.json` | Risk scores, vulnerability trends, alert counts |
+| `device-health.json` | Device status, scan history, uptime |
+| `scan-performance.json` | Scan duration, port counts, success rates |
+| `audit-trail.json` | Audit log volume, user activity, error rates |
+
+Prometheus configuration is at `docker/prometheus/prometheus.yml`. Metrics are exposed at `GET /metrics` on the backend.
+
+---
+
+## Kubernetes Deployment
+
+Production-ready manifests are in `k8s/`:
+
+| Manifest | Purpose |
+|---|---|
+| `seagles-backend-deployment.yaml` | Backend API deployment (2 replicas) |
+| `seagles-frontend-deployment.yaml` | Frontend nginx deployment (2 replicas) |
+| `seagles-service.yaml` | ClusterIP services for backend + frontend |
+| `seagles-ingress.yaml` | HTTPS ingress with TLS |
+| `seagles-hpa.yaml` | Horizontal Pod Autoscaler (CPU > 70%) |
+| `seagles-network-policy.yaml` | Pod isolation, deny-all default |
+| `seagles-pvc.yaml` | Persistent volume claims for PostgreSQL |
+| `seagles-rbac.yaml` | Least-privilege ServiceAccount + Role |
+
+```bash
+kubectl create namespace security-tools
+kubectl apply -f k8s/
+```
+
+**Note:** Update image tags and registry URLs in the manifests before deploying.
+
+---
+
+## Deploy Script
+
+The `deploy.sh` script automates production deployment:
+
+```bash
+./deploy.sh
+```
+
+It builds the backend binary, installs frontend dependencies and builds the bundle, runs database migrations, then copies assets.
+
+---
+
 ## Testing
 
 ### Backend Tests
-```bash
-cd backend
-go test -v -count=1 ./...
-```
 
-### Run specific package
 ```bash
-go test -v -count=1 ./auth/
-```
+# All tests
+cd backend && go test -v -count=1 ./...
 
-### Run with race detection
-```bash
-go test -race ./...
+# Specific package
+cd backend && go test -v -count=1 ./auth/
+
+# With race detection
+cd backend && go test -race ./...
+
+# Benchmarks
+cd backend && go test -bench=. ./...
 ```
 
 ### Frontend Tests
+
 ```bash
-cd frontend
-npm test
+cd frontend && npm test
+
+# Watch mode
+cd frontend && npm run test:watch
 ```
 
-### Frontend tests in watch mode
-```bash
-cd frontend
-npm run test:watch
-```
+### Integration Tests
 
-### Integration Tests (requires Docker)
 ```bash
 # Start test DB
 docker compose up -d postgres
+
 # Run tests pointing at test DB
-DATABASE_URL=postgres://... go test -v ./api/
+DATABASE_URL=postgres://ironmesh:password@localhost:5432/ironmesh?sslmode=disable go test -v ./api/
 ```
 
 ---
@@ -229,6 +308,7 @@ DATABASE_URL=postgres://... go test -v ./api/
 ## Adding Migrations
 
 Create a new file in `backend/db/migrations/` with sequential numbering:
+
 ```sql
 -- 014_my_feature.sql
 CREATE TABLE ...
@@ -244,7 +324,7 @@ Migrations run automatically on startup in sorted order.
 1. Create handler in `backend/api/` (or add to existing file)
 2. Register route in `backend/api/router.go`
 3. Add request/response types if needed
-4. Add OpenAPI spec to `backend/api/swagger.json`
+4. Add OpenAPI spec to `backend/api/swagger.go`
 5. Add API docs in `docs/api.md`
 6. Add permission check in `backend/auth/auth.go` (RolePermissions map)
 7. Add audit logging if it's a write operation
@@ -262,7 +342,7 @@ docker build -t seagles-backend:latest -f backend/Dockerfile backend/
 docker build -t seagles-frontend:latest -f frontend/Dockerfile frontend/
 
 # Backend binary (without Docker)
-cd backend && go build -o bin/ironmesh .
+cd backend && go build -o ironmesh .
 
 # Frontend (without Docker)
 cd frontend && npm run build

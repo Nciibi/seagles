@@ -10,14 +10,15 @@ Tokens are obtained via `POST /auth/login`.
 ### Token Types
 
 | Token | TTL | Storage | Usage |
-|-------|-----|---------|-------|
+|---|---|---|---|
 | Access Token | 15 min | Client memory | `Authorization: Bearer <token>` |
-| Refresh Token | 7 days | Secure storage | `POST /auth/refresh` |
+| Refresh Token | 7 days | Secure storage (httpOnly cookie) | `POST /auth/refresh` |
 
 ### Token Rotation
 - Refresh tokens are rotated on each use (old token invalidated)
 - Password change invalidates ALL refresh tokens for the user
 - Logout blacklists the current access token (15 min residual)
+- Sessions list shows all active sessions; admins can revoke remotely
 
 ---
 
@@ -35,7 +36,7 @@ All endpoints return a uniform envelope:
 ### HTTP Status Codes
 
 | Code | Meaning |
-|------|---------|
+|---|---|
 | 200 | Success |
 | 201 | Created |
 | 400 | Bad request (validation error) |
@@ -68,14 +69,14 @@ All endpoints return a uniform envelope:
 List endpoints support cursor-based pagination via query parameters:
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
+|---|---|---|---|
 | `page` | int | `1` | Page number (1-indexed) |
 | `per_page` | int | `20` | Items per page (max 100) |
 
 Pagination metadata is returned in response headers:
 
 | Header | Description |
-|--------|-------------|
+|---|---|
 | `X-Total-Count` | Total number of items |
 | `X-Page` | Current page |
 | `X-Per-Page` | Items per page |
@@ -85,7 +86,7 @@ Pagination metadata is returned in response headers:
 List endpoints support query parameter filtering:
 
 | Parameter | Type | Description |
-|-----------|------|-------------|
+|---|---|---|
 | `search` | string | Full-text search across name/description |
 | `sort` | string | Field to sort by (prefix `-` for desc: `-risk_score`) |
 | `severity` | string | Filter by severity: `critical`, `high`, `medium`, `low` |
@@ -105,7 +106,7 @@ List endpoints support query parameter filtering:
 Rate limit headers are returned on every response:
 
 | Header | Description |
-|--------|-------------|
+|---|---|
 | `X-RateLimit-Limit` | Max requests per window |
 | `X-RateLimit-Remaining` | Requests remaining in current window |
 | `X-RateLimit-Reset` | Unix timestamp when window resets |
@@ -117,50 +118,55 @@ Default: 60 requests per minute per IP. Per-endpoint rules may apply.
 ## RBAC Permissions
 
 | Role | Level | Description |
-|------|-------|-------------|
+|---|---|---|
 | `viewer` | 0 | Read-only access to devices, scans, vulnerabilities, alerts, firmware |
 | `auditor` | 1 | Same as viewer + audit log access |
-| `operator` | 2 | Full CRUD on devices, scans, vulnerabilities, alerts, firmware, safelists, webhooks |
-| `admin` | 3 | All permissions including user management and admin functions |
+| `operator` | 2 | Full CRUD on devices, scans, vulnerabilities, alerts, firmware |
+| `admin` | 3 | All permissions including user management, admin functions, webhook management |
 
 Permissions follow the pattern `<resource>:<action>`. Admins get `<resource>:*` wildcards.
 
 ### Permission Matrix
 
 | Endpoint | viewer | auditor | operator | admin |
-|----------|--------|---------|----------|-------|
+|---|---|---|---|---|
 | GET /devices | ✓ | ✓ | ✓ | ✓ |
 | GET /devices/:id | ✓ | ✓ | ✓ | ✓ |
-| DELETE /devices/:id | ✗ | ✗ | ✓ | ✓ |
-| POST /devices/:id/scan | ✗ | ✗ | ✓ | ✓ |
+| DELETE /devices/:id | ✗ | ✗ | ✗ | ✓ |
+| POST /devices/:id/scan | ✗ | ✗ | ✗ | ✓ |
 | GET /devices/:id/risk-breakdown | ✓ | ✓ | ✓ | ✓ |
 | GET /scans | ✓ | ✓ | ✓ | ✓ |
 | GET /scans/:id | ✓ | ✓ | ✓ | ✓ |
-| POST /scan/network | ✗ | ✗ | ✓ | ✓ |
+| POST /scan/network | ✗ | ✗ | ✗ | ✓ |
 | GET /vulnerabilities | ✓ | ✓ | ✓ | ✓ |
 | PATCH /vulnerabilities/:id/resolve | ✗ | ✗ | ✓ | ✓ |
 | GET /firmware | ✓ | ✓ | ✓ | ✓ |
-| POST /firmware/:id/analyze | ✗ | ✗ | ✓ | ✓ |
-| POST /firmware/upload | ✗ | ✗ | ✓ | ✓ |
+| POST /firmware/:id/analyze | ✗ | ✗ | ✗ | ✓ |
+| POST /firmware/upload | ✗ | ✗ | ✗ | ✓ |
 | GET /alerts | ✓ | ✓ | ✓ | ✓ |
 | POST /alerts/:id/ack | ✓ | ✓ | ✓ | ✓ |
-| GET /webhooks | ✗ | ✗ | ✓ | ✓ |
-| POST /webhooks | ✗ | ✗ | ✓ | ✓ |
-| DELETE /webhooks/:id | ✗ | ✗ | ✓ | ✓ |
-| POST /webhooks/:id/test | ✗ | ✗ | ✓ | ✓ |
+| GET /webhooks | ✗ | ✗ | ✗ | ✓ |
+| POST /webhooks | ✗ | ✗ | ✗ | ✓ |
+| DELETE /webhooks/:id | ✗ | ✗ | ✗ | ✓ |
+| POST /webhooks/:id/test | ✗ | ✗ | ✗ | ✓ |
 | GET /users | ✗ | ✗ | ✗ | ✓ |
 | POST /users | ✗ | ✗ | ✗ | ✓ |
 | GET /audit-log | ✗ | ✓ | ✓ | ✓ |
 | GET /safelists | ✓ | ✓ | ✓ | ✓ |
-| POST /safelists | ✗ | ✗ | ✓ | ✓ |
-| DELETE /safelists/:id | ✗ | ✗ | ✓ | ✓ |
+| POST /safelists | ✗ | ✗ | ✗ | ✓ |
+| DELETE /safelists/:id | ✗ | ✗ | ✗ | ✓ |
 | GET /scan-profiles | ✓ | ✓ | ✓ | ✓ |
 | GET /scan-scopes | ✓ | ✓ | ✓ | ✓ |
-| POST /scan-scopes | ✗ | ✗ | ✓ | ✓ |
-| DELETE /scan-scopes/:id | ✗ | ✗ | ✓ | ✓ |
+| POST /scan-scopes | ✗ | ✗ | ✗ | ✓ |
+| DELETE /scan-scopes/:id | ✗ | ✗ | ✗ | ✓ |
+| GET /sessions | ✗ | ✗ | ✗ | ✓ |
+| DELETE /sessions/:id | ✗ | ✗ | ✗ | ✓ |
 | GET /stats | ✓ | ✓ | ✓ | ✓ |
 | GET /health | Public | Public | Public | Public |
 | GET /kev/status | ✓ | ✓ | ✓ | ✓ |
+| GET /metrics | Public | Public | Public | Public |
+| GET /swagger.json | Public | Public | Public | Public |
+| GET /docs | Public | Public | Public | Public |
 | WebSocket /ws | ✓ | ✓ | ✓ | ✓ |
 
 ---
@@ -659,6 +665,34 @@ Returns the role, permission list, and hierarchy level for the current user.
 
 ---
 
+### Sessions
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/sessions` | Admin | List all active sessions |
+| DELETE | `/sessions/:id` | Admin | Revoke a session |
+
+**Response (GET /sessions):**
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "user_id": "uuid",
+      "username": "admin",
+      "ip_address": "192.168.1.10",
+      "user_agent": "Mozilla/5.0...",
+      "last_activity": "2026-07-04T14:30:00Z",
+      "created_at": "2026-07-04T10:00:00Z",
+      "is_current": true
+    }
+  ],
+  "error": null
+}
+```
+
+---
+
 ### Audit Log
 
 | Method | Path | Auth | Description |
@@ -711,6 +745,29 @@ Returns the role, permission list, and hierarchy level for the current user.
     "suspicious_firmware": 3
   },
   "error": null
+}
+```
+
+### Public Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Health check — returns DB + service status |
+| GET | `/metrics` | Prometheus metrics endpoint |
+| GET | `/swagger.json` | OpenAPI 3.0 specification |
+| GET | `/docs` | Swagger UI documentation explorer |
+
+**Response (GET /swagger.json):**
+```json
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "IronMesh API",
+    "version": "2.1.0"
+  },
+  "paths": {
+    ...
+  }
 }
 ```
 

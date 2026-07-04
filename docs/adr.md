@@ -306,3 +306,116 @@
 **Alternatives considered:**
 - Workbox — powerful but adds dependency
 - No SW — no offline capability, poor mobile experience
+
+---
+
+## ADR-016: Gin Web Framework over net/http
+
+**Status:** Accepted  
+**Date:** 2026-07-04  
+
+**Context:** Need HTTP framework with routing, middleware chaining, request binding, and response rendering.
+
+**Decision:** Use Gin (gin-gonic/gin) as the HTTP framework.
+
+**Consequences:**
+- Declarative router groups with path parameters (`/devices/:id`)
+- Built-in request validation via `ShouldBindJSON` + struct tags
+- Middleware chain with `Use()` for cross-cutting concerns
+- High performance (minimal reflection overhead)
+- Recovery middleware for panic handling
+
+**Alternatives considered:**
+- `net/http` — zero dependencies but manual routing and no built-in middleware
+- Echo — similar performance but smaller ecosystem
+- Chi — lightweight but fewer built-in features
+
+---
+
+## ADR-017: Worker Pool for Scan Concurrency
+
+**Status:** Accepted  
+**Date:** 2026-07-04  
+
+**Context:** Network scanning is resource-intensive. Unbounded concurrency could saturate the host network and CPU.
+
+**Decision:** Implement a bounded worker pool (20 goroutines) for scan operations.
+
+**Consequences:**
+- Controlled resource usage during network scans
+- Worker pool configured via `SCAN_MAX_CONCURRENT` env var
+- Jobs submitted via buffered channel with backpressure
+- Graceful shutdown drains in-progress scans
+
+**Alternatives considered:**
+- Unbounded goroutines — simpler but risk of resource exhaustion
+- Semaphore pattern — equivalent but less encapsulated
+- External job queue (RabbitMQ) — overkill for current scale
+
+---
+
+## ADR-018: bcrypt for Password Hashing
+
+**Status:** Accepted  
+**Date:** 2026-07-04  
+
+**Context:** Need password storage that resists brute-force and rainbow table attacks.
+
+**Decision:** Use bcrypt with cost factor 12.
+
+**Consequences:**
+- ~250ms per hash verification (acceptable for auth login)
+- Built-in salt eliminates rainbow table risk
+- Cost factor tunable for future hardware improvements
+- Standard library `golang.org/x/crypto/bcrypt`
+
+**Alternatives considered:**
+- SHA-256 with salt — fast but lacks work factor
+- Argon2 — more modern but requires CGO on some platforms
+- scrypt — memory-hard but less widely supported in Go
+
+---
+
+## ADR-019: Axios with Interceptor for Token Refresh
+
+**Status:** Accepted  
+**Date:** 2026-07-04  
+
+**Context:** Frontend needs automatic token refresh when access tokens expire, with retry of failed requests.
+
+**Decision:** Use Axios HTTP client with response interceptor for token refresh.
+
+**Consequences:**
+- Interceptor catches 401 responses, refreshes token, retries original request
+- Request queue prevents concurrent refresh calls
+- Failed refreshes redirect to login page
+- FormData upload support for firmware files
+
+**Alternatives considered:**
+- Fetch API — no built-in interceptor pattern
+- ky — newer but smaller ecosystem
+- Plain XMLHttpRequest — verbose and error-prone
+
+---
+
+## ADR-020: Prometheus for Metrics Collection
+
+**Status:** Accepted  
+**Date:** 2026-07-04  
+
+**Context:** Need application metrics (request count, latency, error rate) for monitoring and alerting.
+
+**Decision:** Expose Prometheus metrics at `GET /metrics` and provide Grafana dashboards.
+
+**Consequences:**
+- Industry-standard pull-based metrics collection
+- 4 pre-built Grafana dashboards (security overview, device health, scan performance, audit trail)
+- Metrics grouped by endpoint, method, and status code
+- Uses `prometheus/client_golang` with Gin middleware
+- Zero external monitoring dependencies (Prometheus + Grafana in Docker Compose)
+
+**Alternatives considered:**
+- OpenTelemetry — more comprehensive but significantly more complex
+- Datadog/New Relic agents — vendor lock-in and cost
+- StatsD — push-based, requires aggregator
+

@@ -1,10 +1,13 @@
-# 🛡️ IronMesh
+# IronMesh
 
 **Open-source IoT security platform. Find vulnerable devices before attackers do.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.22-00ADD8.svg)](https://go.dev)
+[![Node](https://img.shields.io/badge/Node-20+-339933.svg)](https://nodejs.org)
 [![Docker](https://img.shields.io/badge/Docker-required-2496ED.svg)](https://docker.com)
+[![Kubernetes](https://img.shields.io/badge/K8s-ready-326CE5.svg)](https://kubernetes.io)
+[![PWA](https://img.shields.io/badge/PWA-enabled-5A0FC8.svg)](frontend/public/manifest.json)
 
 ---
 
@@ -18,20 +21,25 @@ IronMesh discovers every IoT device on your network, scans them for real CVEs, t
 
 ## Features
 
-- **Device Discovery** — Passive (gopacket) + active (nmap) scanning
-- **Vulnerability Detection** — CVE matching, CISA KEV, EPSS scoring
-- **Credential Testing** — Top-100 default credential pairs, rate-limited
-- **Protocol Fingerprinting** — Telnet, ADB, MQTT, Modbus, RTSP, TLS
-- **Firmware Analysis** — Entropy, binwalk, CVE lookup (Python microservice)
+- **Device Discovery** — Passive (gopacket) + active (nmap) scanning with protocol fingerprinting
+- **Vulnerability Detection** — CVE matching, CISA KEV, EPSS scoring with circuit breaker
+- **Credential Testing** — Top-100 default credential pairs, rate-limited with lockout detection
+- **Protocol Fingerprinting** — Telnet, ADB, MQTT, Modbus, RTSP, TLS version/cipher detection
+- **Firmware Analysis** — Entropy scoring, binwalk, magic byte validation, CVE lookup (Python microservice)
 - **Risk Scoring** — 0-10 additive score with per-factor breakdown
-- **Real-time Alerts** — WebSocket push, Slack/Teams/Syslog webhooks
-- **RBAC** — 4 roles (viewer, auditor, operator, admin) with 50+ permissions
-- **Audit Logging** — All write operations logged for compliance
-- **PWA** — Installable, offline-capable, service worker
+- **Real-time Alerts** — WebSocket push, Slack/Teams/Syslog webhooks, email-ready
+- **RBAC** — 4 roles (viewer, auditor, operator, admin) with 50+ granular permissions
+- **Audit Logging** — All write operations logged for compliance (90-day retention)
+- **PWA** — Installable, offline-capable, service worker with push notifications
+- **Monitoring** — Built-in Prometheus metrics + Grafana dashboards (4 pre-built)
+- **Scan Management** — Scan profiles, scopes, safelists, scheduled scanning
+- **Kubernetes** — Production-ready manifests with HPA, NetworkPolicy, RBAC
 
 ---
 
-## Setup in 5 minutes
+## Quick Start
+
+### Docker (recommended)
 
 ```bash
 git clone https://github.com/Nciibi/seagles
@@ -45,8 +53,25 @@ open http://localhost:3000
 Default credentials: `admin` / `changeme`
 
 Trigger your first network scan:
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/scan/network
+```
+
+### Quick Start Script (Windows)
+
+```powershell
+.\scaffold.ps1
+```
+
+### Makefile
+
+```bash
+make help          # List all targets
+make build         # Build backend + frontend
+make docker-up     # Start all services
+make test          # Run all tests
+make lint          # Run all linters
 ```
 
 ---
@@ -73,13 +98,15 @@ curl -X POST http://localhost:8080/api/v1/scan/network
 graph TB
     subgraph "Frontend"
         React[React SPA - Port 3000]
+        SW[Service Worker]
     end
     subgraph "Backend"
         API[Go API Server - Port 8080]
-        WS[WebSocket]
+        WS[WebSocket Hub]
         Scanner[Scanner Engine]
+        Risk[Risk Scorer]
     end
-    subgraph "Services"
+    subgraph "Microservices"
         FA[Firmware Analyzer - Port 8001]
     end
     subgraph "Data"
@@ -87,12 +114,18 @@ graph TB
         RD[(Redis)]
         MO[(MinIO/S3)]
     end
+    subgraph "Monitoring"
+        PM[Prometheus]
+        GF[Grafana]
+    end
     React --> API
     React --> WS
     API --> PG
     API --> RD
     API --> MO
     API --> FA
+    PM --> API
+    GF --> PM
     Scanner --> API
 ```
 
@@ -118,23 +151,36 @@ See [docs/architecture.md](docs/architecture.md) for detailed diagrams.
 | `DB_PASSWORD` | PostgreSQL password | `changeme_strong_password_here` |
 | `NETWORK_CIDR` | Network range to scan (e.g. `192.168.1.0/24`) | `192.168.1.0/24` |
 | `NVD_API_KEY` | NIST NVD API key for faster CVE lookups | *(empty — uses public rate limit)* |
+| `JWT_SECRET` | RSA private key PEM (auto-generated if empty) | *(auto-generated)* |
+| `JWT_PRIVATE_KEY_FILE` | Path to PEM key file on disk | *(empty)* |
 | `PORT` | Backend API port | `8080` |
 | `FIRMWARE_ANALYZER_URL` | Firmware analyzer service URL | `http://firmware-analyzer:8001` |
-| `ALLOWED_ORIGINS` | CORS/WebSocket origin whitelist (comma-separated) | *(all origins blocked)* |
+| `ALLOWED_ORIGINS` | CORS/WebSocket origin whitelist (comma-separated) | `http://localhost:3000` |
+| `REDIS_URL` | Redis connection string (optional, falls back to in-memory) | *(empty)* |
+| `RATE_LIMIT_PER_MIN` | Default rate limit per IP | `60` |
+| `LOG_LEVEL` | Logging verbosity | `info` |
+| `S3_ENDPOINT` | S3-compatible storage endpoint | `minio:9000` |
+| `SLACK_WEBHOOK_URL` | Slack webhook for alerts | *(empty)* |
+| `TEAMS_WEBHOOK_URL` | Microsoft Teams webhook | *(empty)* |
+| `GRAFANA_PASSWORD` | Grafana admin password | `admin` |
+
+See `.env.example` for the complete list.
 
 ---
 
 ## Documentation
 
 | Document | Description |
-|----------|-------------|
-| [docs/setup.md](docs/setup.md) | Full setup guide (Linux, macOS, Windows) |
+|---|---|
+| [docs/setup.md](docs/setup.md) | Full setup guide (Linux, macOS, Windows, K8s) |
 | [docs/api.md](docs/api.md) | Complete API reference with request/response schemas |
 | [docs/architecture.md](docs/architecture.md) | Architecture diagrams, data flow, middleware chain |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Common issues and solutions |
-| [docs/adr.md](docs/adr.md) | Architecture Decision Records |
+| [docs/adr.md](docs/adr.md) | Architecture Decision Records (15 decisions) |
+| [CHANGELOG.md](CHANGELOG.md) | Release history and version tracking |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute code |
 | [SECURITY.md](SECURITY.md) | Vulnerability disclosure policy |
+| [THREAT_MODEL.md](THREAT_MODEL.md) | Threat model and risk analysis |
 
 ---
 
@@ -172,15 +218,37 @@ Every device gets a 0–10 risk score. The scoring is additive:
 
 ---
 
+## Deployment Options
+
+| Method | Docs | Use Case |
+|---|---|---|
+| Docker Compose | [docs/setup.md](docs/setup.md) | Local dev, small deployments |
+| Kubernetes | `k8s/` manifests | Production, HA, auto-scaling |
+| Manual (no Docker) | [docs/setup.md](docs/setup.md) | Custom environments |
+
+### Kubernetes
+
+Production-ready manifests are in `k8s/`:
+
+```bash
+kubectl apply -f k8s/
+```
+
+Includes: Deployments, Service, Ingress, HPA, NetworkPolicy, PVC, RBAC.
+
+---
+
 ## Responsible Use
 
-⚠️ **IronMesh performs active network scanning and credential testing.** Only use it on networks you own or have explicit written permission to test. Unauthorized scanning may be illegal in your jurisdiction.
+**IronMesh performs active network scanning and credential testing.** Only use it on networks you own or have explicit written permission to test. Unauthorized scanning may be illegal in your jurisdiction.
 
 Built-in safety measures:
+
 - 500ms delay between credential attempts
 - Maximum 50 credential pairs per device per scan
 - Lockout detection via HTTP 429 and response body analysis
 - Full audit logging of every credential test
+- Safelist support to exclude known-safe devices
 
 ---
 

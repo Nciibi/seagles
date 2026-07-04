@@ -1,4 +1,4 @@
-# 🛡️ Seagles
+# 🛡️ IronMesh
 
 **Open-source IoT security platform. Find vulnerable devices before attackers do.**
 
@@ -12,20 +12,37 @@
 
 820,000 IoT attacks happen every day. Most are through default credentials that nobody changed. Most companies have no idea what IoT devices are on their network, let alone whether they're secure.
 
-Seagles discovers every IoT device on your network, scans them for real CVEs, tests for default credentials (admin/admin, root/root — the ones botnets use), analyzes firmware for malware indicators, and scores each device's risk from 0 to 10. When something is wrong, you know immediately.
+IronMesh discovers every IoT device on your network, scans them for real CVEs, tests for default credentials (admin/admin, root/root — the ones botnets use), analyzes firmware for malware indicators, and scores each device's risk from 0 to 10. When something is wrong, you know immediately.
+
+---
+
+## Features
+
+- **Device Discovery** — Passive (gopacket) + active (nmap) scanning
+- **Vulnerability Detection** — CVE matching, CISA KEV, EPSS scoring
+- **Credential Testing** — Top-100 default credential pairs, rate-limited
+- **Protocol Fingerprinting** — Telnet, ADB, MQTT, Modbus, RTSP, TLS
+- **Firmware Analysis** — Entropy, binwalk, CVE lookup (Python microservice)
+- **Risk Scoring** — 0-10 additive score with per-factor breakdown
+- **Real-time Alerts** — WebSocket push, Slack/Teams/Syslog webhooks
+- **RBAC** — 4 roles (viewer, auditor, operator, admin) with 50+ permissions
+- **Audit Logging** — All write operations logged for compliance
+- **PWA** — Installable, offline-capable, service worker
 
 ---
 
 ## Setup in 5 minutes
 
 ```bash
-git clone https://github.com/yourusername/seagles
+git clone https://github.com/Nciibi/seagles
 cd seagles
 cp .env.example .env
 # Edit .env: set your network CIDR (e.g. 192.168.1.0/24)
 docker compose up -d
 open http://localhost:3000
 ```
+
+Default credentials: `admin` / `changeme`
 
 Trigger your first network scan:
 ```bash
@@ -36,7 +53,7 @@ curl -X POST http://localhost:8080/api/v1/scan/network
 
 ## What it detects
 
-| Threat | Real-world Example | How Seagles Catches It |
+| Threat | Real-world Example | How IronMesh Catches It |
 |---|---|---|
 | **Default credentials** | Mirai botnet (820K attacks/day) | Tests top-100 credential pairs per device, scores 9.5 CVSS if found |
 | **Telnet exposure** | Aisuru botnet (20+ Tbps DDoS) | Detects open port 23, creates Critical alert immediately |
@@ -52,28 +69,34 @@ curl -X POST http://localhost:8080/api/v1/scan/network
 
 ## Architecture
 
+```mermaid
+graph TB
+    subgraph "Frontend"
+        React[React SPA - Port 3000]
+    end
+    subgraph "Backend"
+        API[Go API Server - Port 8080]
+        WS[WebSocket]
+        Scanner[Scanner Engine]
+    end
+    subgraph "Services"
+        FA[Firmware Analyzer - Port 8001]
+    end
+    subgraph "Data"
+        PG[(PostgreSQL)]
+        RD[(Redis)]
+        MO[(MinIO/S3)]
+    end
+    React --> API
+    React --> WS
+    API --> PG
+    API --> RD
+    API --> MO
+    API --> FA
+    Scanner --> API
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      React Frontend                         │
-│         Dashboard · Inventory · Alerts · Reports           │
-└────────────────────────┬────────────────────────────────────┘
-                         │ REST API (HTTP/JSON)
-┌────────────────────────▼────────────────────────────────────┐
-│                    Go API Server                            │
-│    /devices  /scans  /vulns  /firmware  /alerts  /risks    │
-└──────┬──────────────┬───────────────┬────────────┬──────────┘
-       │              │               │            │
-┌──────▼──────┐ ┌─────▼──────┐ ┌─────▼────┐ ┌────▼────────┐
-│   Scanner   │ │  Firmware  │ │  Risk    │ │  Alerting   │
-│   Engine    │ │  Analyzer  │ │  (Go)    │ │  Engine     │
-│ (nmap+Go)   │ │  (Python)  │ │          │ │  (Go)       │
-└──────┬──────┘ └─────┬──────┘ └─────┬────┘ └────┬────────┘
-       │              │               │            │
-┌──────▼──────────────▼───────────────▼────────────▼──────────┐
-│                     PostgreSQL                              │
-│   devices · scans · vulnerabilities · firmware · alerts    │
-└─────────────────────────────────────────────────────────────┘
-```
+
+See [docs/architecture.md](docs/architecture.md) for detailed diagrams.
 
 ---
 
@@ -97,6 +120,21 @@ curl -X POST http://localhost:8080/api/v1/scan/network
 | `NVD_API_KEY` | NIST NVD API key for faster CVE lookups | *(empty — uses public rate limit)* |
 | `PORT` | Backend API port | `8080` |
 | `FIRMWARE_ANALYZER_URL` | Firmware analyzer service URL | `http://firmware-analyzer:8001` |
+| `ALLOWED_ORIGINS` | CORS/WebSocket origin whitelist (comma-separated) | *(all origins blocked)* |
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [docs/setup.md](docs/setup.md) | Full setup guide (Linux, macOS, Windows) |
+| [docs/api.md](docs/api.md) | Complete API reference with request/response schemas |
+| [docs/architecture.md](docs/architecture.md) | Architecture diagrams, data flow, middleware chain |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | Common issues and solutions |
+| [docs/adr.md](docs/adr.md) | Architecture Decision Records |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute code |
+| [SECURITY.md](SECURITY.md) | Vulnerability disclosure policy |
 
 ---
 
@@ -106,7 +144,8 @@ curl -X POST http://localhost:8080/api/v1/scan/network
 2. **Call `alerts.CreateAlert()`** with the appropriate type constant from `alerts/engine.go`
 3. **Add a risk factor** to the `RiskFactors` struct in `risk/scorer.go`
 4. **Update `CalculateRiskScore()`** with the new factor's point value
-5. **Open a PR** with a test and update the README "What it detects" table
+5. **Add tests** in the corresponding `*_test.go` file
+6. **Open a PR** with a test and update the README "What it detects" table
 
 ---
 
@@ -135,7 +174,7 @@ Every device gets a 0–10 risk score. The scoring is additive:
 
 ## Responsible Use
 
-⚠️ **Seagles performs active network scanning and credential testing.** Only use it on networks you own or have explicit written permission to test. Unauthorized scanning may be illegal in your jurisdiction.
+⚠️ **IronMesh performs active network scanning and credential testing.** Only use it on networks you own or have explicit written permission to test. Unauthorized scanning may be illegal in your jurisdiction.
 
 Built-in safety measures:
 - 500ms delay between credential attempts
@@ -151,4 +190,4 @@ MIT — see [LICENSE](LICENSE) for details.
 
 ---
 
-*Seagles — built to be real, built to find threats before attackers do.*
+*IronMesh — built to be real, built to find threats before attackers do.*

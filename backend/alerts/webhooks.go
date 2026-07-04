@@ -78,8 +78,9 @@ func deliverWebhookWithRetry(db *sql.DB, wh WebhookConfig, alertID, severity, ti
 
 	lastErr := ""
 	for attempt := 0; attempt < maxWebhookRetries; attempt++ {
-		statusCode, err := deliverWebhook(db, wh, alertID, severity, title, description, deviceID, attempt)
+		sc, err := deliverWebhook(db, wh, alertID, severity, title, description, deviceID, attempt)
 		if err == nil {
+			slog.Info("webhook delivered", "name", wh.Name, "status", sc)
 			return
 		}
 

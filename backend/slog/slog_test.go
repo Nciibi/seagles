@@ -124,10 +124,10 @@ func TestLoggerPrefix(t *testing.T) {
 	}
 }
 
-func TestFatalDoesNotPanic(t *testing.T) {
+func TestFatalOutput(t *testing.T) {
 	SetLevel(LevelDebug)
 	out := captureOutput(func() {
-		Fatal("fatal error", "code", 1)
+		logf(LevelFatal, "fatal error", "code", 1)
 	})
 
 	if !strings.Contains(out, "FATAL") {

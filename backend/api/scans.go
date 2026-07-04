@@ -138,9 +138,19 @@ func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, d
 		}
 	}()
 
+	ctx := context.Background()
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		slog.Error("Failed to begin transaction", "error", err.Error())
+		db.Exec(`UPDATE scans SET status='failed', completed_at=NOW() WHERE id=$1`, scanID)
+		return
+	}
+	defer tx.Rollback()
+
 	if IsSafelisted(db, ip) {
 		slog.Info("Scan skipped: IP is safelisted", "ip", ip)
-		db.Exec(`UPDATE scans SET status='skipped', scan_output='Device is safelisted', completed_at=NOW() WHERE id=$1`, scanID)
+		tx.Exec(`UPDATE scans SET status='skipped', scan_output='Device is safelisted', completed_at=NOW() WHERE id=$1`, scanID)
+		tx.Commit()
 		return
 	}
 
@@ -148,7 +158,8 @@ func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, d
 	result, err := scanner.DeepScan(ip)
 	if err != nil {
 		slog.Error("Deep scan failed", "ip", ip, "error", err.Error())
-		db.Exec(`UPDATE scans SET status='failed', completed_at=NOW() WHERE id=$1`, scanID)
+		tx.Exec(`UPDATE scans SET status='failed', completed_at=NOW() WHERE id=$1`, scanID)
+		tx.Commit()
 		return
 	}
 
@@ -162,26 +173,26 @@ func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, d
 	portsJSON, _ := json.Marshal(openPortNumbers)
 	servicesJSON, _ := json.Marshal(result.Host.Services)
 
-	db.Exec(`UPDATE scans SET open_ports=$1, services=$2 WHERE id=$3`,
+	tx.Exec(`UPDATE scans SET open_ports=$1, services=$2 WHERE id=$3`,
 		portsJSON, servicesJSON, scanID)
 
 	if result.Host.Hostname != "" {
-		db.Exec(`UPDATE devices SET hostname=$1 WHERE id=$2`, result.Host.Hostname, deviceID)
+		tx.Exec(`UPDATE devices SET hostname=$1 WHERE id=$2`, result.Host.Hostname, deviceID)
 	}
 	if result.Host.Vendor != "" {
-		db.Exec(`UPDATE devices SET vendor=$1 WHERE id=$2`, result.Host.Vendor, deviceID)
+		tx.Exec(`UPDATE devices SET vendor=$1 WHERE id=$2`, result.Host.Vendor, deviceID)
 	}
 	if result.Host.OSMatch != "" {
-		db.Exec(`UPDATE devices SET os_fingerprint=$1 WHERE id=$2`, result.Host.OSMatch, deviceID)
+		tx.Exec(`UPDATE devices SET os_fingerprint=$1 WHERE id=$2`, result.Host.OSMatch, deviceID)
 	}
 	if len(result.Host.RawXML) > 0 {
-		db.Exec(`UPDATE devices SET raw_nmap=$1 WHERE id=$2`, result.Host.RawXML, deviceID)
+		tx.Exec(`UPDATE devices SET raw_nmap=$1 WHERE id=$2`, result.Host.RawXML, deviceID)
 	}
 
 	findings := scanner.DetectProtocols(ip, openPortNumbers)
 	for _, f := range findings {
 		var vulnID string
-		err := db.QueryRow(`INSERT INTO vulnerabilities (device_id, scan_id, severity, title, description, affected_component)
+		err := tx.QueryRow(`INSERT INTO vulnerabilities (device_id, scan_id, severity, title, description, affected_component)
 			VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
 			deviceID, scanID, f.Risk, f.Protocol+" exposure detected", f.Description, fmt.Sprintf("port/%d", f.Port),
 		).Scan(&vulnID)
@@ -202,7 +213,7 @@ func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, d
 		if p == 443 {
 			tlsResult := scanner.CheckTLS(ip, 443)
 			if tlsResult.SupportsTLS10 || tlsResult.SupportsTLS11 || len(tlsResult.WeakCiphers) > 0 {
-				db.QueryRow(`INSERT INTO vulnerabilities (device_id, scan_id, severity, title, description, affected_component)
+				tx.QueryRow(`INSERT INTO vulnerabilities (device_id, scan_id, severity, title, description, affected_component)
 					VALUES ($1, $2, 'high', 'Weak TLS configuration', 'Device supports deprecated TLS versions or weak ciphers', 'tls')
 					RETURNING id`, deviceID, scanID).Scan(new(string))
 				alerts.CreateAlert(db, alerts.AlertRequest{
@@ -227,7 +238,12 @@ func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, d
 		runCredentialTests(db, deviceID, scanID, ip, openPortNumbers, creds, kevCatalog)
 	}
 
-	db.Exec(`UPDATE scans SET status='complete', completed_at=NOW() WHERE id=$1`, scanID)
+	tx.Exec(`UPDATE scans SET status='complete', completed_at=NOW() WHERE id=$1`, scanID)
+	if err := tx.Commit(); err != nil {
+		slog.Error("Failed to commit transaction", "error", err.Error())
+		db.Exec(`UPDATE scans SET status='failed', completed_at=NOW() WHERE id=$1`, scanID)
+		return
+	}
 	risk.UpdateDeviceRiskScore(db, deviceID)
 
 	slog.Info("Scan complete", "device_id", deviceID, "ip", ip,

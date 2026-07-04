@@ -191,3 +191,7 @@ func TestListAuditLogsHandler_DBError(t *testing.T) {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
 }
+
+type testError struct{ msg string }
+
+func (e *testError) Error() string { return e.msg }

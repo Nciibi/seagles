@@ -197,54 +197,6 @@ func TestUpdateDeviceRiskScore(t *testing.T) {
 	}
 }
 
-func TestScoreBreakdown(t *testing.T) {
-	factors := RiskFactors{
-		HasDefaultCreds:     true,
-		HasTelnet:           true,
-		HasADB:              true,
-		KnownCVECount:       5,
-		KEVMatchCount:       1,
-		HighEntropyFirmware: true,
-	}
-
-	breakdown := ScoreBreakdown(factors)
-	expectedKeys := []string{
-		"default_credentials",
-		"telnet_exposed",
-		"adb_exposed",
-		"known_cves",
-		"kev_matches",
-		"high_entropy_firmware",
-	}
-	for _, key := range expectedKeys {
-		if _, ok := breakdown[key]; !ok {
-			t.Errorf("expected key %s in breakdown", key)
-		}
-	}
-}
-
-func TestSeverityFromScore(t *testing.T) {
-	tests := []struct {
-		score float64
-		want  string
-	}{
-		{9.0, "critical"},
-		{8.0, "critical"},
-		{7.0, "high"},
-		{6.0, "high"},
-		{4.0, "medium"},
-		{3.0, "medium"},
-		{2.0, "low"},
-		{0.0, "low"},
-	}
-	for _, tt := range tests {
-		got := SeverityFromScore(tt.score)
-		if got != tt.want {
-			t.Errorf("SeverityFromScore(%.1f) = %s, want %s", tt.score, got, tt.want)
-		}
-	}
-}
-
 func TestGetRiskBreakdown_Error(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {

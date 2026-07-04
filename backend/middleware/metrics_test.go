@@ -13,7 +13,7 @@ func TestNormalizePath(t *testing.T) {
 		{"/api/v1/devices", "/api/v1/devices"},
 		{"/api/v1/devices/123", "/api/v1/devices/:id"},
 		{"/api/v1/devices/550e8400-e29b-41d4-a716-446655440000", "/api/v1/devices/:id"},
-		{"/api/v1/devices/uuid/scan", "/api/v1/devices/:id/scan"},
+		{"/api/v1/devices/550e8400-e29b-41d4-a716-446655440000/scan", "/api/v1/devices/:id/scan"},
 	}
 
 	for _, tt := range tests {

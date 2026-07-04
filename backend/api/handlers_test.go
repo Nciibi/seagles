@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -52,8 +53,9 @@ func setupTestRouter(t *testing.T) (*gin.Engine, sqlmock.Sqlmock, *config.Config
 		{
 			protected.GET("/stats", StatsHandler(db))
 			protected.GET("/devices", ListDevicesHandler(db))
-			protected.GET("/devices/:id", GetDeviceHandler(db))
-			protected.DELETE("/devices/:id", DeleteDeviceHandler(db))
+		protected.GET("/devices/:id", GetDeviceHandler(db))
+		protected.GET("/devices/:id/risk-breakdown", RiskBreakdownHandler(db))
+		protected.DELETE("/devices/:id", DeleteDeviceHandler(db))
 			protected.GET("/scans", ListScansHandler(db))
 			protected.GET("/scans/:id", GetScanHandler(db))
 			protected.GET("/vulnerabilities", ListVulnerabilitiesHandler(db))
@@ -111,7 +113,7 @@ func TestListDevicesHandler_Success(t *testing.T) {
 	}).AddRow(
 		uuid.NewString(), "192.168.1.100", nil, nil, nil, "router",
 		nil, nil, now, now, 5.0, true,
-		pq.StringArray{}, nil,
+		pq.StringArray{}, []byte("null"),
 	)
 
 	mock.ExpectQuery(`SELECT id, ip_address, mac_address, hostname, vendor, device_type`).
@@ -190,7 +192,7 @@ func TestGetDeviceHandler_Success(t *testing.T) {
 	}).AddRow(
 		deviceID, "10.0.0.5", nil, nil, nil, "camera",
 		nil, nil, now, now, 7.5, true,
-		pq.StringArray{}, nil,
+		pq.StringArray{}, []byte("null"),
 	)
 
 	mock.ExpectQuery(`SELECT id, ip_address, mac_address, hostname, vendor, device_type`).
@@ -221,7 +223,7 @@ func TestGetDeviceHandler_NotFound(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT id, ip_address, mac_address, hostname, vendor, device_type`).
 		WithArgs(deviceID).
-		WillReturnError(assertAnError("sql: no rows in result set"))
+		WillReturnError(sql.ErrNoRows)
 
 	w := request(router, "GET", "/api/v1/devices/"+deviceID, nil)
 	if w.Code != http.StatusNotFound {
@@ -343,7 +345,7 @@ func TestGetScanHandler_NotFound(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT id, device_id, started_at, completed_at, status`).
 		WithArgs("nonexistent").
-		WillReturnError(assertAnError("sql: no rows in result set"))
+		WillReturnError(sql.ErrNoRows)
 
 	w := request(router, "GET", "/api/v1/scans/nonexistent", nil)
 	if w.Code != http.StatusNotFound {
@@ -666,9 +668,9 @@ func TestWebhookHandlers(t *testing.T) {
 	t.Run("TestWebhook_NotFound", func(t *testing.T) {
 		router, mock, _ := setupTestRouter(t)
 
-		mock.ExpectQuery(`SELECT url, webhook_type FROM webhooks`).
-			WithArgs("nonexistent").
-			WillReturnError(assertAnError("sql: no rows in result set"))
+	mock.ExpectQuery(`SELECT url, webhook_type FROM webhooks`).
+		WithArgs("nonexistent").
+		WillReturnError(sql.ErrNoRows)
 
 		w := request(router, "POST", "/api/v1/webhooks/nonexistent/test", nil)
 		if w.Code != http.StatusNotFound {

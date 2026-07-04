@@ -53,6 +53,19 @@ jobs:
       run: go test -v -count=1 ./...
       working-directory: backend
 
+  openapi-validate:
+    name: OpenAPI Validation
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Validate OpenAPI spec
+      run: npx @redocly/cli lint backend/api/swagger.json
+
   frontend-lint:
     name: Frontend Lint
     runs-on: ubuntu-latest

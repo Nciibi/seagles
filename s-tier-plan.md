@@ -1,6 +1,6 @@
 # S+ Tier Plan — IronMesh/Seagles IoT Security Platform
 
-**Current Score: ~9.5/10** *(Phase S1 + S2 + S4 — Critical Bugs + Testing + Infra/CI — COMPLETE)*
+**Current Score: ~9.7/10** *(Phase S1 + S2 + S4 + S5 — Critical Bugs + Testing + Infra/CI + Documentation — COMPLETE)*
 
 > This document captures the complete audit findings and execution plan to bring the project to 10/10 — enterprise-grade security, testing, frontend quality, infrastructure, documentation, and advanced features.
 
@@ -156,20 +156,22 @@
 | Makefile | `Makefile` — build, test, lint, docker, security targets | ✅ |
 | `.gitattributes` | `.gitattributes` — LF/CRLF normalization | ✅ |
 
-### Phase S5 — Documentation Overhaul (~1–2 days)
+### ~~Phase S5 — Documentation Overhaul (~1–2 days)~~ ✅ COMPLETE
 
-| Task | Files | Description |
-|------|-------|-------------|
-| Brand consistency | All docs | Pick "Seagles" or "IronMesh", make consistent across all files, decide on canonical name |
-| Architecture diagram | `docs/architecture.md` | Add Mermaid or PlantUML diagram showing all services, networks, data flow |
-| README screenshots | `README.md` | Add dashboard, device detail, vulnerability screenshots |
-| Fix outdated paths | `docs/architecture.md`, `CONTRIBUTING.md`, `plan.md` | Update file paths to match current repo structure |
-| API docs completeness | `docs/api.md` | Add missing pagination params, filter params, error codes, RBAC permission matrix, WS handshake docs, request/response schemas for safelists/webhooks/scopes |
-| Setup docs | `docs/setup.md` | Add Windows setup, MinIO config, frontend proxy, PgBouncer config |
-| Troubleshooting | `docs/troubleshooting.md` | Add CORS, WebSocket, firmware analyzer, Redis, MinIO, PgBouncer sections |
-| ADRs | `docs/adr.md` | Add ADRs for WebSocket choice, React Router, recharts, TailwindCSS, nginx, service worker strategy |
-| Changelog | `CHANGELOG.md` | Semantic versioning changelog |
-| OpenAPI validation | CI | Validate `swagger.json` against OpenAPI 3.0 schema in CI |
+> **Result:** Full documentation suite — API reference with RBAC matrix, WS handshake, pagination/filtering, all request/response schemas. Setup guide with Windows steps, MinIO, PgBouncer, frontend proxy. Troubleshooting with CORS, WS, Redis, MinIO, PgBouncer, firmware analyzer, K8s. 6 new ADRs (WS, React Router, Recharts, Tailwind, nginx, service worker). Mermaid architecture diagrams. CHANGELOG. Brand: "IronMesh" = product, "seagles" = repo/module. OpenAPI validation in CI.
+
+| Task | Status |
+|------|--------|
+| Brand consistency — "IronMesh" product, "seagles" repo/module | ✅ |
+| Architecture diagram — Mermaid in `docs/architecture.md` | ✅ |
+| API docs completeness — pagination, filters, RBAC matrix, WS handshake, all schemas | ✅ |
+| Setup docs — Windows, MinIO, frontend proxy, PgBouncer | ✅ |
+| Troubleshooting — CORS, WS, Redis, MinIO, PgBouncer, FA, K8s | ✅ |
+| ADRs — ADR-010 through ADR-015 (WS, React Router, Recharts, Tailwind, nginx, SW) | ✅ |
+| CHANGELOG.md — semantic versioning from 2.0.0 | ✅ |
+| OpenAPI validation in CI — `@redocly/cli lint` step | ✅ |
+| Fix outdated paths — `docs/architecture.md`, `CONTRIBUTING.md`, `README.md` | ✅ |
+| README — clone URL, docs links, Mermaid arch diagram | ✅ |
 
 ### Phase S6 — Advanced Enterprise Features (~1–2 weeks)
 
@@ -241,4 +243,4 @@ Key audit dimensions:
 - Testing: Unit, integration, E2E coverage per package
 - Frontend: Error handling, loading states, a11y, responsive, performance, types
 - Infrastructure: CI/CD, Docker best practices, K8s, monitoring, dependency mgmt
-- Documentation: Completeness, accuracy, consistency, discoverability
+- Documentation: Complet

@@ -299,8 +299,22 @@ func LogoutHandler() gin.HandlerFunc {
 
 func ChangePasswordHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userID, _ := c.Get("user_id")
-		username, _ := c.Get("username")
+		userIDVal, exists := c.Get("user_id")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"data": nil, "error": "Not authenticated"})
+			return
+		}
+		userID, ok := userIDVal.(string)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Invalid user identity"})
+			return
+		}
+
+		usernameVal, _ := c.Get("username")
+		username := ""
+		if usernameVal != nil {
+			username, _ = usernameVal.(string)
+		}
 
 		var req ChangePasswordRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -333,7 +347,7 @@ func ChangePasswordHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		if err := revokeAllRefreshTokens(db, userID.(string)); err != nil {
+		if err := revokeAllRefreshTokens(db, userID); err != nil {
 			slog.Error("refresh_token_revoke_failed", "user_id", userID, "error", err.Error())
 		}
 
@@ -350,7 +364,11 @@ func PermissionsHandler() gin.HandlerFunc {
 			return
 		}
 
-		roleStr := role.(string)
+		roleStr, ok := role.(string)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Invalid role type"})
+			return
+		}
 		permissions := RolePermissions[roleStr]
 		if permissions == nil {
 			permissions = []string{}

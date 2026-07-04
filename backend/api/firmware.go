@@ -197,7 +197,7 @@ func UploadFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 
 		tempDir := "/tmp/ironmesh-uploads"
 		os.MkdirAll(tempDir, 0750)
-		tempPath := filepath.Join(tempDir, header.Filename)
+		tempPath := filepath.Join(tempDir, filepath.Base(header.Filename))
 
 		destFile, err := os.Create(tempPath)
 		if err != nil {

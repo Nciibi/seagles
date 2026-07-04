@@ -7,34 +7,31 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
-	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/yourusername/seagles/slog"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// jwtSecret is the HMAC signing key for tokens.
 var jwtSecret []byte
 
 func init() {
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
-		log.Fatal("Failed to generate JWT secret")
+		slog.Fatal("Failed to generate JWT secret")
 	}
 	jwtSecret = secret
 }
 
-// SetJWTSecret allows setting the secret from environment config.
 func SetJWTSecret(secret string) {
 	if secret != "" {
 		jwtSecret = []byte(secret)
 	}
 }
 
-// User represents an authenticated user.
 type User struct {
 	ID       string `json:"id"`
 	Username string `json:"username"`
@@ -42,53 +39,45 @@ type User struct {
 	Role     string `json:"role"`
 }
 
-// LoginRequest contains login credentials.
 type LoginRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
+	Username string `json:"username" binding:"required,min=1,max=100"`
+	Password string `json:"password" binding:"required,min=8,max=128"`
 }
 
-// LoginResponse contains the token and user info.
 type LoginResponse struct {
 	Token     string `json:"token"`
 	ExpiresIn int64  `json:"expires_in"`
 	User      User   `json:"user"`
 }
 
-// RegisterRequest contains registration fields.
 type RegisterRequest struct {
-	Username string `json:"username" binding:"required"`
-	Email    string `json:"email" binding:"required"`
-	Password string `json:"password" binding:"required"`
-	Role     string `json:"role"`
+	Username string `json:"username" binding:"required,min=3,max=50,alphanum"`
+	Email    string `json:"email" binding:"required,email,max=255"`
+	Password string `json:"password" binding:"required,min=8,max=128"`
+	Role     string `json:"role" binding:"omitempty,oneof=admin viewer"`
 }
 
-// hmacSign creates an HMAC-SHA256 signature.
 func hmacSign(data string, key []byte) string {
 	mac := hmac.New(sha256.New, key)
 	mac.Write([]byte(data))
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-// generateTokenID creates a random token ID.
 func generateTokenID() string {
 	b := make([]byte, 16)
 	rand.Read(b)
 	return hex.EncodeToString(b)
 }
 
-// HashPassword hashes a password using bcrypt.
 func HashPassword(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	return string(hash), err
 }
 
-// CheckPassword compares a password against a hash.
 func CheckPassword(password, hash string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
 }
 
-// GenerateToken creates a signed token for the given user.
 func GenerateToken(user User) (string, time.Time) {
 	tokenID := generateTokenID()
 	expiresAt := time.Now().Add(24 * time.Hour)
@@ -103,7 +92,6 @@ func GenerateToken(user User) (string, time.Time) {
 	return token, expiresAt
 }
 
-// ValidateToken parses and validates a token string.
 func ValidateToken(tokenStr string) (*User, error) {
 	parts := strings.SplitN(tokenStr, ".", 2)
 	if len(parts) != 2 {
@@ -142,12 +130,11 @@ func ValidateToken(tokenStr string) (*User, error) {
 	}, nil
 }
 
-// LoginHandler handles user authentication and returns a token.
 func LoginHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req LoginRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"data": nil, "error": "Username and password are required"})
+			c.JSON(http.StatusBadRequest, gin.H{"data": nil, "error": "Invalid credentials format: " + err.Error()})
 			return
 		}
 
@@ -159,15 +146,18 @@ func LoginHandler(db *sql.DB) gin.HandlerFunc {
 		).Scan(&user.ID, &user.Username, &user.Email, &user.Role, &passwordHash)
 
 		if err == sql.ErrNoRows {
+			slog.Warn("login_failed", "username", req.Username, "reason", "invalid_credentials")
 			c.JSON(http.StatusUnauthorized, gin.H{"data": nil, "error": "Invalid credentials"})
 			return
 		}
 		if err != nil {
+			slog.Error("login_error", "username", req.Username, "error", err.Error())
 			c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Authentication failed"})
 			return
 		}
 
 		if !CheckPassword(req.Password, passwordHash) {
+			slog.Warn("login_failed", "username", req.Username, "reason", "wrong_password")
 			c.JSON(http.StatusUnauthorized, gin.H{"data": nil, "error": "Invalid credentials"})
 			return
 		}
@@ -175,6 +165,7 @@ func LoginHandler(db *sql.DB) gin.HandlerFunc {
 		db.Exec(`UPDATE users SET last_login = NOW() WHERE id = $1`, user.ID)
 
 		token, expiresAt := GenerateToken(user)
+		slog.Info("login_success", "username", user.Username, "role", user.Role)
 
 		c.JSON(http.StatusOK, gin.H{
 			"data": LoginResponse{
@@ -187,17 +178,11 @@ func LoginHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-// RegisterHandler creates a new user (admin only).
 func RegisterHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req RegisterRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"data": nil, "error": "Invalid request: " + err.Error()})
-			return
-		}
-
-		if len(req.Password) < 8 {
-			c.JSON(http.StatusBadRequest, gin.H{"data": nil, "error": "Password must be at least 8 characters"})
 			return
 		}
 
@@ -227,6 +212,8 @@ func RegisterHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		slog.Info("user_registered", "username", req.Username, "role", role)
+
 		c.JSON(http.StatusCreated, gin.H{
 			"data":  gin.H{"id": userID, "username": req.Username, "role": role},
 			"error": nil,
@@ -234,7 +221,6 @@ func RegisterHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-// MeHandler returns the current user info.
 func MeHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, exists := c.Get("user")
@@ -246,7 +232,6 @@ func MeHandler() gin.HandlerFunc {
 	}
 }
 
-// AuthMiddleware validates the Bearer token and sets user context.
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
@@ -277,7 +262,6 @@ func AuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-// AdminOnly restricts access to admin users.
 func AdminOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, exists := c.Get("user_role")
@@ -290,7 +274,6 @@ func AdminOnly() gin.HandlerFunc {
 	}
 }
 
-// ListUsersHandler returns all users (admin only).
 func ListUsersHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rows, err := db.Query(`SELECT id, username, email, role, is_active, last_login, created_at FROM users ORDER BY created_at DESC`)

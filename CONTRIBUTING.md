@@ -46,6 +46,8 @@ if portSet[YOUR_PORT] {
 }
 ```
 
+Tests go in `backend/scanner/protocols_test.go`.
+
 ## 2. Adding New Default Credentials
 
 Edit `data/default-credentials.txt`. Format: `username:password`, one per line.
@@ -127,20 +129,16 @@ if factors.HasMyNewFactor {
 }
 ```
 
+Tests go in `backend/risk/scorer_test.go`.
+
 ## 5. Running Locally
 
+See [docs/setup.md](docs/setup.md) for full setup instructions.
+
+Quick start:
 ```bash
-# Start PostgreSQL
-docker run -d -e POSTGRES_PASSWORD=test -e POSTGRES_DB=ironmesh -p 5432:5432 postgres:16-alpine
-
-# Set environment
-export DATABASE_URL="postgres://postgres:test@localhost:5432/ironmesh?sslmode=disable"
-
-# Run backend
-cd backend && go run main.go
-
-# Run frontend (separate terminal)
-cd frontend && npm install && npm run dev
+docker compose up -d
+open http://localhost:3000
 ```
 
 ## 6. PR Checklist
@@ -154,6 +152,9 @@ Before submitting a pull request:
 - [ ] Does it update the **risk scoring** if applicable?
 - [ ] Does it update the README **"What it detects"** table?
 - [ ] Does it follow the existing **code patterns**?
+- [ ] Do all tests pass? (`make test`)
+- [ ] Does `go vet ./...` pass?
+- [ ] Are there new tests for new functionality?
 
 ---
 

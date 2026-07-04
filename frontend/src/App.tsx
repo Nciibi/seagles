@@ -148,7 +148,7 @@ export default function App() {
             </div>
           </aside>
 
-          <main style={{
+          <main id="main-content" style={{
             marginLeft: '240px',
             flex: 1,
             padding: '24px 32px',

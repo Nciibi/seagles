@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: seagles-backend
+  namespace: security-tools
+  labels:
+    app: seagles-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: seagles-backend
+  template:
+    metadata:
+      labels:
+        app: seagles-backend
+    spec:
+      serviceAccountName: seagles-sa
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 3000
+        fsGroup: 2000
+      containers:
+      - name: seagles-backend
+        image: your-registry.com/seagles-backend:v2.0.0
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 9090
+          name: metrics
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - NET_RAW
+            - NET_ADMIN
+
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: seagles-db-secrets
+              key: connection-string
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: seagles-jwt-secret
+              key: secret
+        - name: S3_ENDPOINT
+          value: "minio-service.storage.svc.cluster.local:9000"
+        - name: S3_BUCKET
+          value: "ironmesh-firmware"
+        - name: S3_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: seagles-s3-secrets
+              key: access-key
+        - name: S3_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: seagles-s3-secrets
+              key: secret-key
+
+        resources:
+          requests:
+            cpu: 250m
+            memory: 256Mi
+          limits:
+            cpu: 1
+            memory: 512Mi
+
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 2
+
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 3
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 12
+
+        volumeMounts:
+        - name: tmp-volume
+          mountPath: /tmp
+        - name: data-volume
+          mountPath: /app/data
+
+      volumes:
+      - name: tmp-volume
+        emptyDir: {}
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: seagles-data-pvc

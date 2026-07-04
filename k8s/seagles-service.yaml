@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: seagles-backend
+  namespace: security-tools
+  labels:
+    app: seagles-backend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: http
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: metrics
+    protocol: TCP
+    name: metrics
+  selector:
+    app: seagles-backend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: seagles-frontend
+  namespace: security-tools
+  labels:
+    app: seagles-frontend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app: seagles-frontend

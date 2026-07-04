@@ -1,0 +1,41 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: seagles-ingress
+  namespace: security-tools
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - seagles.example.com
+    secretName: seagles-tls
+  rules:
+  - host: seagles.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: seagles-frontend
+            port:
+              name: http
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: seagles-backend
+            port:
+              name: http
+      - path: /ws
+        pathType: Prefix
+        backend:
+          service:
+            name: seagles-backend
+            port:
+              name: http

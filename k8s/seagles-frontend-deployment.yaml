@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: seagles-frontend
+  namespace: security-tools
+  labels:
+    app: seagles-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: seagles-frontend
+  template:
+    metadata:
+      labels:
+        app: seagles-frontend
+    spec:
+      securityContext:
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+      containers:
+      - name: seagles-frontend
+        image: your-registry.com/seagles-frontend:v2.0.0
+        ports:
+        - containerPort: 80
+          name: http
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+
+        env:
+        - name: VITE_API_URL
+          value: "/api/v1"
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 15
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10

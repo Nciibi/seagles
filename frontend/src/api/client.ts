@@ -7,6 +7,9 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+let isRefreshing = false
+let pendingRequests: Array<(token: string) => void> = []
+
 // Request interceptor: attach JWT token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('ironmesh_token')
@@ -16,27 +19,87 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Response interceptor: unwrap {data, error} envelope + handle 401
+// Response interceptor: unwrap {data, error} envelope + handle 401 with auto-refresh
 api.interceptors.response.use(
   (response) => {
     if (response.data?.error) {
       throw new Error(response.data.error)
     }
+    // Update token if server returned a new one (token rotation)
+    if (response.data?.data?.token) {
+      localStorage.setItem('ironmesh_token', response.data.data.token)
+    }
     return response.data?.data !== undefined ? { ...response, data: response.data.data } : response
   },
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('ironmesh_token')
-      localStorage.removeItem('ironmesh_user')
-      // Redirect to login if not already there
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login'
+  async (error) => {
+    const originalRequest = error.config
+
+    // If 401 and not a login/refresh request and not already retried
+    if (error.response?.status === 401 && 
+        !originalRequest._retry && 
+        !originalRequest.url?.includes('/auth/login') &&
+        !originalRequest.url?.includes('/auth/refresh')) {
+      
+      const refreshToken = localStorage.getItem('ironmesh_refresh')
+      if (!refreshToken) {
+        clearSession()
+        return Promise.reject(error)
       }
+
+      if (isRefreshing) {
+        // Queue requests while refresh is in progress
+        return new Promise((resolve) => {
+          pendingRequests.push((newToken: string) => {
+            originalRequest.headers.Authorization = `Bearer ${newToken}`
+            resolve(api(originalRequest))
+          })
+        })
+      }
+
+      originalRequest._retry = true
+      isRefreshing = true
+
+      try {
+        const res = await axios.post(`${API_BASE}/auth/refresh`, { refresh_token: refreshToken })
+        const data = res.data?.data || res.data
+        const newToken = data.token
+        const newRefresh = data.refresh_token
+
+        localStorage.setItem('ironmesh_token', newToken)
+        if (newRefresh) {
+          localStorage.setItem('ironmesh_refresh', newRefresh)
+        }
+
+        // Process queued requests
+        pendingRequests.forEach((cb) => cb(newToken))
+        pendingRequests = []
+
+        originalRequest.headers.Authorization = `Bearer ${newToken}`
+        return api(originalRequest)
+      } catch (refreshError) {
+        clearSession()
+        return Promise.reject(refreshError)
+      } finally {
+        isRefreshing = false
+      }
+    }
+
+    if (error.response?.status === 401) {
+      clearSession()
     }
     console.error('API Error:', error)
     return Promise.reject(error)
   }
 )
+
+function clearSession() {
+  localStorage.removeItem('ironmesh_token')
+  localStorage.removeItem('ironmesh_refresh')
+  localStorage.removeItem('ironmesh_user')
+  if (!window.location.pathname.includes('/login')) {
+    window.location.href = '/login'
+  }
+}
 
 // Types
 export interface Device {

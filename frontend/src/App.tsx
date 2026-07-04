@@ -36,8 +36,14 @@ export default function App() {
     }
   }, [location])
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await axios.post('/api/v1/auth/logout', {}, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('ironmesh_token')}` }
+      })
+    } catch {}
     localStorage.removeItem('ironmesh_token')
+    localStorage.removeItem('ironmesh_refresh')
     localStorage.removeItem('ironmesh_user')
     window.location.href = '/login'
   }

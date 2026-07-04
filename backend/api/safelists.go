@@ -6,16 +6,15 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/yourusername/seagles/auth"
 )
 
-// Safelist entry types
 const (
 	SafelistTypeIP   = "ip"
 	SafelistTypeCIDR = "cidr"
 	SafelistTypeMAC  = "mac"
 )
 
-// SafelistEntry represents a safelist entry.
 type SafelistEntry struct {
 	ID        string  `json:"id"`
 	EntryType string  `json:"entry_type"`
@@ -26,14 +25,12 @@ type SafelistEntry struct {
 	IsActive  bool    `json:"is_active"`
 }
 
-// CreateSafelistRequest is the request body for creating a safelist entry.
 type CreateSafelistRequest struct {
-	EntryType string `json:"entry_type" binding:"required"`
-	Value     string `json:"value" binding:"required"`
-	Reason    string `json:"reason"`
+	EntryType string `json:"entry_type" binding:"required,oneof=ip cidr mac"`
+	Value     string `json:"value" binding:"required,min=1,max=255"`
+	Reason    string `json:"reason" binding:"max=500"`
 }
 
-// ListSafelistHandler returns all active safelist entries.
 func ListSafelistHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rows, err := db.Query(`SELECT id, entry_type, value, reason, created_by, created_at, is_active
@@ -66,17 +63,11 @@ func ListSafelistHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-// CreateSafelistHandler adds a new safelist entry.
 func CreateSafelistHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req CreateSafelistRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			fail(c, 400, "Invalid request: "+err.Error())
-			return
-		}
-
-		if req.EntryType != SafelistTypeIP && req.EntryType != SafelistTypeCIDR && req.EntryType != SafelistTypeMAC {
-			fail(c, 400, "entry_type must be 'ip', 'cidr', or 'mac'")
 			return
 		}
 
@@ -95,7 +86,6 @@ func CreateSafelistHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-// DeleteSafelistHandler deactivates a safelist entry.
 func DeleteSafelistHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
@@ -113,7 +103,6 @@ func DeleteSafelistHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-// IsSafelisted checks if an IP address is in the safelist.
 func IsSafelisted(db *sql.DB, ip string) bool {
 	var count int
 	db.QueryRow(`SELECT COUNT(*) FROM safelists
@@ -124,9 +113,6 @@ func IsSafelisted(db *sql.DB, ip string) bool {
 	return count > 0
 }
 
-// --- Scan Profiles ---
-
-// ScanProfile represents a scan configuration profile.
 type ScanProfile struct {
 	ID                 string `json:"id"`
 	Name               string `json:"name"`
@@ -138,7 +124,6 @@ type ScanProfile struct {
 	IsDefault          bool   `json:"is_default"`
 }
 
-// ListScanProfilesHandler returns all scan profiles.
 func ListScanProfilesHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rows, err := db.Query(`SELECT id, name, description, skip_credential_test, skip_protocol_probe,
@@ -169,9 +154,6 @@ func ListScanProfilesHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-// --- Scan Scopes ---
-
-// ScanScope represents a network CIDR scope.
 type ScanScope struct {
 	ID       string `json:"id"`
 	CIDR     string `json:"cidr"`
@@ -179,7 +161,6 @@ type ScanScope struct {
 	IsActive bool   `json:"is_active"`
 }
 
-// ListScanScopesHandler returns all scan scopes.
 func ListScanScopesHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rows, err := db.Query(`SELECT id, cidr, label, is_active FROM scan_scopes ORDER BY created_at DESC`)
@@ -208,15 +189,16 @@ func ListScanScopesHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-// CreateScanScopeHandler adds a new scan scope.
+type CreateScanScopeRequest struct {
+	CIDR  string `json:"cidr" binding:"required,cidr"`
+	Label string `json:"label" binding:"max=200"`
+}
+
 func CreateScanScopeHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var req struct {
-			CIDR  string `json:"cidr" binding:"required"`
-			Label string `json:"label"`
-		}
+		var req CreateScanScopeRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			fail(c, 400, "CIDR is required")
+			fail(c, 400, "CIDR is required: "+err.Error())
 			return
 		}
 
@@ -232,7 +214,6 @@ func CreateScanScopeHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-// DeleteScanScopeHandler deactivates a scan scope.
 func DeleteScanScopeHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
@@ -250,9 +231,6 @@ func DeleteScanScopeHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-// --- Webhooks ---
-
-// WebhookInfo represents a webhook for API responses.
 type WebhookInfo struct {
 	ID            string  `json:"id"`
 	Name          string  `json:"name"`
@@ -263,7 +241,6 @@ type WebhookInfo struct {
 	LastTriggered *string `json:"last_triggered"`
 }
 
-// ListWebhooksHandler returns all configured webhooks.
 func ListWebhooksHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rows, err := db.Query(`SELECT id, name, url, webhook_type, min_severity, is_active, last_triggered
@@ -293,15 +270,16 @@ func ListWebhooksHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-// CreateWebhookHandler adds a new webhook.
+type CreateWebhookRequest struct {
+	Name        string `json:"name" binding:"required,min=1,max=100"`
+	URL         string `json:"url" binding:"required,url"`
+	WebhookType string `json:"webhook_type" binding:"required,oneof=slack teams generic"`
+	MinSeverity string `json:"min_severity" binding:"omitempty,oneof=critical high medium low"`
+}
+
 func CreateWebhookHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var req struct {
-			Name        string `json:"name" binding:"required"`
-			URL         string `json:"url" binding:"required"`
-			WebhookType string `json:"webhook_type" binding:"required"`
-			MinSeverity string `json:"min_severity"`
-		}
+		var req CreateWebhookRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			fail(c, 400, "Invalid request: "+err.Error())
 			return
@@ -324,7 +302,6 @@ func CreateWebhookHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-// DeleteWebhookHandler removes a webhook.
 func DeleteWebhookHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
@@ -342,7 +319,6 @@ func DeleteWebhookHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-// TestWebhookHandler sends a test alert to a webhook.
 func TestWebhookHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
@@ -352,7 +328,8 @@ func TestWebhookHandler(db *sql.DB) gin.HandlerFunc {
 			fail(c, http.StatusNotFound, "Webhook not found")
 			return
 		}
-
 		success(c, gin.H{"message": "Test webhook sent", "webhook_id": id})
 	}
 }
+
+var _ = auth.AuthMiddleware

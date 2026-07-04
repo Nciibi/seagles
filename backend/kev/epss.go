@@ -5,14 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"time"
+
+	"github.com/yourusername/seagles/breaker"
+	"github.com/yourusername/seagles/slog"
 )
 
 const epssAPIURL = "https://api.first.org/data/v1/epss"
 
-// EPSSScore contains EPSS data for a single CVE.
 type EPSSScore struct {
 	CVE        string  `json:"cve"`
 	EPSS       float64 `json:"epss"`
@@ -20,7 +21,6 @@ type EPSSScore struct {
 	Date       string  `json:"date"`
 }
 
-// EPSSResponse is the API response from FIRST.org.
 type EPSSResponse struct {
 	Status     string      `json:"status"`
 	StatusCode int         `json:"status-code"`
@@ -29,8 +29,12 @@ type EPSSResponse struct {
 	Data       []EPSSScore `json:"data"`
 }
 
-// FetchEPSSScores queries the FIRST.org EPSS API for the given CVE IDs.
-// It batches requests in groups of 30 to respect rate limits.
+var epssBreaker = breaker.New(breaker.Options{
+	Name:         "epss-api",
+	MaxFailures:  5,
+	ResetTimeout: 2 * time.Minute,
+})
+
 func FetchEPSSScores(cveIDs []string) (map[string]EPSSScore, error) {
 	results := make(map[string]EPSSScore)
 	if len(cveIDs) == 0 {
@@ -47,7 +51,6 @@ func FetchEPSSScores(cveIDs []string) (map[string]EPSSScore, error) {
 		}
 		batch := cveIDs[i:end]
 
-		// Build comma-separated CVE list
 		cveParam := ""
 		for j, cve := range batch {
 			if j > 0 {
@@ -57,34 +60,39 @@ func FetchEPSSScores(cveIDs []string) (map[string]EPSSScore, error) {
 		}
 
 		url := fmt.Sprintf("%s?cve=%s", epssAPIURL, cveParam)
-		req, err := http.NewRequest("GET", url, nil)
+
+		err := epssBreaker.Execute(func() error {
+			req, reqErr := http.NewRequest("GET", url, nil)
+			if reqErr != nil {
+				return reqErr
+			}
+			req.Header.Set("User-Agent", "IronMesh-Security-Scanner/2.0")
+
+			resp, reqErr := client.Do(req)
+			if reqErr != nil {
+				return reqErr
+			}
+			defer resp.Body.Close()
+
+			body, readErr := io.ReadAll(resp.Body)
+			if readErr != nil {
+				return readErr
+			}
+
+			var epssResp EPSSResponse
+			if unmarshalErr := json.Unmarshal(body, &epssResp); unmarshalErr != nil {
+				return unmarshalErr
+			}
+
+			for _, score := range epssResp.Data {
+				results[score.CVE] = score
+			}
+			return nil
+		})
 		if err != nil {
-			return results, fmt.Errorf("failed to create EPSS request: %v", err)
-		}
-		req.Header.Set("User-Agent", "IronMesh-Security-Scanner/1.0")
-
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Printf("EPSS API request failed: %v", err)
-			continue
+			slog.Warn("EPSS batch fetch failed", "batch_size", len(batch), "error", err.Error())
 		}
 
-		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			continue
-		}
-
-		var epssResp EPSSResponse
-		if err := json.Unmarshal(body, &epssResp); err != nil {
-			continue
-		}
-
-		for _, score := range epssResp.Data {
-			results[score.CVE] = score
-		}
-
-		// Rate limit: 100 requests per minute
 		if end < len(cveIDs) {
 			time.Sleep(700 * time.Millisecond)
 		}
@@ -93,12 +101,11 @@ func FetchEPSSScores(cveIDs []string) (map[string]EPSSScore, error) {
 	return results, nil
 }
 
-// UpdateEPSSScores fetches EPSS scores for all unresolved CVEs and updates the database.
 func UpdateEPSSScores(db *sql.DB) {
 	rows, err := db.Query(`SELECT DISTINCT cve_id FROM vulnerabilities
 		WHERE cve_id IS NOT NULL AND is_resolved = FALSE`)
 	if err != nil {
-		log.Printf("Failed to query CVEs for EPSS update: %v", err)
+		slog.Error("Failed to query CVEs for EPSS update", "error", err.Error())
 		return
 	}
 	defer rows.Close()
@@ -112,13 +119,14 @@ func UpdateEPSSScores(db *sql.DB) {
 	}
 
 	if len(cveIDs) == 0 {
-		log.Println("No CVEs to update EPSS scores for")
+		slog.Debug("No CVEs to update EPSS scores for")
 		return
 	}
 
+	slog.Info("Fetching EPSS scores", "cve_count", len(cveIDs))
 	scores, err := FetchEPSSScores(cveIDs)
 	if err != nil {
-		log.Printf("EPSS fetch failed: %v", err)
+		slog.Error("EPSS fetch failed", "error", err.Error())
 		return
 	}
 
@@ -132,12 +140,10 @@ func UpdateEPSSScores(db *sql.DB) {
 		}
 	}
 
-	log.Printf("EPSS scores updated: %d/%d CVEs", updated, len(cveIDs))
+	slog.Info("EPSS scores updated", "updated", updated, "total", len(cveIDs))
 }
 
-// StartEPSSUpdater runs EPSS score updates every 6 hours.
 func StartEPSSUpdater(db *sql.DB) {
-	// Initial update after 30 seconds (let system stabilize)
 	go func() {
 		time.Sleep(30 * time.Second)
 		UpdateEPSSScores(db)

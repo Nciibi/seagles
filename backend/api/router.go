@@ -12,6 +12,7 @@ import (
 	"github.com/yourusername/seagles/auth"
 	"github.com/yourusername/seagles/config"
 	"github.com/yourusername/seagles/kev"
+	"github.com/yourusername/seagles/middleware"
 	"github.com/yourusername/seagles/slog"
 )
 
@@ -152,6 +153,8 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 		}
 		c.Next()
 	})
+
+	r.Use(middleware.SanitizeInput(middleware.DefaultXSSConfig))
 
 	v1 := r.Group("/api/v1")
 	{

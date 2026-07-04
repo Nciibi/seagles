@@ -19,6 +19,7 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/yourusername/seagles/alerts"
 	"github.com/yourusername/seagles/config"
+	"github.com/yourusername/seagles/middleware"
 	"github.com/yourusername/seagles/models"
 	"github.com/yourusername/seagles/slog"
 )
@@ -180,6 +181,20 @@ func UploadFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
+		headerBytes := make([]byte, 512)
+		n, err := io.ReadFull(file, headerBytes)
+		if err != nil && err != io.ErrUnexpectedEOF {
+			fail(c, http.StatusBadRequest, "Failed to read file header")
+			return
+		}
+		headerBytes = headerBytes[:n]
+
+		if err := middleware.ValidateFirmwareFile(header.Filename, headerBytes); err != nil {
+			slog.Warn("firmware_validation_failed", "filename", header.Filename, "error", err.Error())
+			fail(c, http.StatusBadRequest, "Invalid firmware file: "+err.Error())
+			return
+		}
+
 		tempDir := "/tmp/ironmesh-uploads"
 		os.MkdirAll(tempDir, 0750)
 		tempPath := filepath.Join(tempDir, header.Filename)
@@ -191,7 +206,8 @@ func UploadFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 		}
 
 		hasher := sha256.New()
-		tee := io.TeeReader(file, hasher)
+		combinedReader := io.MultiReader(bytes.NewReader(headerBytes), file)
+		tee := io.TeeReader(combinedReader, hasher)
 
 		written, err := io.Copy(destFile, tee)
 		destFile.Close()

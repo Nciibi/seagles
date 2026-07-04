@@ -5,34 +5,31 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/yourusername/seagles/slog"
 	"golang.org/x/crypto/ssh"
 )
 
-// Credential represents a username:password pair.
 type Credential struct {
 	Username string
 	Password string
 }
 
-// CredentialResult contains the result of credential testing.
 type CredentialResult struct {
-	Tested   int      `json:"tested"`
-	Found    bool     `json:"found"`
-	Username string   `json:"username,omitempty"`
-	Password string   `json:"password,omitempty"`
-	Method   string   `json:"method"`
-	LockedOut bool    `json:"locked_out"`
-	AuditLog []string `json:"audit_log"`
+	Tested    int      `json:"tested"`
+	Found     bool     `json:"found"`
+	Username  string   `json:"username,omitempty"`
+	Password  string   `json:"password,omitempty"`
+	Method    string   `json:"method"`
+	LockedOut bool     `json:"locked_out"`
+	AuditLog  []string `json:"audit_log"`
 }
 
-// LoadCredentials reads a credential file in username:password format.
 func LoadCredentials(filepath string) ([]Credential, error) {
 	file, err := os.Open(filepath)
 	if err != nil {
@@ -67,7 +64,6 @@ func LoadCredentials(filepath string) ([]Credential, error) {
 	return creds, scanner.Err()
 }
 
-// TestSSHCreds tests SSH credentials against a device with safety limits.
 func TestSSHCreds(ip string, port int, creds []Credential, maxPairs int) CredentialResult {
 	result := CredentialResult{Method: "ssh"}
 	addr := fmt.Sprintf("%s:%d", ip, port)
@@ -86,17 +82,14 @@ func TestSSHCreds(ip string, port int, creds []Credential, maxPairs int) Credent
 		cred := creds[i]
 		result.Tested++
 
-		logEntry := fmt.Sprintf("[CRED-TEST] %s SSH %s user=%s",
-			time.Now().Format(time.RFC3339), addr, cred.Username)
+		logEntry := fmt.Sprintf("[CRED-TEST] SSH %s user=%s", addr, cred.Username)
 		result.AuditLog = append(result.AuditLog, logEntry)
-		log.Println(logEntry)
 
 		config := &ssh.ClientConfig{
 			User: cred.Username,
 			Auth: []ssh.AuthMethod{
 				ssh.Password(cred.Password),
 			},
-			// NOTE: For production use known_hosts instead
 			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 			Timeout:         5 * time.Second,
 		}
@@ -107,14 +100,14 @@ func TestSSHCreds(ip string, port int, creds []Credential, maxPairs int) Credent
 			result.Found = true
 			result.Username = cred.Username
 			result.Password = cred.Password
-			log.Printf("[CRED-TEST] SUCCESS SSH %s user=%s", addr, cred.Username)
+			slog.Warn("Default SSH credentials found", "ip", ip, "username", cred.Username)
 			return result
 		}
 
 		errStr := strings.ToLower(err.Error())
 		if strings.Contains(errStr, "too many") || strings.Contains(errStr, "locked") {
 			result.LockedOut = true
-			log.Printf("[CRED-TEST] LOCKOUT SSH %s", addr)
+			slog.Warn("SSH credential lockout", "ip", ip)
 			return result
 		}
 
@@ -123,14 +116,12 @@ func TestSSHCreds(ip string, port int, creds []Credential, maxPairs int) Credent
 			consecutiveFailures = 0
 		}
 
-		// 500ms delay between attempts
 		time.Sleep(500 * time.Millisecond)
 	}
 
 	return result
 }
 
-// TestHTTPBasicCreds tests HTTP Basic Auth credentials with safety limits.
 func TestHTTPBasicCreds(ip string, port int, path string, creds []Credential, maxPairs int) CredentialResult {
 	result := CredentialResult{Method: "http-basic"}
 	scheme := "http"
@@ -158,10 +149,8 @@ func TestHTTPBasicCreds(ip string, port int, path string, creds []Credential, ma
 		cred := creds[i]
 		result.Tested++
 
-		logEntry := fmt.Sprintf("[CRED-TEST] %s HTTP-BASIC %s user=%s",
-			time.Now().Format(time.RFC3339), url, cred.Username)
+		logEntry := fmt.Sprintf("[CRED-TEST] HTTP-BASIC %s user=%s", url, cred.Username)
 		result.AuditLog = append(result.AuditLog, logEntry)
-		log.Println(logEntry)
 
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
@@ -184,13 +173,13 @@ func TestHTTPBasicCreds(ip string, port int, path string, creds []Credential, ma
 
 		if resp.StatusCode == 429 {
 			result.LockedOut = true
-			log.Printf("[CRED-TEST] LOCKOUT HTTP %s", url)
+			slog.Warn("HTTP rate limited", "ip", ip)
 			return result
 		}
 
 		if strings.Contains(bodyStr, "locked") || strings.Contains(bodyStr, "disabled") {
 			result.LockedOut = true
-			log.Printf("[CRED-TEST] LOCKOUT HTTP %s (body)", url)
+			slog.Warn("HTTP account locked", "ip", ip)
 			return result
 		}
 
@@ -198,18 +187,16 @@ func TestHTTPBasicCreds(ip string, port int, path string, creds []Credential, ma
 			result.Found = true
 			result.Username = cred.Username
 			result.Password = cred.Password
-			log.Printf("[CRED-TEST] SUCCESS HTTP-BASIC %s user=%s", url, cred.Username)
+			slog.Warn("Default HTTP credentials found", "ip", ip, "username", cred.Username)
 			return result
 		}
 
-		// 500ms delay between attempts
 		time.Sleep(500 * time.Millisecond)
 	}
 
 	return result
 }
 
-// TestTelnetCreds tests Telnet credentials with safety limits.
 func TestTelnetCreds(ip string, port int, creds []Credential, maxPairs int) CredentialResult {
 	result := CredentialResult{Method: "telnet"}
 	addr := fmt.Sprintf("%s:%d", ip, port)
@@ -226,35 +213,28 @@ func TestTelnetCreds(ip string, port int, creds []Credential, maxPairs int) Cred
 		cred := creds[i]
 		result.Tested++
 
-		logEntry := fmt.Sprintf("[CRED-TEST] %s TELNET %s user=%s",
-			time.Now().Format(time.RFC3339), addr, cred.Username)
+		logEntry := fmt.Sprintf("[CRED-TEST] TELNET %s user=%s", addr, cred.Username)
 		result.AuditLog = append(result.AuditLog, logEntry)
-		log.Println(logEntry)
 
 		conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
 		if err != nil {
-			break // Can't connect at all
+			break
 		}
 
-		// Read initial banner
 		conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 		banner := make([]byte, 1024)
-		conn.Read(banner) // Ignore error — some servers don't send banner immediately
+		conn.Read(banner)
 
-		// Send username
 		conn.SetWriteDeadline(time.Now().Add(3 * time.Second))
 		conn.Write([]byte(cred.Username + "\n"))
 
-		// Read response
 		conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 		resp1 := make([]byte, 1024)
 		conn.Read(resp1)
 
-		// Send password
 		conn.SetWriteDeadline(time.Now().Add(3 * time.Second))
 		conn.Write([]byte(cred.Password + "\n"))
 
-		// Read response
 		conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 		resp2 := make([]byte, 1024)
 		n, _ := conn.Read(resp2)
@@ -270,12 +250,11 @@ func TestTelnetCreds(ip string, port int, creds []Credential, maxPairs int) Cred
 				result.Found = true
 				result.Username = cred.Username
 				result.Password = cred.Password
-				log.Printf("[CRED-TEST] SUCCESS TELNET %s user=%s", addr, cred.Username)
+				slog.Warn("Default Telnet credentials found", "ip", ip, "username", cred.Username)
 				return result
 			}
 		}
 
-		// 500ms delay between attempts
 		time.Sleep(500 * time.Millisecond)
 	}
 

@@ -1,0 +1,10 @@
+{
+  "name": "IronMesh IoT Security",
+  "short_name": "IronMesh",
+  "description": "IoT Security Platform - Discover vulnerable devices before attackers do",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1117",
+  "theme_color": "#5c7cfa",
+  "icons": []
+}

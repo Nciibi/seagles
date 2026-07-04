@@ -3,7 +3,6 @@ package scanner
 import (
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"

@@ -2,6 +2,7 @@ package breaker
 
 import (
 	"errors"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"

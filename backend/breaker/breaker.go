@@ -19,6 +19,19 @@ var (
 	ErrCircuitOpen = errors.New("circuit breaker is open")
 )
 
+func (s State) String() string {
+	switch s {
+	case StateClosed:
+		return "closed"
+	case StateHalfOpen:
+		return "half-open"
+	case StateOpen:
+		return "open"
+	default:
+		return "unknown"
+	}
+}
+
 type Breaker struct {
 	name          string
 	maxFailures   int

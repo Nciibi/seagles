@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/yourusername/seagles/alerts"
@@ -13,15 +13,23 @@ import (
 	"github.com/yourusername/seagles/models"
 	"github.com/yourusername/seagles/risk"
 	"github.com/yourusername/seagles/scanner"
+	"github.com/yourusername/seagles/slog"
 )
 
-// ListScansHandler returns all scans ordered by started_at DESC.
+type TriggerScanRequest struct {
+	ProfileID string `json:"profile_id" binding:"omitempty,uuid"`
+	ScanType  string `json:"scan_type" binding:"omitempty,oneof=full quick"`
+}
+
 func ListScansHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		requestID, _ := c.Get("request_id")
+
 		rows, err := db.Query(`SELECT id, device_id, started_at, completed_at, status,
 			scan_type, open_ports, services, scan_output
 			FROM scans ORDER BY started_at DESC LIMIT 100`)
 		if err != nil {
+			slog.Error("Failed to query scans", "request_id", requestID, "error", err.Error())
 			fail(c, 500, "Failed to query scans: "+err.Error())
 			return
 		}
@@ -36,15 +44,18 @@ func ListScansHandler(db *sql.DB) gin.HandlerFunc {
 			}
 			scans = append(scans, s.ToJSON())
 		}
-		if scans == nil { scans = []models.ScanJSON{} }
+		if scans == nil {
+			scans = []models.ScanJSON{}
+		}
 		success(c, scans)
 	}
 }
 
-// GetScanHandler returns a single scan with its device info.
 func GetScanHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		requestID, _ := c.Get("request_id")
 		id := c.Param("id")
+
 		var s models.Scan
 		err := db.QueryRow(`SELECT id, device_id, started_at, completed_at, status,
 			scan_type, open_ports, services, scan_output
@@ -56,6 +67,7 @@ func GetScanHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		if err != nil {
+			slog.Error("Failed to query scan", "request_id", requestID, "scan_id", id, "error", err.Error())
 			fail(c, 500, "Failed to query scan: "+err.Error())
 			return
 		}
@@ -78,12 +90,11 @@ func GetScanHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-// TriggerDeviceScanHandler creates a scan record and launches the scanner in a goroutine.
 func TriggerDeviceScanHandler(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		requestID, _ := c.Get("request_id")
 		deviceID := c.Param("id")
 
-		// Get device IP
 		var ip string
 		err := db.QueryRow(`SELECT ip_address FROM devices WHERE id = $1`, deviceID).Scan(&ip)
 		if err == sql.ErrNoRows {
@@ -91,53 +102,50 @@ func TriggerDeviceScanHandler(db *sql.DB, cfg *config.Config, kevCatalog *kev.KE
 			return
 		}
 		if err != nil {
+			slog.Error("Failed to query device", "request_id", requestID, "device_id", deviceID, "error", err.Error())
 			fail(c, 500, "Failed to query device: "+err.Error())
 			return
 		}
 
-		// Create scan record
 		var scanID string
 		err = db.QueryRow(`INSERT INTO scans (device_id, status, scan_type) VALUES ($1, 'running', 'full') RETURNING id`,
 			deviceID).Scan(&scanID)
 		if err != nil {
+			slog.Error("Failed to create scan", "request_id", requestID, "device_id", deviceID, "error", err.Error())
 			fail(c, 500, "Failed to create scan: "+err.Error())
 			return
 		}
 
-		log.Printf("Scan triggered for device %s (%s)", deviceID, ip)
+		slog.Info("Scan triggered", "request_id", requestID, "device_id", deviceID, "ip", ip, "scan_id", scanID)
 
-		// Launch scan goroutine
 		go runDeviceScan(db, cfg, kevCatalog, deviceID, scanID, ip)
 
 		success(c, gin.H{"scan_id": scanID, "status": "running"})
 	}
 }
 
-// runDeviceScan performs a full scan pipeline on a device.
 func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, deviceID, scanID, ip string) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("Scan goroutine panicked for device %s: %v", deviceID, r)
+			slog.Error("Scan goroutine panicked", "device_id", deviceID, "recover", r)
 			db.Exec(`UPDATE scans SET status='failed', completed_at=NOW() WHERE id=$1`, scanID)
 		}
 	}()
 
-	// Check if IP is safelisted before scanning
 	if IsSafelisted(db, ip) {
-		log.Printf("Scan skipped: IP %s is safelisted", ip)
+		slog.Info("Scan skipped: IP is safelisted", "ip", ip)
 		db.Exec(`UPDATE scans SET status='skipped', scan_output='Device is safelisted', completed_at=NOW() WHERE id=$1`, scanID)
 		return
 	}
 
-	// Step 1: Deep scan
+	startTime := time.Now()
 	result, err := scanner.DeepScan(ip)
 	if err != nil {
-		log.Printf("Deep scan failed for %s: %v", ip, err)
+		slog.Error("Deep scan failed", "ip", ip, "error", err.Error())
 		db.Exec(`UPDATE scans SET status='failed', completed_at=NOW() WHERE id=$1`, scanID)
 		return
 	}
 
-	// Save ports and services
 	var openPortNumbers []int
 	for _, p := range result.Host.OpenPorts {
 		if p.State == "open" {
@@ -151,7 +159,6 @@ func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, d
 	db.Exec(`UPDATE scans SET open_ports=$1, services=$2 WHERE id=$3`,
 		portsJSON, servicesJSON, scanID)
 
-	// Update device info from scan
 	if result.Host.Hostname != "" {
 		db.Exec(`UPDATE devices SET hostname=$1 WHERE id=$2`, result.Host.Hostname, deviceID)
 	}
@@ -165,7 +172,6 @@ func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, d
 		db.Exec(`UPDATE devices SET raw_nmap=$1 WHERE id=$2`, result.Host.RawXML, deviceID)
 	}
 
-	// Step 2: Protocol detection
 	findings := scanner.DetectProtocols(ip, openPortNumbers)
 	for _, f := range findings {
 		var vulnID string
@@ -174,19 +180,18 @@ func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, d
 			deviceID, scanID, f.Risk, f.Protocol+" exposure detected", f.Description, fmt.Sprintf("port/%d", f.Port),
 		).Scan(&vulnID)
 		if err != nil {
-			log.Printf("Failed to insert vulnerability: %v", err)
+			slog.Error("Failed to insert vulnerability", "error", err.Error())
 		}
 
 		alerts.CreateAlert(db, alerts.AlertRequest{
-			DeviceID:  deviceID,
-			AlertType: protocolToAlertType(f.Protocol),
-			Severity:  f.Risk,
-			Title:     fmt.Sprintf("%s detected on %s:%d", f.Protocol, ip, f.Port),
+			DeviceID:    deviceID,
+			AlertType:   protocolToAlertType(f.Protocol),
+			Severity:    f.Risk,
+			Title:       fmt.Sprintf("%s detected on %s:%d", f.Protocol, ip, f.Port),
 			Description: f.Description,
 		})
 	}
 
-	// Step 3: TLS check if port 443 open
 	for _, p := range openPortNumbers {
 		if p == 443 {
 			tlsResult := scanner.CheckTLS(ip, 443)
@@ -209,28 +214,28 @@ func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, d
 		}
 	}
 
-	// Step 4: Credential testing
 	creds, credErr := scanner.LoadCredentials("data/default-credentials.txt")
 	if credErr != nil {
-		log.Printf("Failed to load credentials: %v", credErr)
+		slog.Warn("Failed to load credentials", "error", credErr.Error())
 	} else {
 		runCredentialTests(db, deviceID, scanID, ip, openPortNumbers, creds, kevCatalog)
 	}
 
-	// Step 5: Update scan status
 	db.Exec(`UPDATE scans SET status='complete', completed_at=NOW() WHERE id=$1`, scanID)
-
-	// Step 6: Update risk score
 	risk.UpdateDeviceRiskScore(db, deviceID)
 
-	log.Printf("Scan complete for %s: found %d open ports, %d protocol findings",
-		ip, len(openPortNumbers), len(findings))
+	slog.Info("Scan complete", "device_id", deviceID, "ip", ip,
+		"open_ports", len(openPortNumbers),
+		"findings", len(findings),
+		"duration", time.Since(startTime).String())
 }
 
 func runCredentialTests(db *sql.DB, deviceID, scanID, ip string, ports []int, creds []scanner.Credential, kevCatalog *kev.KEVCatalog) {
 	hasPort := func(target int) bool {
 		for _, p := range ports {
-			if p == target { return true }
+			if p == target {
+				return true
+			}
 		}
 		return false
 	}
@@ -261,18 +266,22 @@ func runCredentialTests(db *sql.DB, deviceID, scanID, ip string, ports []int, cr
 
 			metadata, _ := json.Marshal(map[string]string{"username": r.Username, "method": r.Method})
 			alerts.CreateAlert(db, alerts.AlertRequest{
-				DeviceID: deviceID, AlertType: alerts.AlertDefaultCreds, Severity: "critical",
-				Title: fmt.Sprintf("Default credentials found on %s", ip),
-				Metadata: metadata,
+				DeviceID:  deviceID,
+				AlertType: alerts.AlertDefaultCreds,
+				Severity:  "critical",
+				Title:     fmt.Sprintf("Default credentials found on %s", ip),
+				Metadata:  metadata,
 			})
 
 			db.Exec(`UPDATE devices SET tags = array_append(tags, 'default-creds') WHERE id = $1 AND NOT ('default-creds' = ANY(COALESCE(tags, '{}')))`, deviceID)
 		}
 		if r.LockedOut {
-			log.Printf("[WARNING] Credential lockout detected on %s - stopping credential tests", ip)
+			slog.Warn("Credential lockout detected", "ip", ip)
 			alerts.CreateAlert(db, alerts.AlertRequest{
-				DeviceID: deviceID, AlertType: alerts.AlertLockedOut, Severity: "medium",
-				Title: fmt.Sprintf("Account lockout triggered during scan of %s", ip),
+				DeviceID:  deviceID,
+				AlertType: alerts.AlertLockedOut,
+				Severity:  "medium",
+				Title:     fmt.Sprintf("Account lockout triggered during scan of %s", ip),
 			})
 			break
 		}
@@ -281,30 +290,35 @@ func runCredentialTests(db *sql.DB, deviceID, scanID, ip string, ports []int, cr
 
 func protocolToAlertType(protocol string) string {
 	switch protocol {
-	case "Telnet": return alerts.AlertTelnetOpen
-	case "ADB": return alerts.AlertADBExposed
-	case "MQTT-plaintext": return alerts.AlertPlaintextMQTT
-	case "RTSP-unauth": return alerts.AlertUnauthRTSP
-	default: return protocol
+	case "Telnet":
+		return alerts.AlertTelnetOpen
+	case "ADB":
+		return alerts.AlertADBExposed
+	case "MQTT-plaintext":
+		return alerts.AlertPlaintextMQTT
+	case "RTSP-unauth":
+		return alerts.AlertUnauthRTSP
+	default:
+		return protocol
 	}
 }
 
-// NetworkScanHandler triggers a full network discovery.
 func NetworkScanHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		log.Println("Network scan triggered")
+		requestID, _ := c.Get("request_id")
+		slog.Info("Network scan triggered", "request_id", requestID)
 
 		go func() {
 			hosts, err := scanner.DiscoverHosts(cfg.NetworkCIDR)
 			if err != nil {
-				log.Printf("Network discovery failed: %v", err)
+				slog.Error("Network discovery failed", "error", err.Error())
 				return
 			}
 
 			discovered := 0
 			for _, ip := range hosts {
 				if IsSafelisted(db, ip) {
-					log.Printf("Skipping safelisted IP during network scan: %s", ip)
+					slog.Debug("Skipping safelisted IP", "ip", ip)
 					continue
 				}
 
@@ -323,13 +337,15 @@ func NetworkScanHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 
 				if isNew && deviceID != "" {
 					alerts.CreateAlert(db, alerts.AlertRequest{
-						DeviceID: deviceID, AlertType: alerts.AlertNewDevice, Severity: "high",
-						Title: fmt.Sprintf("New device discovered: %s", ip),
+						DeviceID:  deviceID,
+						AlertType: alerts.AlertNewDevice,
+						Severity:  "high",
+						Title:     fmt.Sprintf("New device discovered: %s", ip),
 					})
 				}
 				discovered++
 			}
-			log.Printf("Network scan complete: discovered %d hosts", discovered)
+			slog.Info("Network scan complete", "hosts_discovered", discovered)
 		}()
 
 		success(c, gin.H{"message": "network scan started"})

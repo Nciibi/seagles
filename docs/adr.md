@@ -172,3 +172,137 @@
 - File extension whitelist as secondary check
 - Rejects empty files and oversized payloads (>256MB)
 - Validation before write prevents wasted I/O
+
+---
+
+## ADR-010: WebSocket with Origin Whitelist
+
+**Status:** Accepted  
+**Date:** 2026-07-04  
+
+**Context:** WebSocket connections must be secured against cross-origin WebSocket hijacking (CSWSH) and unauthorized access.
+
+**Decision:** Implement WebSocket with origin whitelist verification and JWT authentication middleware.
+
+**Consequences:**
+- `CheckOrigin` verifies against `ALLOWED_ORIGINS` env var (comma-separated)
+- WebSocket route placed inside authenticated Gin group (JWT required)
+- `Broadcast()` uses `Lock()` instead of `RLock()` to prevent data race
+- Unauthenticated connections are rejected before upgrade
+
+**Alternatives considered:**
+- Permissive `CheckOrigin: true` — original bug, removed
+- Token in query string — less secure, logged by proxies
+
+---
+
+## ADR-011: React Router for Client-Side Routing
+
+**Status:** Accepted  
+**Date:** 2026-07-04  
+
+**Context:** Need client-side routing for SPA with protected routes, login redirects, and deep-linking to device details.
+
+**Decision:** Use React Router v6 with `BrowserRouter`.
+
+**Consequences:**
+- Declarative route definitions with `<Route>` nesting
+- `<Navigate>` for auth redirects
+- URL params for device IDs (`/devices/:id`)
+- Future `v7_startTransition` flag ready for React 19
+- `createRoutesFromElements` pattern for route composition
+
+**Alternatives considered:**
+- TanStack Router — newer but less ecosystem adoption
+- Next.js — would require full framework migration, not SPA
+
+---
+
+## ADR-012: Recharts for Data Visualization
+
+**Status:** Accepted  
+**Date:** 2026-07-04  
+
+**Context:** Need charts for risk score distribution, vulnerability trends, and scan history.
+
+**Decision:** Use Recharts (React + D3 wrapper) for all data visualization.
+
+**Consequences:**
+- Declarative chart components (`<BarChart>`, `<PieChart>`, `<LineChart>`)
+- Responsive containers with `<ResponsiveContainer>`
+- Bundle weight ~150KB gzipped (acceptable for analytics page)
+- Easy customization via standard React props
+
+**Alternatives considered:**
+- Chart.js + react-chartjs-2 — similar bundle, imperative API
+- D3 directly — more flexible but much higher complexity
+- Nivo — beautiful but heavier bundle
+
+---
+
+## ADR-013: TailwindCSS over CSS-in-JS
+
+**Status:** Accepted  
+**Date:** 2026-07-04  
+
+**Context:** Need consistent styling with minimal runtime overhead and fast iteration.
+
+**Decision:** Use TailwindCSS with utility classes for all styling.
+
+**Consequences:**
+- Zero runtime CSS-in-JS overhead
+- Consistent design tokens (colors, spacing, typography) via `tailwind.config.js`
+- Dark mode via `class` strategy
+- PostCSS purge removes unused styles in production
+- Some inline styles remain for dynamic values (risk colors)
+
+**Alternatives considered:**
+- CSS Modules — scoped but verbose for complex components
+- Styled Components — runtime overhead, harder to debug
+- Plain CSS — global namespace collisions
+
+---
+
+## ADR-014: nginx for Frontend Serving
+
+**Status:** Accepted  
+**Date:** 2026-07-04  
+
+**Context:** Need to serve built React SPA with compression, caching, and API proxying.
+
+**Decision:** Use nginx:alpine as production frontend server.
+
+**Consequences:**
+- Gzip/brotli compression of static assets
+- `Cache-Control: immutable` for hashed assets (1 year)
+- `Cache-Control: no-cache` for index.html
+- API proxy to backend (avoiding CORS in production)
+- SPA fallback (`try_files $uri /index.html`)
+- Runs as non-root user (security best practice)
+
+**Alternatives considered:**
+- Caddy — simpler config but less familiar to DevOps
+- Node.js (serve) — more resource-intensive, no native compression
+- Cloudflare Pages — external dependency
+
+---
+
+## ADR-015: Service Worker for PWA + Offline Cache
+
+**Status:** Accepted  
+**Date:** 2026-07-04  
+
+**Context:** Need offline capability and installable PWA for field use (security engineers on client sites).
+
+**Decision:** Implement service worker with cache-first strategy for static assets and network-first for API calls.
+
+**Consequences:**
+- App shell cached on first visit (instant load on return)
+- Dashboard data cached for offline viewing
+- Push notification support for critical alerts
+- Manifest.json for "Add to Home Screen"
+- Versioned cache busting on deploy
+
+**Alternatives considered:**
+- Workbox — powerful but adds dependency
+- No SW — no offline capability, poor mobile experience

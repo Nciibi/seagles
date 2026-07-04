@@ -11,7 +11,7 @@ import (
 	"github.com/yourusername/seagles/auth"
 	"github.com/yourusername/seagles/config"
 	"github.com/yourusername/seagles/kev"
-	"github.com/yourusername/seagles/db"
+	dbpkg "github.com/yourusername/seagles/db"
 	"github.com/yourusername/seagles/middleware"
 	"github.com/yourusername/seagles/slog"
 )
@@ -99,11 +99,12 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 		v1.POST("/auth/refresh", auth.RefreshTokenHandler(db))
 
 		v1.GET("/health", func(c *gin.Context) {
+			dbOk := dbpkg.IsHealthy()
 			c.JSON(200, gin.H{
 				"status":  "ok",
 				"service": "ironmesh-api",
 				"version": "2.1.0",
-				"db_ok":   db.IsHealthy(),
+				"db_ok":   dbOk,
 			})
 		})
 

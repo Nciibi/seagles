@@ -172,7 +172,7 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 
 		protected := v1.Group("")
 		protected.GET("/ws", WSHandler(cfg.AllowedOrigins))
-		protected.Use(auth.AuthMiddleware())
+
 		{
 			protected.GET("/auth/me", auth.MeHandler())
 			protected.GET("/auth/permissions", auth.PermissionsHandler())

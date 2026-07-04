@@ -1,7 +1,9 @@
 package config
 
 import (
+	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -54,6 +56,7 @@ func Load() (*Config, error) {
 		DBConnMaxLifetime:   time.Duration(getEnvInt("DB_CONN_MAX_LIFETIME_MINUTES", 5)) * time.Minute,
 	}
 
+	fmt.Printf("Config loaded: port=%s cidr=%s redis=%s\n", cfg.Port, cfg.NetworkCIDR, cfg.RedisURL)
 	return cfg, nil
 }
 
@@ -66,8 +69,7 @@ func getEnv(key, fallback string) string {
 
 func getEnvInt(key string, fallback int) int {
 	if value, exists := os.LookupEnv(key); exists {
-		var i int
-		if _, err := fmt.Sscanf(value, "%d", &i); err == nil {
+		if i, err := strconv.Atoi(value); err == nil {
 			return i
 		}
 	}

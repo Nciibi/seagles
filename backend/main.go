@@ -25,7 +25,13 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	auth.SetJWTSecret(cfg.JWTSecret)
+	jwtKey := cfg.JWTSecret
+	if jwtKey == "" && cfg.JWTPrivateKeyFile != "" {
+		if keyData, err := os.ReadFile(cfg.JWTPrivateKeyFile); err == nil {
+			jwtKey = string(keyData)
+		}
+	}
+	auth.SetJWTSecret(jwtKey)
 
 	database := db.Connect(cfg.DatabaseURL)
 	defer database.Close()

@@ -15,6 +15,7 @@ type Config struct {
 	NVDAPIKey           string
 	FirmwareAnalyzerURL string
 	JWTSecret           string
+	JWTPrivateKeyFile   string
 	SlackWebhookURL     string
 	TeamsWebhookURL     string
 	S3Endpoint          string
@@ -40,6 +41,7 @@ func Load() (*Config, error) {
 		NVDAPIKey:           getEnv("NVD_API_KEY", ""),
 		FirmwareAnalyzerURL: getEnv("FIRMWARE_ANALYZER_URL", "http://firmware-analyzer:8001"),
 		JWTSecret:           getEnv("JWT_SECRET", ""),
+		JWTPrivateKeyFile:   getEnv("JWT_PRIVATE_KEY_FILE", ""),
 		SlackWebhookURL:     getEnv("SLACK_WEBHOOK_URL", ""),
 		TeamsWebhookURL:     getEnv("TEAMS_WEBHOOK_URL", ""),
 		S3Endpoint:          getEnv("S3_ENDPOINT", ""),

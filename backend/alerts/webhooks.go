@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/yourusername/seagles/slog"
 )
 
-// WebhookConfig represents a configured webhook destination.
 type WebhookConfig struct {
 	ID          string          `json:"id"`
 	Name        string          `json:"name"`
@@ -23,7 +23,6 @@ type WebhookConfig struct {
 	Headers     json.RawMessage `json:"headers"`
 }
 
-// severityLevel returns a numeric level for severity comparison.
 func severityLevel(sev string) int {
 	switch strings.ToLower(sev) {
 	case "critical":
@@ -39,12 +38,11 @@ func severityLevel(sev string) int {
 	}
 }
 
-// DispatchWebhooks sends alert notifications to all matching webhook endpoints.
 func DispatchWebhooks(db *sql.DB, alertID, severity, title, description, deviceID string) {
 	rows, err := db.Query(`SELECT id, name, url, webhook_type, min_severity, secret, headers
 		FROM webhooks WHERE is_active = TRUE`)
 	if err != nil {
-		log.Printf("Failed to query webhooks: %v", err)
+		slog.Error("Failed to query webhooks", "error", err.Error())
 		return
 	}
 	defer rows.Close()
@@ -57,7 +55,6 @@ func DispatchWebhooks(db *sql.DB, alertID, severity, title, description, deviceI
 			continue
 		}
 
-		// Check severity threshold
 		if alertLevel < severityLevel(wh.MinSeverity) {
 			continue
 		}
@@ -66,11 +63,10 @@ func DispatchWebhooks(db *sql.DB, alertID, severity, title, description, deviceI
 	}
 }
 
-// deliverWebhook sends a single webhook and logs the delivery.
 func deliverWebhook(db *sql.DB, wh WebhookConfig, alertID, severity, title, description, deviceID string) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("Webhook delivery panicked for %s: %v", wh.Name, r)
+			slog.Error("Webhook delivery panicked", "name", wh.Name, "recover", r)
 		}
 	}()
 
@@ -96,9 +92,8 @@ func deliverWebhook(db *sql.DB, wh WebhookConfig, alertID, severity, title, desc
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "IronMesh-Webhook/1.0")
+	req.Header.Set("User-Agent", "IronMesh-Webhook/2.0")
 
-	// Apply custom headers
 	if len(wh.Headers) > 0 {
 		var headers map[string]string
 		if json.Unmarshal(wh.Headers, &headers) == nil {
@@ -122,21 +117,18 @@ func deliverWebhook(db *sql.DB, wh WebhookConfig, alertID, severity, title, desc
 
 	logDelivery(db, wh.ID, alertID, resp.StatusCode, body, "")
 
-	// Mark alert as webhook-sent
 	db.Exec(`UPDATE alerts SET webhook_sent = TRUE, webhook_sent_at = NOW() WHERE id = $1`, alertID)
 	db.Exec(`UPDATE webhooks SET last_triggered = NOW() WHERE id = $1`, wh.ID)
 
-	log.Printf("[WEBHOOK] Delivered to %s (%s): status %d", wh.Name, wh.WebhookType, resp.StatusCode)
+	slog.Info("webhook_delivered", "name", wh.Name, "type", wh.WebhookType, "status", resp.StatusCode)
 }
 
-// logDelivery records a webhook delivery attempt.
 func logDelivery(db *sql.DB, webhookID, alertID string, statusCode int, responseBody, errMsg string) {
 	db.Exec(`INSERT INTO webhook_deliveries (webhook_id, alert_id, status_code, response_body, error)
 		VALUES ($1, $2, $3, $4, $5)`,
 		webhookID, alertID, statusCode, responseBody, errMsg)
 }
 
-// buildSlackPayload creates a Slack-formatted webhook payload.
 func buildSlackPayload(severity, title, description, deviceID string) ([]byte, error) {
 	emoji := "⚪"
 	switch severity {
@@ -162,14 +154,13 @@ func buildSlackPayload(severity, title, description, deviceID string) ([]byte, e
 				"type": "section",
 				"text": map[string]string{
 					"type": "mrkdwn",
-					"text": fmt.Sprintf("*Description:* %s\n*Device:* `%s`\n*Severity:* %s",
-						description, deviceID, severity),
+					"text": fmt.Sprintf("*Description:* %s\n*Device:* `%s`\n*Severity:* %s", description, deviceID, severity),
 				},
 			},
 			{
 				"type": "context",
 				"elements": []map[string]string{
-					{"type": "mrkdwn", "text": fmt.Sprintf("🛡️ IronMesh Security Platform · %s", time.Now().Format(time.RFC3339))},
+					{"type": "mrkdwn", "text": fmt.Sprintf("IronMesh Security Platform · %s", time.Now().Format(time.RFC3339))},
 				},
 			},
 		},
@@ -177,7 +168,6 @@ func buildSlackPayload(severity, title, description, deviceID string) ([]byte, e
 	return json.Marshal(msg)
 }
 
-// buildTeamsPayload creates a Microsoft Teams-formatted webhook payload.
 func buildTeamsPayload(severity, title, description, deviceID string) ([]byte, error) {
 	color := "0078D4"
 	switch severity {
@@ -196,7 +186,7 @@ func buildTeamsPayload(severity, title, description, deviceID string) ([]byte, e
 		"summary":    fmt.Sprintf("[%s] %s", strings.ToUpper(severity), title),
 		"sections": []map[string]interface{}{
 			{
-				"activityTitle": fmt.Sprintf("🛡️ [%s] %s", strings.ToUpper(severity), title),
+				"activityTitle": fmt.Sprintf("[%s] %s", strings.ToUpper(severity), title),
 				"facts": []map[string]string{
 					{"name": "Severity", "value": severity},
 					{"name": "Device", "value": deviceID},
@@ -209,7 +199,6 @@ func buildTeamsPayload(severity, title, description, deviceID string) ([]byte, e
 	return json.Marshal(msg)
 }
 
-// buildGenericPayload creates a generic/CEF webhook payload (compatible with SIEM).
 func buildGenericPayload(alertID, severity, title, description, deviceID string) ([]byte, error) {
 	msg := map[string]interface{}{
 		"event_type": "security_alert",
@@ -223,14 +212,12 @@ func buildGenericPayload(alertID, severity, title, description, deviceID string)
 			"device_id":   deviceID,
 			"timestamp":   time.Now().Format(time.RFC3339),
 		},
-		// CEF-compatible fields
 		"cef": fmt.Sprintf("CEF:0|IronMesh|SecurityPlatform|1.0|%s|%s|%s|dst=%s msg=%s",
 			"IoTAlert", title, severityCEF(severity), deviceID, description),
 	}
 	return json.Marshal(msg)
 }
 
-// severityCEF maps severity to CEF severity levels (0-10).
 func severityCEF(sev string) string {
 	switch sev {
 	case "critical":

@@ -5,18 +5,26 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/yourusername/seagles/alerts"
 	"github.com/yourusername/seagles/config"
 	"github.com/yourusername/seagles/models"
+	"github.com/yourusername/seagles/slog"
 )
 
-// ListFirmwareHandler returns all firmware records with device info joined.
+type AnalyzeFirmwareRequest struct {
+	Filepath string `json:"filepath" binding:"omitempty,min=1"`
+	Vendor   string `json:"vendor" binding:"omitempty,min=1,max=200"`
+	Version  string `json:"version" binding:"omitempty,min=1,max=100"`
+}
+
 func ListFirmwareHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		requestID, _ := c.Get("request_id")
+
 		rows, err := db.Query(`SELECT f.id, f.device_id, f.version, f.vendor, f.checksum,
 			f.file_path, f.analyzed_at, f.entropy_score, f.has_default_creds,
 			f.has_telnet, f.has_backdoor_indicators, f.strings_of_interest,
@@ -26,6 +34,7 @@ func ListFirmwareHandler(db *sql.DB) gin.HandlerFunc {
 			LEFT JOIN devices d ON f.device_id = d.id
 			ORDER BY f.analyzed_at DESC NULLS LAST`)
 		if err != nil {
+			slog.Error("Failed to query firmware", "request_id", requestID, "error", err.Error())
 			fail(c, 500, "Failed to query firmware: "+err.Error())
 			return
 		}
@@ -49,21 +58,26 @@ func ListFirmwareHandler(db *sql.DB) gin.HandlerFunc {
 				continue
 			}
 			entry := FirmwareWithDevice{FirmwareJSON: f.ToJSON()}
-			if deviceIP.Valid { entry.DeviceIP = &deviceIP.String }
-			if deviceHostname.Valid { entry.DeviceHostname = &deviceHostname.String }
+			if deviceIP.Valid {
+				entry.DeviceIP = &deviceIP.String
+			}
+			if deviceHostname.Valid {
+				entry.DeviceHostname = &deviceHostname.String
+			}
 			firmwareList = append(firmwareList, entry)
 		}
-		if firmwareList == nil { firmwareList = []FirmwareWithDevice{} }
+		if firmwareList == nil {
+			firmwareList = []FirmwareWithDevice{}
+		}
 		success(c, firmwareList)
 	}
 }
 
-// AnalyzeFirmwareHandler triggers firmware analysis via the Python microservice.
 func AnalyzeFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		requestID, _ := c.Get("request_id")
 		id := c.Param("id")
 
-		// Get firmware record
 		var f models.Firmware
 		err := db.QueryRow(`SELECT id, device_id, version, vendor, file_path
 			FROM firmware WHERE id = $1`, id).Scan(
@@ -73,15 +87,14 @@ func AnalyzeFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 		if err != nil {
+			slog.Error("Failed to query firmware", "request_id", requestID, "firmware_id", id, "error", err.Error())
 			fail(c, 500, "Failed to query firmware: "+err.Error())
 			return
 		}
 
-		// Update status to pending
 		db.Exec(`UPDATE firmware SET analysis_status='pending' WHERE id=$1`, id)
-		log.Printf("Firmware analysis triggered for %s", id)
+		slog.Info("Firmware analysis triggered", "request_id", requestID, "firmware_id", id)
 
-		// Launch analysis in background
 		go func() {
 			analyzerURL := cfg.FirmwareAnalyzerURL
 			if analyzerURL == "" {
@@ -89,11 +102,17 @@ func AnalyzeFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 			}
 
 			filePath := ""
-			if f.FilePath.Valid { filePath = f.FilePath.String }
+			if f.FilePath.Valid {
+				filePath = f.FilePath.String
+			}
 			vendor := ""
-			if f.Vendor.Valid { vendor = f.Vendor.String }
+			if f.Vendor.Valid {
+				vendor = f.Vendor.String
+			}
 			version := ""
-			if f.Version.Valid { version = f.Version.String }
+			if f.Version.Valid {
+				version = f.Version.String
+			}
 
 			reqBody, _ := json.Marshal(map[string]string{
 				"firmware_id": id,
@@ -102,9 +121,10 @@ func AnalyzeFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 				"version":     version,
 			})
 
-			resp, err := http.Post(analyzerURL+"/analyze", "application/json", bytes.NewReader(reqBody))
+			client := &http.Client{Timeout: 120 * time.Second}
+			resp, err := client.Post(analyzerURL+"/analyze", "application/json", bytes.NewReader(reqBody))
 			if err != nil {
-				log.Printf("Firmware analysis request failed: %v", err)
+				slog.Error("Firmware analysis request failed", "firmware_id", id, "error", err.Error())
 				db.Exec(`UPDATE firmware SET analysis_status='failed' WHERE id=$1`, id)
 				return
 			}
@@ -128,8 +148,126 @@ func AnalyzeFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 					Title:     fmt.Sprintf("High entropy firmware detected (score: %.4f)", result.Report.Entropy.EntropyScore),
 				})
 			}
+
+			slog.Info("Firmware analysis complete", "firmware_id", id, "entropy", result.Report.Entropy.EntropyScore)
 		}()
 
 		success(c, gin.H{"message": "Firmware analysis started", "firmware_id": id})
+	}
+}
+
+func UploadFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadSize)
+
+		file, header, err := c.Request.FormFile("firmware")
+		if err != nil {
+			fail(c, http.StatusBadRequest, "Firmware file is required (form field: 'firmware')")
+			return
+		}
+		defer file.Close()
+
+		deviceID := c.PostForm("device_id")
+		vendor := c.PostForm("vendor")
+		version := c.PostForm("version")
+
+		if header.Size == 0 {
+			fail(c, http.StatusBadRequest, "Uploaded file is empty")
+			return
+		}
+
+		tempDir := "/tmp/ironmesh-uploads"
+		os.MkdirAll(tempDir, 0750)
+		tempPath := filepath.Join(tempDir, header.Filename)
+
+		destFile, err := os.Create(tempPath)
+		if err != nil {
+			fail(c, http.StatusInternalServerError, "Failed to initialize upload buffer")
+			return
+		}
+
+		hasher := sha256.New()
+		tee := io.TeeReader(file, hasher)
+
+		written, err := io.Copy(destFile, tee)
+		destFile.Close()
+
+		if err != nil {
+			os.Remove(tempPath)
+			fail(c, http.StatusInternalServerError, "Failed to write firmware file")
+			return
+		}
+
+		checksum := hex.EncodeToString(hasher.Sum(nil))
+		finalPath := tempPath
+
+		if cfg.S3Endpoint != "" && cfg.S3AccessKey != "" {
+			useSSL := false
+			minioClient, err := minio.New(cfg.S3Endpoint, &minio.Options{
+				Creds:  credentials.NewStaticV4(cfg.S3AccessKey, cfg.S3SecretKey, ""),
+				Secure: useSSL,
+			})
+
+			if err == nil {
+				bucketName := cfg.S3Bucket
+				if bucketName == "" {
+					bucketName = "ironmesh-firmware"
+				}
+
+				ctx := context.Background()
+				exists, _ := minioClient.BucketExists(ctx, bucketName)
+				if !exists {
+					_ = minioClient.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
+				}
+
+				objectName := fmt.Sprintf("%s/%s", checksum, header.Filename)
+				_, err = minioClient.FPutObject(ctx, bucketName, objectName, tempPath, minio.PutObjectOptions{
+					ContentType: "application/octet-stream",
+				})
+
+				if err == nil {
+					finalPath = fmt.Sprintf("s3://%s/%s", bucketName, objectName)
+					os.Remove(tempPath)
+					slog.Info("Firmware uploaded to S3", "path", finalPath)
+				} else {
+					slog.Warn("S3 upload failed, falling back to local storage", "error", err.Error())
+				}
+			} else {
+				slog.Warn("MinIO client init failed, falling back to local storage", "error", err.Error())
+			}
+		}
+
+		if finalPath == tempPath {
+			uploadDir := "data/firmware-uploads"
+			os.MkdirAll(uploadDir, 0750)
+			finalPath = filepath.Join(uploadDir, fmt.Sprintf("%s_%s", checksum[:8], header.Filename))
+			os.Rename(tempPath, finalPath)
+		}
+
+		var firmwareID string
+		err = db.QueryRow(`INSERT INTO firmware (device_id, vendor, version, checksum, file_path, 
+			file_size_bytes, original_filename, upload_source, analysis_status)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, 'upload', 'pending') RETURNING id`,
+			nullableString(deviceID), nullableString(vendor), nullableString(version),
+			checksum, finalPath, written, header.Filename,
+		).Scan(&firmwareID)
+
+		if err != nil {
+			slog.Error("Failed to insert firmware record", "error", err.Error())
+			fail(c, http.StatusInternalServerError, "Failed to create firmware record")
+			return
+		}
+
+		slog.Info("Firmware uploaded", "firmware_id", firmwareID, "filename", header.Filename, "size", written)
+
+		success(c, gin.H{
+			"firmware_id":       firmwareID,
+			"filename":          header.Filename,
+			"size_bytes":        written,
+			"checksum_sha256":   checksum,
+			"storage_path":      finalPath,
+			"analysis_status":   "pending",
+			"message":           fmt.Sprintf("Firmware uploaded. Use POST /firmware/%s/analyze to start analysis.", firmwareID),
+		})
 	}
 }

@@ -1,0 +1,340 @@
+{
+	"info": {
+		"name": "IronMesh API",
+		"description": "IoT Security Platform — Authentication, Device Management, Firmware Analysis, and Scanning",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "ironmesh"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{access_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{ "key": "base_url", "value": "http://localhost:8080/api/v1", "type": "string" },
+		{ "key": "email", "value": "admin@ironmesh.dev", "type": "string" },
+		{ "key": "password", "value": "admin123", "type": "string" },
+		{ "key": "access_token", "value": "", "type": "string" },
+		{ "key": "refresh_token", "value": "", "type": "string" }
+	],
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"pm.collectionVariables.set('access_token', jsonData.data.access_token);",
+									"pm.collectionVariables.set('refresh_token', jsonData.data.refresh_token);"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"url": "{{base_url}}/auth/login",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Refresh Token",
+					"request": {
+						"method": "POST",
+						"url": "{{base_url}}/auth/refresh",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Get Me",
+					"request": {
+						"method": "GET",
+						"url": "{{base_url}}/auth/me"
+					}
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"url": "{{base_url}}/auth/logout"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.collectionVariables.set('access_token', '');",
+									"pm.collectionVariables.set('refresh_token', '');"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Change Password",
+					"request": {
+						"method": "POST",
+						"url": "{{base_url}}/auth/change-password",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"current_password\": \"{{password}}\",\n  \"new_password\": \"newpass123\"\n}"
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Devices",
+			"item": [
+				{
+					"name": "List Devices",
+					"request": {
+						"method": "GET",
+						"url": "{{base_url}}/devices"
+					}
+				},
+				{
+					"name": "Get Device",
+					"request": {
+						"method": "GET",
+						"url": "{{base_url}}/devices/1"
+					}
+				},
+				{
+					"name": "Create Device",
+					"request": {
+						"method": "POST",
+						"url": "{{base_url}}/devices",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"ip\": \"192.168.1.100\",\n  \"mac\": \"aa:bb:cc:dd:ee:ff\",\n  \"hostname\": \"test-device\",\n  \"vendor\": \"TestCorp\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Update Device",
+					"request": {
+						"method": "PUT",
+						"url": "{{base_url}}/devices/1",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"hostname\": \"updated-device\",\n  \"vendor\": \"UpdatedCorp\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Delete Device",
+					"request": {
+						"method": "DELETE",
+						"url": "{{base_url}}/devices/1"
+					}
+				},
+				{
+					"name": "Get Device Alerts",
+					"request": {
+						"method": "GET",
+						"url": "{{base_url}}/devices/1/alerts"
+					}
+				}
+			]
+		},
+		{
+			"name": "Firmware",
+			"item": [
+				{
+					"name": "List Firmware",
+					"request": {
+						"method": "GET",
+						"url": "{{base_url}}/firmware"
+					}
+				},
+				{
+					"name": "Get Firmware",
+					"request": {
+						"method": "GET",
+						"url": "{{base_url}}/firmware/1"
+					}
+				},
+				{
+					"name": "Upload Firmware",
+					"request": {
+						"method": "POST",
+						"url": "{{base_url}}/firmware/upload",
+						"header": [{"key": "Content-Type", "value": "multipart/form-data"}],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{"key": "file", "type": "file", "src": "/path/to/firmware.bin"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Analyze Firmware",
+					"request": {
+						"method": "POST",
+						"url": "{{base_url}}/firmware/1/analyze"
+					}
+				}
+			]
+		},
+		{
+			"name": "Scanning",
+			"item": [
+				{
+					"name": "Discover Network",
+					"request": {
+						"method": "POST",
+						"url": "{{base_url}}/scan/discover",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"cidr\": \"192.168.1.0/24\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Deep Scan",
+					"request": {
+						"method": "POST",
+						"url": "{{base_url}}/scan/deep",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"ip\": \"192.168.1.100\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Batch Scan",
+					"request": {
+						"method": "POST",
+						"url": "{{base_url}}/scan/batch",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"ips\": [\"192.168.1.100\", \"192.168.1.101\"]\n}"
+						}
+					}
+				},
+				{
+					"name": "Scan Status",
+					"request": {
+						"method": "GET",
+						"url": "{{base_url}}/scan/status/1"
+					}
+				}
+			]
+		},
+		{
+			"name": "Vulnerabilities",
+			"item": [
+				{
+					"name": "List Vulnerabilities",
+					"request": {
+						"method": "GET",
+						"url": "{{base_url}}/vulnerabilities"
+					}
+				},
+				{
+					"name": "Get Vulnerability",
+					"request": {
+						"method": "GET",
+						"url": "{{base_url}}/vulnerabilities/CVE-2024-1234"
+					}
+				},
+				{
+					"name": "Get CVSS Score",
+					"request": {
+						"method": "GET",
+						"url": "{{base_url}}/vulnerabilities/CVE-2024-1234/cvss"
+					}
+				},
+				{
+					"name": "Risk Assessment",
+					"request": {
+						"method": "POST",
+						"url": "{{base_url}}/vulnerabilities/assess",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"cve_id\": \"CVE-2024-1234\",\n  \"epss_score\": 0.5,\n  \"has_exploit\": true,\n  \"asset_criticality\": 0.8,\n  \"network_exposure\": 0.6\n}"
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Alerts",
+			"item": [
+				{
+					"name": "List Alerts",
+					"request": {
+						"method": "GET",
+						"url": "{{base_url}}/alerts"
+					}
+				},
+				{
+					"name": "Acknowledge Alert",
+					"request": {
+						"method": "POST",
+						"url": "{{base_url}}/alerts/1/acknowledge"
+					}
+				}
+			]
+		},
+		{
+			"name": "Admin",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"url": "{{base_url}}/health"
+					}
+				},
+				{
+					"name": "Audit Log",
+					"request": {
+						"method": "GET",
+						"url": "{{base_url}}/audit-log"
+					}
+				},
+				{
+					"name": "Metrics",
+					"request": {
+						"method": "GET",
+						"url": "{{base_url}}/metrics"
+					}
+				},
+				{
+					"name": "Swagger Docs",
+					"request": {
+						"method": "GET",
+						"url": "{{base_url}}/docs"
+					}
+				}
+			]
+		}
+	]
+}

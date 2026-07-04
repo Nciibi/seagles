@@ -682,23 +682,15 @@ func TestWebhookHandlers(t *testing.T) {
 func TestStatsHandler_Success(t *testing.T) {
 	router, mock, _ := setupTestRouter(t)
 
-	mock.ExpectQuery(`SELECT.*COUNT.*FROM devices`).
+	mock.ExpectQuery(`SELECT.*COUNT.*FILTER.*FROM devices`).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"total_devices", "online_devices", "avg_risk_score",
 		}).AddRow(10, 5, 3.5))
 
-	mock.ExpectQuery(`SELECT COUNT.*FROM vulnerabilities`).
-		WillReturnRows(sqlmock.NewRows([]string{""}).AddRow(2))
-	mock.ExpectQuery(`SELECT COUNT.*FROM vulnerabilities`).
-		WillReturnRows(sqlmock.NewRows([]string{""}).AddRow(5))
-	mock.ExpectQuery(`SELECT COUNT.*FROM vulnerabilities`).
-		WillReturnRows(sqlmock.NewRows([]string{""}).AddRow(8))
-	mock.ExpectQuery(`SELECT COUNT.*FROM vulnerabilities`).
-		WillReturnRows(sqlmock.NewRows([]string{""}).AddRow(1))
-	mock.ExpectQuery(`SELECT COUNT.*FROM alerts`).
-		WillReturnRows(sqlmock.NewRows([]string{""}).AddRow(12))
-	mock.ExpectQuery(`SELECT COUNT.*FROM firmware`).
-		WillReturnRows(sqlmock.NewRows([]string{""}).AddRow(0))
+	mock.ExpectQuery(`SELECT.*COALESCE.*FROM vulnerabilities`).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"critical_vulns", "high_vulns", "medium_vulns", "kev_vulns", "open_alerts", "suspicious_firmware",
+		}).AddRow(2, 5, 8, 1, 12, 0))
 
 	w := request(router, "GET", "/api/v1/stats", nil)
 	if w.Code != http.StatusOK {

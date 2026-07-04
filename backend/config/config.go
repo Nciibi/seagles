@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -56,7 +55,6 @@ func Load() (*Config, error) {
 		DBConnMaxLifetime:   time.Duration(getEnvInt("DB_CONN_MAX_LIFETIME_MINUTES", 5)) * time.Minute,
 	}
 
-	fmt.Printf("Config loaded: port=%s cidr=%s redis=%s\n", cfg.Port, cfg.NetworkCIDR, cfg.RedisURL)
 	return cfg, nil
 }
 

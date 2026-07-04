@@ -330,7 +330,12 @@ export const testWebhook = (id: string) => api.post(`/webhooks/${id}/test`)
 export const getAuditLog = () => api.get('/audit-log')
 
 // --- Users ---
-export const getUsers = () => api.get<AuthUser[]>('/users')
+export interface User extends AuthUser {
+  is_active: boolean
+  last_login: string | null
+}
+
+export const getUsers = () => api.get<User[]>('/users')
 export const createUser = (user: { username: string; email: string; password: string; role?: string }) =>
   api.post('/users', user)
 

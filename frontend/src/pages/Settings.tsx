@@ -4,7 +4,7 @@ import {
   getWebhooks, createWebhook, deleteWebhook,
   getScanProfiles, getScanScopes, createScanScope, deleteScanScope,
   getUsers, createUser,
-  type SafelistEntry, type Webhook, type ScanProfile, type ScanScope, type AuthUser,
+  type SafelistEntry, type Webhook, type ScanProfile, type ScanScope, type User,
 } from '../api/client'
 
 type Tab = 'safelists' | 'webhooks' | 'profiles' | 'scopes' | 'users'
@@ -249,7 +249,7 @@ function ScopesTab({ isAdmin }: { isAdmin: boolean }) {
 }
 
 function UsersTab({ isAdmin }: { isAdmin: boolean }) {
-  const [users, setUsers] = useState<any[]>([])
+  const [users, setUsers] = useState<User[]>([])
   const [form, setForm] = useState({ username: '', email: '', password: '', role: 'viewer' })
   const [showForm, setShowForm] = useState(false)
 
@@ -301,7 +301,7 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
           <tbody>
             {users.length === 0 ? (
               <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '30px' }}>No users found</td></tr>
-            ) : users.map((u: AuthUser) => (
+            ) : users.map((u: User) => (
               <tr key={u.id} style={{ cursor: 'default' }}>
                 <td style={{ fontWeight: 500 }}>{u.username}</td>
                 <td style={{ color: 'var(--text-secondary)' }}>{u.email}</td>

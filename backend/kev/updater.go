@@ -4,15 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yourusername/seagles/breaker"
+	"github.com/yourusername/seagles/slog"
 )
 
-// KEVEntry represents a single vulnerability in the CISA KEV catalog.
 type KEVEntry struct {
 	CVEID             string `json:"cveID"`
 	VendorProject     string `json:"vendorProject"`
@@ -24,7 +25,6 @@ type KEVEntry struct {
 	DueDate           string `json:"dueDate"`
 }
 
-// KEVCatalog represents the full CISA KEV feed.
 type KEVCatalog struct {
 	Title           string     `json:"title"`
 	CatalogVersion  string     `json:"catalogVersion"`
@@ -32,23 +32,32 @@ type KEVCatalog struct {
 	Count           int        `json:"count"`
 	Vulnerabilities []KEVEntry `json:"vulnerabilities"`
 
-	// Internal lookup map for O(1) CVE checks
 	mu       sync.RWMutex
 	cveIndex map[string]*KEVEntry
 }
 
 const kevFeedURL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
 
-// FetchKEV downloads the CISA KEV feed and saves it to the cache file.
+var kevBreaker = breaker.New(breaker.Options{
+	Name:         "kev-feed",
+	MaxFailures:  3,
+	ResetTimeout: 5 * time.Minute,
+})
+
 func FetchKEV(cacheFilePath string) error {
 	client := &http.Client{Timeout: 30 * time.Second}
 	req, err := http.NewRequest("GET", kevFeedURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create KEV request: %v", err)
 	}
-	req.Header.Set("User-Agent", "IronMesh-Security-Scanner/1.0")
+	req.Header.Set("User-Agent", "IronMesh-Security-Scanner/2.0")
 
-	resp, err := client.Do(req)
+	var resp *http.Response
+	err = kevBreaker.Execute(func() error {
+		var innerErr error
+		resp, innerErr = client.Do(req)
+		return innerErr
+	})
 	if err != nil {
 		return fmt.Errorf("failed to download KEV feed: %v", err)
 	}
@@ -67,16 +76,14 @@ func FetchKEV(cacheFilePath string) error {
 		return fmt.Errorf("failed to save KEV cache: %v", err)
 	}
 
-	// Parse to get count for logging
 	var catalog KEVCatalog
 	if err := json.Unmarshal(body, &catalog); err == nil {
-		log.Printf("KEV catalog updated: %d entries", len(catalog.Vulnerabilities))
+		slog.Info("KEV catalog updated", "entries", len(catalog.Vulnerabilities))
 	}
 
 	return nil
 }
 
-// LoadKEV reads and parses the KEV catalog from a cache file.
 func LoadKEV(cacheFilePath string) (*KEVCatalog, error) {
 	data, err := os.ReadFile(cacheFilePath)
 	if err != nil {
@@ -93,7 +100,6 @@ func LoadKEV(cacheFilePath string) (*KEVCatalog, error) {
 	return &catalog, nil
 }
 
-// buildIndex creates the O(1) lookup map from the vulnerability list.
 func (c *KEVCatalog) buildIndex() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -105,7 +111,6 @@ func (c *KEVCatalog) buildIndex() {
 	}
 }
 
-// IsKEV checks if a CVE ID exists in the KEV catalog (case-insensitive, O(1) lookup).
 func IsKEV(catalog *KEVCatalog, cveID string) bool {
 	if catalog == nil || catalog.cveIndex == nil {
 		return false
@@ -116,7 +121,6 @@ func IsKEV(catalog *KEVCatalog, cveID string) bool {
 	return exists
 }
 
-// GetKEVEntry returns the full KEV entry for a CVE ID, or nil if not found.
 func GetKEVEntry(catalog *KEVCatalog, cveID string) *KEVEntry {
 	if catalog == nil || catalog.cveIndex == nil {
 		return nil
@@ -126,40 +130,34 @@ func GetKEVEntry(catalog *KEVCatalog, cveID string) *KEVEntry {
 	return catalog.cveIndex[strings.ToUpper(cveID)]
 }
 
-// StartKEVUpdater fetches the KEV catalog on startup and refreshes it every 24 hours.
 func StartKEVUpdater(cacheFilePath string) *KEVCatalog {
-	// Try to fetch fresh data
 	err := FetchKEV(cacheFilePath)
 	if err != nil {
-		log.Printf("KEV fetch failed (will try cache): %v", err)
+		slog.Warn("KEV fetch failed, using cache", "error", err.Error())
 	}
 
-	// Load from cache (either fresh or existing)
 	catalog, err := LoadKEV(cacheFilePath)
 	if err != nil {
-		log.Printf("WARNING: KEV catalog not available: %v", err)
-		// Return empty catalog — don't crash
+		slog.Warn("KEV catalog not available", "error", err.Error())
 		catalog = &KEVCatalog{
 			Vulnerabilities: []KEVEntry{},
 			cveIndex:        make(map[string]*KEVEntry),
 		}
 	}
 
-	// Start background updater
 	go func() {
 		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
 		for range ticker.C {
 			if err := FetchKEV(cacheFilePath); err != nil {
-				log.Printf("KEV refresh failed: %v", err)
+				slog.Error("KEV refresh failed", "error", err.Error())
 				continue
 			}
 			newCatalog, err := LoadKEV(cacheFilePath)
 			if err != nil {
-				log.Printf("KEV reload failed: %v", err)
+				slog.Error("KEV reload failed", "error", err.Error())
 				continue
 			}
-			// Update the catalog in-place
 			catalog.mu.Lock()
 			catalog.Vulnerabilities = newCatalog.Vulnerabilities
 			catalog.Count = newCatalog.Count
@@ -167,7 +165,7 @@ func StartKEVUpdater(cacheFilePath string) *KEVCatalog {
 			catalog.DateReleased = newCatalog.DateReleased
 			catalog.cveIndex = newCatalog.cveIndex
 			catalog.mu.Unlock()
-			log.Printf("KEV catalog refreshed: %d entries", catalog.Count)
+			slog.Info("KEV catalog refreshed", "entries", catalog.Count)
 		}
 	}()
 

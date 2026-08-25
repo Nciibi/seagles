@@ -77,8 +77,6 @@ func TestSSHCreds(ip string, port int, creds []Credential, maxPairs int) Credent
 		limit = len(creds)
 	}
 
-	consecutiveFailures := 0
-
 	for i := 0; i < limit; i++ {
 		cred := creds[i]
 		result.Tested++
@@ -238,11 +236,18 @@ func TestTelnetCreds(ip string, port int, creds []Credential, maxPairs int) Cred
 
 		if n > 0 {
 			response := strings.ToLower(string(resp2[:n]))
-			if !strings.Contains(response, "incorrect") &&
-				!strings.Contains(response, "failed") &&
-				!strings.Contains(response, "denied") &&
-				!strings.Contains(response, "invalid") &&
-				!strings.Contains(response, "wrong") {
+			rejected := strings.Contains(response, "incorrect") ||
+				strings.Contains(response, "failed") ||
+				strings.Contains(response, "denied") ||
+				strings.Contains(response, "invalid") ||
+				strings.Contains(response, "wrong")
+			// A re-prompt means the login was rejected; treating any bytes as
+			// success produced false "default credentials" findings on echo or
+			// banner noise.
+			reprompt := strings.Contains(response, "password:") ||
+				strings.Contains(response, "login:") ||
+				strings.Contains(response, "username:")
+			if !rejected && !reprompt {
 				result.Found = true
 				result.Username = cred.Username
 				result.Password = cred.Password

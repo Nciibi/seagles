@@ -162,6 +162,10 @@ func sanitizeIP(ip string) error {
 	}
 
 	if strings.Contains(ip, ":") {
+		// IPv6: previously any string containing ':' bypassed validation.
+		if net.ParseIP(ip) == nil {
+			return errInvalidIP
+		}
 		return nil
 	}
 

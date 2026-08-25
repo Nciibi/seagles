@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"regexp"
 	"testing"
-	"time"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 

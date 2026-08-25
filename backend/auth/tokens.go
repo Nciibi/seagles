@@ -236,6 +236,7 @@ func ValidateAccessToken(tokenStr string) (*User, error) {
 		ID:       claims.Sub,
 		Username: claims.Name,
 		Role:     claims.Role,
+		TokenID:  claims.JTI,
 	}, nil
 }
 

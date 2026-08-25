@@ -10,8 +10,8 @@ import (
 )
 
 type visitor struct {
-	count    int
-	lastSeen time.Time
+	count       int
+	windowStart time.Time
 }
 
 type RateLimitRule struct {
@@ -84,13 +84,16 @@ func (rl *RateLimiter) Allow(ip, userID, method, path string) (bool, int, int) {
 	v, exists := rl.visitors[key]
 	now := time.Now()
 
-	if !exists || now.Sub(v.lastSeen) > rule.Window {
-		rl.visitors[key] = &visitor{count: 1, lastSeen: now}
+	// Fixed-window semantics: the counter resets when the current window has
+	// elapsed since it started. The previous implementation refreshed a
+	// sliding "lastSeen" timestamp on every request, so continuously active
+	// clients could never reach a reset and stayed blocked forever.
+	if !exists || now.Sub(v.windowStart) >= rule.Window {
+		rl.visitors[key] = &visitor{count: 1, windowStart: now}
 		return true, rule.Limit - 1, rule.Limit
 	}
 
 	v.count++
-	v.lastSeen = now
 	remaining := rule.Limit - v.count
 	if remaining < 0 {
 		remaining = 0
@@ -105,7 +108,7 @@ func (rl *RateLimiter) cleanup() {
 		rl.mu.Lock()
 		now := time.Now()
 		for k, v := range rl.visitors {
-			if now.Sub(v.lastSeen) > rl.fallback.Window {
+			if now.Sub(v.windowStart) > rl.fallback.Window {
 				delete(rl.visitors, k)
 			}
 		}

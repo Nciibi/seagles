@@ -56,20 +56,6 @@ func GetWSHub() *WSHub {
 	return hub
 }
 
-func (h *WSHub) Run() {
-	for {
-		time.Sleep(30 * time.Second)
-		h.mu.RLock()
-		for client := range h.clients {
-			select {
-			case client.send <- []byte(`{"type":"ping"}`):
-			default:
-			}
-		}
-		h.mu.RUnlock()
-	}
-}
-
 func (h *WSHub) Register(client *WSClient) {
 	h.mu.Lock()
 	defer h.mu.Unlock()

@@ -3,21 +3,24 @@ package api
 import (
 	"database/sql"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/Nciibi/seagles/slog"
 )
 
 type SessionInfo struct {
-	ID           string  `json:"id"`
-	UserID       string  `json:"user_id"`
-	Username     string  `json:"username"`
-	IPAddress    string  `json:"ip_address"`
-	UserAgent    string  `json:"user_agent"`
-	CreatedAt    string  `json:"created_at"`
-	ExpiresAt    string  `json:"expires_at"`
-	IsRevoked    bool    `json:"is_revoked"`
-	IsCurrent    bool    `json:"is_current"`
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	Username  string    `json:"username"`
+	CreatedAt time.Time `json:"created_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+	IsRevoked bool      `json:"is_revoked"`
+	// IsCurrent is always false for now: an access token does not carry the
+	// identity of the refresh token (session) it was issued from, so the
+	// current session cannot be reliably identified. The field is kept for
+	// API compatibility with the frontend.
+	IsCurrent bool `json:"is_current"`
 }
 
 func ListSessionsHandler(db *sql.DB) gin.HandlerFunc {
@@ -28,21 +31,26 @@ func ListSessionsHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		isAdmin, _ := c.Get("role")
-		adminMode := isAdmin == "admin" && c.Query("user_id") != ""
+		roleVal, _ := c.Get("user_role")
+		roleStr, _ := roleVal.(string)
+		adminMode := roleStr == "admin" && c.Query("user_id") != ""
 
 		var queryUserID string
 		if adminMode {
 			queryUserID = c.Query("user_id")
+		} else if uid, ok := userID.(string); ok {
+			queryUserID = uid
 		} else {
-			queryUserID = userID.(string)
+			fail(c, http.StatusUnauthorized, "User not authenticated")
+			return
 		}
 
 		rows, err := db.Query(`
-			SELECT id, user_id, username, ip_address, user_agent, created_at, expires_at, revoked
-			FROM refresh_tokens
-			WHERE user_id = $1
-			ORDER BY created_at DESC
+			SELECT rt.id, rt.user_id, u.username, rt.created_at, rt.expires_at, rt.revoked
+			FROM refresh_tokens rt
+			JOIN users u ON u.id = rt.user_id
+			WHERE rt.user_id = $1
+			ORDER BY rt.created_at DESC
 			LIMIT 100`, queryUserID)
 		if err != nil {
 			slog.Error("failed to list sessions", "error", err.Error())
@@ -54,10 +62,10 @@ func ListSessionsHandler(db *sql.DB) gin.HandlerFunc {
 		sessions := make([]SessionInfo, 0)
 		for rows.Next() {
 			var s SessionInfo
-			if err := rows.Scan(&s.ID, &s.UserID, &s.Username, &s.IPAddress, &s.UserAgent, &s.CreatedAt, &s.ExpiresAt, &s.IsRevoked); err != nil {
+			if err := rows.Scan(&s.ID, &s.UserID, &s.Username, &s.CreatedAt, &s.ExpiresAt, &s.IsRevoked); err != nil {
+				slog.Warn("failed to scan session row", "error", err.Error())
 				continue
 			}
-			s.IsCurrent = s.ID == c.GetString("token_id")
 			sessions = append(sessions, s)
 		}
 		if err := rows.Err(); err != nil {

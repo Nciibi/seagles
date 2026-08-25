@@ -44,7 +44,7 @@ func TestMain(m *testing.M) {
 	}
 
 	auth.SetJWTSecret(testCfg.JWTSecret)
-	testDB = db.Connect(testCfg.DatabaseURL)
+	testDB = db.Connect(testCfg.DatabaseURL, testCfg.DBMaxOpenConns, testCfg.DBMaxIdleConns, testCfg.DBConnMaxLifetime)
 	db.RunMigrations(testDB)
 
 	kevCatalog := kev.StartKEVUpdater("../../data/cisa-kev.json")

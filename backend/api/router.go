@@ -90,6 +90,7 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 		}
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID, X-CSRF-Token")
+		c.Header("Access-Control-Expose-Headers", "X-Request-ID, X-CSRF-Token")
 		c.Header("Access-Control-Max-Age", "86400")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
@@ -178,7 +179,7 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 			protected.GET("/ws", WSHandler(cfg.AllowedOrigins))
 			protected.GET("/auth/me", auth.MeHandler())
 			protected.GET("/auth/permissions", auth.PermissionsHandler())
-			protected.POST("/auth/logout", auth.LogoutHandler())
+			protected.POST("/auth/logout", auth.LogoutHandler(db))
 			protected.POST("/auth/change-password", auth.ChangePasswordHandler(db))
 			protected.GET("/stats", StatsHandler(db))
 			protected.GET("/devices", ListDevicesHandler(db))

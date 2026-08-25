@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -66,6 +67,17 @@ func ValidateCSRFToken(token string) bool {
 
 func CSRFMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Requests carrying a Bearer token are not susceptible to classic CSRF:
+		// browsers never attach Authorization headers automatically, so a
+		// cross-site attacker cannot forge them. Enforcing single-use CSRF
+		// tokens on these requests would break every token-authenticated
+		// write without adding security.
+		if strings.HasPrefix(c.GetHeader("Authorization"), "Bearer ") {
+			SetCSRFToken(c)
+			c.Next()
+			return
+		}
+
 		if c.Request.Method == "GET" || c.Request.Method == "HEAD" || c.Request.Method == "OPTIONS" {
 			SetCSRFToken(c)
 			c.Next()
@@ -90,4 +102,26 @@ func CSRFMiddleware() gin.HandlerFunc {
 		SetCSRFToken(c)
 		c.Next()
 	}
+}
+
+// purgeExpiredCSRFTokens periodically removes expired tokens. Without this,
+// tokens minted by GET requests (and never submitted) would accumulate forever.
+func purgeExpiredCSRFTokens() {
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		now := time.Now()
+		globalCSRF.mu.Lock()
+		for hash, expiry := range globalCSRF.tokens {
+			if now.After(expiry) {
+				delete(globalCSRF.tokens, hash)
+			}
+		}
+		globalCSRF.mu.Unlock()
+	}
+}
+
+func init() {
+	go purgeExpiredCSRFTokens()
 }

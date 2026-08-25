@@ -38,12 +38,14 @@ func main() {
 	}
 	auth.SetJWTSecret(jwtKey)
 
-	database := db.Connect(cfg.DatabaseURL)
+	database := db.Connect(cfg.DatabaseURL, cfg.DBMaxOpenConns, cfg.DBMaxIdleConns, cfg.DBConnMaxLifetime)
 	defer database.Close()
 
 	db.RunMigrations(database)
 
 	var wg sync.WaitGroup
+
+	stopAlertMonitor := make(chan struct{})
 
 	kevCatalog := kev.StartKEVUpdater("data/cisa-kev.json")
 	kev.StartEPSSUpdater(database)
@@ -51,7 +53,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		alerts.StartAlertMonitor(database)
+		alerts.StartAlertMonitor(database, stopAlertMonitor)
 	}()
 
 	passiveMonitor := scanner.NewPassiveMonitor(database, "")
@@ -113,10 +115,15 @@ func main() {
 		log.Fatalf("Server forced to shutdown: %v", err)
 	}
 
+	// Signal background workers to stop BEFORE waiting on them, otherwise
+	// StartAlertMonitor (infinite ticker loop) and the passive monitor
+	// (which blocks on its quit channel) would deadlock wg.Wait() forever.
+	close(stopAlertMonitor)
+	passiveMonitor.Stop()
+
 	slog.Info("Waiting for background goroutines to finish...")
 	wg.Wait()
 
-	passiveMonitor.Stop()
 	slog.Info("Server exited gracefully")
 }
 

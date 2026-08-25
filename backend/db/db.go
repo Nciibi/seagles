@@ -75,15 +75,26 @@ func (m *DBMonitor) LastChecked() time.Time {
 
 var monitor *DBMonitor
 
-func Connect(databaseURL string) *sql.DB {
+func Connect(databaseURL string, maxOpenConns, maxIdleConns int, connMaxLifetime time.Duration) *sql.DB {
 	db, err := sql.Open("postgres", databaseURL)
 	if err != nil {
 		slog.Fatal("Failed to open database connection", "error", err.Error())
 	}
 
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(5 * time.Minute)
+	// Apply caller-supplied pool settings (falling back to sane defaults so
+	// callers that don't care can pass zero values).
+	if maxOpenConns <= 0 {
+		maxOpenConns = 25
+	}
+	if maxIdleConns <= 0 {
+		maxIdleConns = 5
+	}
+	if connMaxLifetime <= 0 {
+		connMaxLifetime = 5 * time.Minute
+	}
+	db.SetMaxOpenConns(maxOpenConns)
+	db.SetMaxIdleConns(maxIdleConns)
+	db.SetConnMaxLifetime(connMaxLifetime)
 	db.SetConnMaxIdleTime(2 * time.Minute)
 
 	if err := db.Ping(); err != nil {

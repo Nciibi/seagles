@@ -21,6 +21,10 @@ type User struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
 	Role     string `json:"role"`
+
+	// TokenID carries the JTI of the access token this User was built from.
+	// It is internal only (never serialized to clients).
+	TokenID string `json:"-"`
 }
 
 type LoginRequest struct {
@@ -109,10 +113,14 @@ func revokeAllRefreshTokens(db *sql.DB, userID string) error {
 	return err
 }
 
-func revokeRefreshTokenByID(db *sql.DB, tokenID string) error {
-	tokenHash := sha256.Sum256([]byte(tokenID))
+func revokeRefreshTokenByValue(db *sql.DB, refreshToken string) error {
+	parts := strings.SplitN(refreshToken, ".", 2)
+	if len(parts) != 2 {
+		return errors.New("invalid refresh token format")
+	}
+	tokenHash := sha256.Sum256([]byte(parts[0]))
 	_, err := db.Exec(
-		`UPDATE refresh_tokens SET revoked = TRUE WHERE token_hash = $1`,
+		`UPDATE refresh_tokens SET revoked = TRUE WHERE token_hash = $1 AND revoked = FALSE`,
 		hex.EncodeToString(tokenHash[:]),
 	)
 	return err
@@ -257,6 +265,13 @@ func RefreshTokenHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Rotate: the refresh token that was just used must not be reusable.
+		// Revoke only after the new token is durably stored so a transient
+		// DB failure can't leave the client with no valid session.
+		if err := revokeRefreshTokenByValue(db, req.RefreshToken); err != nil {
+			slog.Warn("refresh_token_rotation_failed", "error", err.Error())
+		}
+
 		newRefreshToken := refreshTokenID + "." + user.ID
 
 		slog.Info("token_refreshed", "username", user.Username)
@@ -272,7 +287,7 @@ func RefreshTokenHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-func LogoutHandler() gin.HandlerFunc {
+func LogoutHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -291,7 +306,16 @@ func LogoutHandler() gin.HandlerFunc {
 			cache.BlacklistToken(claims.JTI)
 		}
 
+		// Blacklisting the access-token JTI alone is not enough: access tokens
+		// expire in minutes while refresh tokens live for days. Revoke every
+		// refresh token for this user so the session cannot simply be renewed.
 		userID, _ := c.Get("user_id")
+		if userIDStr, ok := userID.(string); ok && userIDStr != "" {
+			if err := revokeAllRefreshTokens(db, userIDStr); err != nil {
+				slog.Error("logout_refresh_revoke_failed", "user_id", userIDStr, "error", err.Error())
+			}
+		}
+
 		slog.Info("user_logout", "user_id", userID)
 		c.JSON(http.StatusOK, gin.H{"data": "Logged out successfully", "error": nil})
 	}
@@ -423,6 +447,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		c.Set("user_id", user.ID)
 		c.Set("username", user.Username)
 		c.Set("user_role", user.Role)
+		c.Set("token_id", user.TokenID)
 		c.Next()
 	}
 }

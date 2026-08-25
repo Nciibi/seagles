@@ -67,14 +67,20 @@ func CreateAlert(db *sql.DB, req AlertRequest) error {
 	return nil
 }
 
-func StartAlertMonitor(db *sql.DB) {
+func StartAlertMonitor(db *sql.DB, stop <-chan struct{}) {
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		checkOfflineDevices(db)
-		checkFirmwareOverdue(db)
-		checkUnresolvedCritical(db)
+	for {
+		select {
+		case <-stop:
+			slog.Info("Alert monitor stopped")
+			return
+		case <-ticker.C:
+			checkOfflineDevices(db)
+			checkFirmwareOverdue(db)
+			checkUnresolvedCritical(db)
+		}
 	}
 }
 

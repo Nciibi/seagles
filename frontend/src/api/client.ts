@@ -10,11 +10,43 @@ const api = axios.create({
 let isRefreshing = false
 let pendingRequests: Array<(token: string) => void> = []
 
+// --- CSRF token plumbing ---
+// The backend mints a single-use CSRF token (X-CSRF-Token response header)
+// and requires it on state-changing requests that are not Bearer-authenticated
+// (e.g. the very first POST /auth/login). Capture, send, and rotate it here.
+const CSRF_STORAGE_KEY = 'seagles_csrf'
+
+function storeCsrfToken(token: unknown): void {
+  if (typeof token === 'string' && token.length > 0) {
+    csrfToken = token
+    try { sessionStorage.setItem(CSRF_STORAGE_KEY, token) } catch { /* private mode */ }
+  }
+}
+
+let csrfToken: string | null = (() => {
+  try { return sessionStorage.getItem(CSRF_STORAGE_KEY) } catch { return null }
+})()
+
+async function fetchFreshCsrfToken(): Promise<string | null> {
+  try {
+    const res = await axios.get(`${API_BASE}/health`)
+    const header = res.headers?.['x-csrf-token']
+    if (typeof header === 'string' && header.length > 0) {
+      storeCsrfToken(header)
+      return header
+    }
+  } catch { /* ignore */ }
+  return null
+}
+
 // Request interceptor: attach JWT token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('seagles_token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
+  }
+  if (csrfToken) {
+    config.headers['X-CSRF-Token'] = csrfToken
   }
   return config
 })

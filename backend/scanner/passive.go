@@ -63,6 +63,20 @@ func (pm *PassiveMonitor) Stop() {
 	close(pm.quit)
 }
 
+// isSafelistedMAC reports whether the MAC has an active 'mac' safelist entry.
+// It lives in the scanner package because the api package (which owns the
+// other safelist helpers) imports scanner, and importing it back would cycle.
+func isSafelistedMAC(db *sql.DB, mac string) bool {
+	if mac == "" {
+		return false
+	}
+	var count int
+	db.QueryRow(`SELECT COUNT(*) FROM safelists
+		WHERE is_active = TRUE AND entry_type = 'mac' AND LOWER(value) = $1`,
+		strings.ToLower(mac)).Scan(&count)
+	return count > 0
+}
+
 func (pm *PassiveMonitor) processPacket(packet gopacket.Packet) {
 	if arpLayer := packet.Layer(layers.LayerTypeARP); arpLayer != nil {
 		arp := arpLayer.(*layers.ARP)

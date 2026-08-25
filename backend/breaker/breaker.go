@@ -119,6 +119,7 @@ func (b *Breaker) Execute(fn func() error) error {
 
 func (b *Breaker) Reset() {
 	atomic.StoreInt32(&b.failures, 0)
+	atomic.StoreInt32(&b.probing, 0)
 	b.setState(StateClosed)
 	b.lastFailure.Store(time.Time{})
 }

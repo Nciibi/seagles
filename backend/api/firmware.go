@@ -226,13 +226,16 @@ func UploadFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 
 		tempDir := "/tmp/seagles-uploads"
 		os.MkdirAll(tempDir, 0750)
-		tempPath := filepath.Join(tempDir, filepath.Base(header.Filename))
 
-		destFile, err := os.Create(tempPath)
+		// Use a unique temp file per upload — deriving the temp name from the
+		// client filename let concurrent uploads with the same name truncate
+		// each other's in-flight files.
+		destFile, err := os.CreateTemp(tempDir, "upload-*")
 		if err != nil {
 			fail(c, http.StatusInternalServerError, "Failed to initialize upload buffer")
 			return
 		}
+		tempPath := destFile.Name()
 
 		hasher := sha256.New()
 		combinedReader := io.MultiReader(bytes.NewReader(headerBytes), file)
@@ -290,7 +293,10 @@ func UploadFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 			uploadDir := "data/firmware-uploads"
 			os.MkdirAll(uploadDir, 0750)
 			finalPath = filepath.Join(uploadDir, fmt.Sprintf("%s_%s", checksum[:8], header.Filename))
-			os.Rename(tempPath, finalPath)
+			if err := os.Rename(tempPath, finalPath); err != nil {
+				slog.Warn("Failed to move uploaded firmware into storage dir; keeping temp path", "error", err.Error())
+				finalPath = tempPath
+			}
 		}
 
 		var firmwareID string

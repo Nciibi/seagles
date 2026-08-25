@@ -87,18 +87,38 @@ func NewPinnedHTTPClient(pins []CertPin) *http.Client {
 					}
 					fingerprint := fmt.Sprintf("%x", sha256.Sum256(cert.Raw))
 					for _, pin := range pins {
-						if (strings.Contains(cert.Subject.CommonName, pin.Hostname) ||
-							containsHost(cert.DNSNames, pin.Hostname)) &&
-							fingerprint != pin.SHA256 {
+						if hostMatchesPin(cert, pin.Hostname) {
+							if fingerprint == strings.ToLower(strings.TrimSpace(pin.SHA256)) {
+								return nil
+							}
 							return fmt.Errorf("certificate pinning failed for %s: expected %s, got %s",
 								pin.Hostname, pin.SHA256, fingerprint)
 						}
 					}
-					return nil
+					// Fail closed: previously, any certificate whose host did
+					// not match a pin was silently accepted, which made the
+					// entire pinning layer decorative.
+					return fmt.Errorf("no certificate pin configured for %q", cert.Subject.CommonName)
 				},
 			},
 		},
 	}
+}
+
+func hostMatchesPin(cert *x509.Certificate, hostname string) bool {
+	target := strings.ToLower(strings.TrimSpace(hostname))
+	if target == "" {
+		return false
+	}
+	if cn := strings.ToLower(strings.TrimSpace(cert.Subject.CommonName)); cn == target {
+		return true
+	}
+	for _, dns := range cert.DNSNames {
+		if strings.EqualFold(strings.TrimSpace(dns), target) {
+			return true
+		}
+	}
+	return false
 }
 
 func containsHost(hosts []string, target string) bool {

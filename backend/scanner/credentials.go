@@ -112,11 +112,6 @@ func TestSSHCreds(ip string, port int, creds []Credential, maxPairs int) Credent
 			return result
 		}
 
-		consecutiveFailures++
-		if consecutiveFailures >= 3 {
-			consecutiveFailures = 0
-		}
-
 		time.Sleep(500 * time.Millisecond)
 	}
 

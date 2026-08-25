@@ -6,10 +6,10 @@ import (
 	"log"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
 	"github.com/Nciibi/seagles/models"
 	"github.com/Nciibi/seagles/risk"
 	"github.com/Nciibi/seagles/slog"
+	"github.com/gin-gonic/gin"
 )
 
 func ListVulnerabilitiesHandler(db *sql.DB) gin.HandlerFunc {
@@ -102,9 +102,9 @@ func ResolveVulnerabilityHandler(db *sql.DB) gin.HandlerFunc {
 						log.Printf("PANIC in risk score update: %v", r)
 					}
 				}()
-if err := risk.UpdateDeviceRiskScore(db, deviceID.String); err != nil {
-				slog.Error("Failed to update risk score", "device_id", deviceID.String, "error", err.Error())
-			}
+				if err := risk.UpdateDeviceRiskScore(db, deviceID.String); err != nil {
+					slog.Error("Failed to update risk score", "device_id", deviceID.String, "error", err.Error())
+				}
 			}()
 		}
 

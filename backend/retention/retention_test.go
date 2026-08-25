@@ -40,17 +40,17 @@ func TestRunOnce_PurgesAllTables(t *testing.T) {
 		RetentionWebhookDelivDays: 14,
 	}
 
-	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM scans")).
-		WithArgs("720h0m0s").
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM scans WHERE started_at < NOW() - make_interval(days => $1)")).
+		WithArgs(30).
 		WillReturnResult(sqlmock.NewResult(0, 5))
-	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM alerts")).
-		WithArgs("2160h0m0s").
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM alerts WHERE triggered_at < NOW() - make_interval(days => $1)")).
+		WithArgs(90).
 		WillReturnResult(sqlmock.NewResult(0, 3))
-	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM audit_log")).
-		WithArgs("2160h0m0s").
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM audit_log WHERE created_at < NOW() - make_interval(days => $1)")).
+		WithArgs(90).
 		WillReturnResult(sqlmock.NewResult(0, 10))
-	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM webhook_deliveries")).
-		WithArgs("336h0m0s").
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM webhook_deliveries WHERE created_at < NOW() - make_interval(days => $1)")).
+		WithArgs(14).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	runOnce(db, cfg)
@@ -64,8 +64,8 @@ func TestRunOnce_PurgeErrorIsSwallowed(t *testing.T) {
 	db, mock := newMockDB(t)
 	cfg := &config.Config{RetentionScansDays: 7}
 
-	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM scans")).
-		WithArgs("168h0m0s").
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM scans WHERE started_at < NOW() - make_interval(days => $1)")).
+		WithArgs(7).
 		WillReturnError(sqlmock.ErrCancelled)
 
 	runOnce(db, cfg)
@@ -75,17 +75,11 @@ func TestRunOnce_PurgeErrorIsSwallowed(t *testing.T) {
 	}
 }
 
-func TestPurgeOld_IntervalFormat(t *testing.T) {
-	cases := map[int]string{
-		1:   "24h0m0s",
-		7:   "168h0m0s",
-		90:  "2160h0m0s",
-		365: "8760h0m0s",
-	}
-	for days, want := range cases {
-		got := (time.Duration(days) * 24 * time.Hour).String()
-		if got != want {
-			t.Errorf("interval for %d days = %q, want %q", days, got, want)
-		}
+func TestPurgeOld_UsesTypedDayParameter(t *testing.T) {
+	// The purge must bind an integer day count into make_interval(), not a
+	// Go duration string ("2160h0m0s") cast to ::interval.
+	if !strings.Contains(makeIntervalQuery("scans"), "make_interval(days => $1)") &&
+		!strings.Contains(purgeScansQuery, "make_interval(days => $1)") {
+		t.Fatal("expected make_interval(days => $1) in purge query")
 	}
 }

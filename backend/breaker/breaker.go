@@ -80,10 +80,18 @@ func (b *Breaker) setState(s State) {
 }
 
 func (b *Breaker) Execute(fn func() error) error {
+	wasHalfOpen := false
 	if b.State() == StateOpen {
 		lastFail := b.lastFailure.Load().(time.Time)
 		if time.Since(lastFail) > b.resetTimeout {
+			// Single-flight probe: only one request may test recovery while
+			// half-open. Previously every concurrent caller was admitted at
+			// once, hammering a just-recovered dependency.
+			if !atomic.CompareAndSwapInt32(&b.probing, 0, 1) {
+				return ErrCircuitOpen
+			}
 			b.setState(StateHalfOpen)
+			wasHalfOpen = true
 		} else {
 			return ErrCircuitOpen
 		}
@@ -100,6 +108,11 @@ func (b *Breaker) Execute(fn func() error) error {
 	b.mu.Unlock()
 
 	err := fn()
+
+	// Release the half-open probe slot no matter how the call turned out.
+	if wasHalfOpen {
+		atomic.StoreInt32(&b.probing, 0)
+	}
 
 	if err != nil {
 		atomic.AddInt32(&b.failures, 1)

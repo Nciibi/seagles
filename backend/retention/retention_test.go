@@ -74,11 +74,6 @@ func TestRunOnce_PurgeErrorIsSwallowed(t *testing.T) {
 	}
 }
 
-func TestPurgeOld_UsesTypedDayParameter(t *testing.T) {
-	// The purge must bind an integer day count into make_interval(), not a
-	// Go duration string ("2160h0m0s") cast to ::interval.
-	if !strings.Contains(makeIntervalQuery("scans"), "make_interval(days => $1)") &&
-		!strings.Contains(purgeScansQuery, "make_interval(days => $1)") {
-		t.Fatal("expected make_interval(days => $1) in purge query")
-	}
-}
+// The make_interval SQL shape is asserted exactly by the sqlmock expectations
+// in TestRunOnce_PurgesAllTables / TestRunOnce_PurgeErrorIsSwallowed above;
+// a separate string test would only duplicate them.

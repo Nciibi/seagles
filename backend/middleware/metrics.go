@@ -43,7 +43,7 @@ func MetricsMiddleware() gin.HandlerFunc {
 		globalMetrics.mu.Lock()
 		globalMetrics.requestsTotal[key]++
 		bucket := globalMetrics.latencyBuckets[key]
-		if len(bucket) < 100 {
+		if len(bucket) < maxLatencySamples {
 			globalMetrics.latencyBuckets[key] = append(bucket, latency)
 		}
 		if status >= 400 {

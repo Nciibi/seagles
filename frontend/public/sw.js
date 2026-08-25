@@ -37,26 +37,32 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(cacheFirst(request))
 })
 
-async function cacheFirst(request) {
+async function cacheFirst(request: Request): Promise<Response> {
   const cached = await caches.match(request)
   if (cached) {
     return cached
   }
   try {
     const response = await fetch(request)
-    const cache = await caches.open(CACHE_NAME)
-    cache.put(request, response.clone())
+    // Cache.put() only accepts GET requests; guard + catch so we never emit
+    // unhandled rejections or race the SW shutdown.
+    if (request.method === 'GET') {
+      const cache = await caches.open(CACHE_NAME)
+      cache.put(request, response.clone()).catch(() => {})
+    }
     return response
   } catch (error) {
     return new Response('Offline', { status: 503 })
   }
 }
 
-async function networkFirst(request) {
+async function networkFirst(request: Request): Promise<Response> {
   try {
     const response = await fetch(request)
-    const cache = await caches.open(CACHE_NAME)
-    cache.put(request, response.clone())
+    if (request.method === 'GET') {
+      const cache = await caches.open(CACHE_NAME)
+      cache.put(request, response.clone()).catch(() => {})
+    }
     return response
   } catch (error) {
     const cached = await caches.match(request)

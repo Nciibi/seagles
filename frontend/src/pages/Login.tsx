@@ -138,7 +138,7 @@ export default function Login() {
         </div>
 
         <p style={{ textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '24px' }}>
-          Seagles v2.0.0 · Protected by Zero Trust Authentication
+          Seagles v2.1.0 · Protected by Zero Trust Authentication
         </p>
       </div>
     </div>

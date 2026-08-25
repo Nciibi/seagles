@@ -113,9 +113,21 @@ func TriggerDeviceScanHandler(db *sql.DB, cfg *config.Config, kevCatalog *kev.KE
 			return
 		}
 
+		// The request body is optional; previously it was defined but never
+		// bound, so scan_type / profile_id were silently ignored.
+		var req TriggerScanRequest
+		if err := c.ShouldBindJSON(&req); err != nil && err.Error() != "EOF" {
+			fail(c, 400, "Invalid request body: "+err.Error())
+			return
+		}
+		scanType := req.ScanType
+		if scanType == "" {
+			scanType = "full"
+		}
+
 		var scanID string
-		err = db.QueryRow(`INSERT INTO scans (device_id, status, scan_type) VALUES ($1, 'running', 'full') RETURNING id`,
-			deviceID).Scan(&scanID)
+		err = db.QueryRow(`INSERT INTO scans (device_id, status, scan_type, scan_profile_id) VALUES ($1, 'running', $2, $3) RETURNING id`,
+			deviceID, scanType, nullableString(req.ProfileID)).Scan(&scanID)
 		if err != nil {
 			slog.Error("Failed to create scan", "request_id", requestID, "device_id", deviceID, "error", err.Error())
 			fail(c, 500, "Failed to create scan: "+err.Error())

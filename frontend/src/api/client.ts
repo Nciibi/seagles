@@ -69,6 +69,17 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config
 
+    // CSRF token was single-use/expired: grab a fresh one and retry once.
+    const errMsg = String(error.response?.data?.error ?? '')
+    if (error.response?.status === 403 && errMsg.includes('CSRF') && !originalRequest._csrfRetry) {
+      originalRequest._csrfRetry = true
+      const fresh = await fetchFreshCsrfToken()
+      if (fresh) {
+        originalRequest.headers['X-CSRF-Token'] = fresh
+        return api(originalRequest)
+      }
+    }
+
     // If 401 and not a login/refresh request and not already retried
     if (error.response?.status === 401 && 
         !originalRequest._retry && 
@@ -131,6 +142,8 @@ function clearSession() {
   localStorage.removeItem('seagles_token')
   localStorage.removeItem('seagles_refresh')
   localStorage.removeItem('seagles_user')
+  try { sessionStorage.removeItem(CSRF_STORAGE_KEY) } catch { /* ignore */ }
+  csrfToken = null
   if (!window.location.pathname.includes('/login')) {
     window.location.href = '/login'
   }
@@ -220,6 +233,7 @@ export interface Stats {
   critical_vulns: number
   high_vulns: number
   medium_vulns: number
+  low_vulns?: number
   kev_vulns: number
   open_alerts: number
   suspicious_firmware: number

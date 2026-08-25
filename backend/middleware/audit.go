@@ -3,6 +3,7 @@ package middleware
 import (
 	"database/sql"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -149,6 +150,7 @@ func ListAuditLogsHandler(db *sql.DB) gin.HandlerFunc {
 		}
 		if err := rows.Err(); err != nil {
 			log.Printf("Error iterating audit logs: %v", err)
+			c.JSON(500, gin.H{"data": nil, "error": "Failed to iterate audit log"})
 			return
 		}
 		if entries == nil {

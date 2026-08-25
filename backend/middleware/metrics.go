@@ -26,6 +26,11 @@ var globalMetrics = &Metrics{
 	uptimeStart:    time.Now(),
 }
 
+// maxLatencySamples caps the samples kept per endpoint for the latency
+// summary. The previous hard-coded 100 made long-running averages freeze
+// after the first hundred requests.
+const maxLatencySamples = 1000
+
 func MetricsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		atomic.AddInt64(&globalMetrics.requestsActive, 1)

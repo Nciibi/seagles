@@ -13,38 +13,40 @@ export default function DeviceDetail() {
   const [activeTab, setActiveTab] = useState<'vulns' | 'scans' | 'firmware'>('vulns')
   const [openVulns, setOpenVulns] = useState(0)
   const [scanning, setScanning] = useState(false)
-  const abortRef = useRef(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const scanTimerRef = useRef<ReturnType<typeof setTimeout>>()
 
-  const fetchAll = async () => {
-    abortRef.current = false
-    if (!id) return
-    try {
-      const [devRes, bdRes, vulnRes, scanRes] = await Promise.all([
-        getDevice(id),
-        getRiskBreakdown(id),
-        getVulnerabilities({ device_id: id }),
-        getScans(),
-      ])
-      if (abortRef.current) return
-      const devData = devRes.data!
-      setDevice(devData.device)
-      setOpenVulns(devData.open_vulnerabilities)
-      if (abortRef.current) return
-      setBreakdown(bdRes.data as unknown as RiskBreakdown)
-      if (abortRef.current) return
-      setVulns(vulnRes.data as unknown as Vulnerability[])
-      if (abortRef.current) return
-      setScans((scanRes.data as unknown as Scan[]).filter((s) => s.device_id === id))
-    } catch (e) {
-      console.error('Failed to fetch device:', e)
-    }
-  }
-
   useEffect(() => {
-    fetchAll()
-    return () => { abortRef.current = true }
-  }, [id])
+    // A closure-local flag makes stale responses impossible to apply: when the
+    // id changes (or a reload is triggered), cleanup flips `cancelled` for the
+    // previous run. The old shared-ref approach was reset by every new fetch,
+    // so an in-flight response for device A could overwrite device B's state.
+    let cancelled = false
+    if (!id) return
+
+    const load = async () => {
+      try {
+        const [devRes, bdRes, vulnRes, scanRes] = await Promise.all([
+          getDevice(id),
+          getRiskBreakdown(id),
+          getVulnerabilities({ device_id: id }),
+          getScans(),
+        ])
+        if (cancelled) return
+        const devData = devRes.data!
+        setDevice(devData.device)
+        setOpenVulns(devData.open_vulnerabilities)
+        setBreakdown(bdRes.data as unknown as RiskBreakdown)
+        setVulns(vulnRes.data as unknown as Vulnerability[])
+        setScans((scanRes.data as unknown as Scan[]).filter((s) => s.device_id === id))
+      } catch (e) {
+        console.error('Failed to fetch device:', e)
+      }
+    }
+
+    load()
+    return () => { cancelled = true }
+  }, [id, reloadKey])
 
   useEffect(() => {
     return () => {
@@ -55,7 +57,7 @@ export default function DeviceDetail() {
   const handleResolve = async (vulnId: string) => {
     try {
       await resolveVuln(vulnId)
-      fetchAll()
+      setReloadKey((k) => k + 1)
     } catch (e) {
       console.error('Failed to resolve:', e)
     }
@@ -65,7 +67,7 @@ export default function DeviceDetail() {
     if (!id) return
     setScanning(true)
     try { await triggerScan(id) } catch (e) { console.error(e) }
-    scanTimerRef.current = setTimeout(() => { setScanning(false); fetchAll() }, 3000)
+    scanTimerRef.current = setTimeout(() => { setScanning(false); setReloadKey((k) => k + 1) }, 3000)
   }
 
   if (!device) return <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading device...</div>

@@ -3,6 +3,7 @@ package scanner
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"

@@ -21,26 +21,28 @@ func StartRetentionJob(db *sql.DB, cfg *config.Config) {
 
 func runOnce(db *sql.DB, cfg *config.Config) {
 	if cfg.RetentionScansDays > 0 {
-		purgeOld(db, "DELETE FROM scans WHERE started_at < NOW() - $1::INTERVAL",
+		purgeOld(db, "DELETE FROM scans WHERE started_at < NOW() - make_interval(days => $1)",
 			cfg.RetentionScansDays, "scans")
 	}
 	if cfg.RetentionAlertsDays > 0 {
-		purgeOld(db, "DELETE FROM alerts WHERE triggered_at < NOW() - $1::INTERVAL",
+		purgeOld(db, "DELETE FROM alerts WHERE triggered_at < NOW() - make_interval(days => $1)",
 			cfg.RetentionAlertsDays, "alerts")
 	}
 	if cfg.RetentionAuditLogDays > 0 {
-		purgeOld(db, "DELETE FROM audit_log WHERE created_at < NOW() - $1::INTERVAL",
+		purgeOld(db, "DELETE FROM audit_log WHERE created_at < NOW() - make_interval(days => $1)",
 			cfg.RetentionAuditLogDays, "audit_log")
 	}
 	if cfg.RetentionWebhookDelivDays > 0 {
-		purgeOld(db, "DELETE FROM webhook_deliveries WHERE created_at < NOW() - $1::INTERVAL",
+		purgeOld(db, "DELETE FROM webhook_deliveries WHERE created_at < NOW() - make_interval(days => $1)",
 			cfg.RetentionWebhookDelivDays, "webhook_deliveries")
 	}
 }
 
 func purgeOld(db *sql.DB, query string, days int, table string) {
-	interval := time.Duration(days) * 24 * time.Hour
-	result, err := db.Exec(query, interval.String())
+	// Pass an integer day count into make_interval() instead of a Go
+	// duration string cast to ::interval — the old format ("2160h0m0s") only
+	// worked by luck of Postgres's lenient parser and is not guaranteed.
+	result, err := db.Exec(query, days)
 	if err != nil {
 		slog.Error("retention purge failed", "table", table, "error", err.Error())
 		return

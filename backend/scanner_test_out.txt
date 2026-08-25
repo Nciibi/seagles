@@ -1,0 +1,1 @@
+ok  	github.com/Nciibi/seagles/scanner	34.411s

@@ -94,6 +94,15 @@ func (pm *PassiveMonitor) processPacket(packet gopacket.Packet) {
 }
 
 func (pm *PassiveMonitor) handleDiscoveredDevice(ip, mac, source string) {
+	// Honor 'mac' safelist entries. Previously that entry type existed in the
+	// schema and UI but was never consulted, so safelisted hardware still got
+	// inventoried and alerted on. We keep last_seen fresh for known devices so
+	// they don't trigger false offline alerts.
+	if isSafelistedMAC(pm.db, mac) {
+		pm.db.Exec(`UPDATE devices SET last_seen = NOW() WHERE ip_address = $1`, ip)
+		return
+	}
+
 	var deviceID string
 	var existingMAC string
 

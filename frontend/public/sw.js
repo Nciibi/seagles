@@ -37,7 +37,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(cacheFirst(request))
 })
 
-async function cacheFirst(request: Request): Promise<Response> {
+async function cacheFirst(request) {
   const cached = await caches.match(request)
   if (cached) {
     return cached
@@ -56,7 +56,7 @@ async function cacheFirst(request: Request): Promise<Response> {
   }
 }
 
-async function networkFirst(request: Request): Promise<Response> {
+async function networkFirst(request) {
   try {
     const response = await fetch(request)
     if (request.method === 'GET') {

@@ -1,0 +1,147 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  GO_VERSION: "1.25"
+  NODE_VERSION: "20"
+
+jobs:
+  backend-lint:
+    name: Backend Lint
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: v1.61.0
+        working-directory: backend
+        args: --timeout=5m
+
+  backend-test:
+    name: Backend Test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Install system deps
+      run: sudo apt-get update && sudo apt-get install -y libpcap-dev nmap
+
+    - name: Download Go deps
+      run: go mod download
+      working-directory: backend
+
+    - name: Go vet
+      run: go vet ./...
+      working-directory: backend
+
+    - name: Go test
+      run: go test -v -count=1 ./...
+      working-directory: backend
+
+  openapi-validate:
+    name: OpenAPI Validation
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Validate OpenAPI spec
+      run: npx @redocly/cli lint backend/api/swagger.json
+
+  firmware-analyzer-test:
+    name: Firmware Analyzer Test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install system deps
+      run: sudo apt-get update && sudo apt-get install -y binwalk
+
+    - name: Install Python deps
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest httpx
+      working-directory: firmware-analyzer
+
+    - name: Pytest
+      run: python -m pytest test_entropy.py test_binwalk_runner.py test_cve_lookup.py test_main.py -v
+      working-directory: firmware-analyzer
+
+  frontend-lint:
+    name: Frontend Lint
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Install deps
+      run: npm ci
+      working-directory: frontend
+
+    - name: Type check
+      run: npx tsc --noEmit
+      working-directory: frontend
+
+  frontend-test:
+    name: Frontend Test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Install deps
+      run: npm ci
+      working-directory: frontend
+
+    - name: Test
+      run: npm test
+      working-directory: frontend
+
+  trivy-scan:
+    name: Trivy Security Scan
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@0.25.0
+      with:
+        scan-type: fs
+        scan-ref: .
+        format: sarif
+        output: trivy-results.sarif
+        severity: CRITICAL,HIGH
+
+    - name: Upload Trivy results
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: trivy-results.sarif

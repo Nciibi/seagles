@@ -1,0 +1,54 @@
+{
+  "title": "Device Health",
+  "uid": "seagles-device-health",
+  "schemaVersion": 39,
+  "version": 1,
+  "timezone": "utc",
+  "panels": [
+    {
+      "title": "Risk Score Distribution",
+      "type": "piechart",
+      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 8},
+      "options": {"pieType": "pie", "reduceOptions": {"values": false, "calcs": ["count"]}},
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {"mode": "absolute", "steps": [
+            {"value": 0, "color": "green"},
+            {"value": 3, "color": "blue"},
+            {"value": 6, "color": "orange"},
+            {"value": 8, "color": "red"}
+          ]}
+        }
+      }
+    },
+    {
+      "title": "Device Types",
+      "type": "table",
+      "gridPos": {"x": 6, "y": 0, "w": 6, "h": 8},
+      "options": {"sortBy": [{"displayName": "Count", "desc": true}]}
+    },
+    {
+      "title": "Firmware Versions",
+      "type": "table",
+      "gridPos": {"x": 0, "y": 8, "w": 6, "h": 8}
+    },
+    {
+      "title": "Vulnerability Severity Breakdown",
+      "type": "bargauge",
+      "gridPos": {"x": 6, "y": 8, "w": 6, "h": 8},
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {"mode": "absolute", "steps": [
+            {"value": 0, "color": "green"},
+            {"value": 3, "color": "blue"},
+            {"value": 6, "color": "orange"},
+            {"value": 8, "color": "red"}
+          ]}
+        }
+      }
+    }
+  ],
+  "refresh": "1m",
+  "time": {"from": "now-24h", "to": "now"},
+  "timepicker": {"refresh_intervals": ["30s", "1m", "5m", "15m"]}
+}

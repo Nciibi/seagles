@@ -1,0 +1,36 @@
+{
+  "title": "Scan Performance",
+  "uid": "seagles-scan-performance",
+  "schemaVersion": 39,
+  "version": 1,
+  "timezone": "utc",
+  "panels": [
+    {
+      "title": "Scans Over Time",
+      "type": "graph",
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+      "targets": [{"expr": "rate(seagles_requests_total{endpoint=~\".*scan.*\"}[5m])", "legendFormat": "scans"}]
+    },
+    {
+      "title": "Scan Duration",
+      "type": "graph",
+      "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+      "targets": [{"expr": "seagles_request_latency_seconds{endpoint=~\".*scan.*\"}", "legendFormat": "latency"}]
+    },
+    {
+      "title": "Error Rate (Scans)",
+      "type": "graph",
+      "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8},
+      "targets": [{"expr": "rate(seagles_errors_total{error=~\".*scan.*\"}[5m])", "legendFormat": "errors"}]
+    },
+    {
+      "title": "Active Scans",
+      "type": "stat",
+      "gridPos": {"x": 0, "y": 24, "w": 3, "h": 4},
+      "targets": [{"expr": "seagles_requests_active"}]
+    }
+  ],
+  "refresh": "30s",
+  "time": {"from": "now-6h", "to": "now"},
+  "timepicker": {"refresh_intervals": ["5s", "30s", "1m", "5m"]}
+}

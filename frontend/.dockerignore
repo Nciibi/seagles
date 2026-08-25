@@ -1,0 +1,9 @@
+.git
+.gitignore
+*.md
+Dockerfile
+.dockerignore
+node_modules
+src/**/*.test.*
+dist/
+.env

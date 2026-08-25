@@ -1,0 +1,54 @@
+{
+  "title": "Audit Trail",
+  "uid": "seagles-audit-trail",
+  "schemaVersion": 39,
+  "version": 1,
+  "timezone": "utc",
+  "panels": [
+    {
+      "title": "Actions by Type",
+      "type": "piechart",
+      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 8},
+      "options": {"pieType": "pie", "reduceOptions": {"values": false, "calcs": ["count"]}},
+      "targets": [{"expr": "rate(seagles_requests_total{method=~\"POST|PUT|PATCH|DELETE\"}[5m])", "legendFormat": "{{method}} {{endpoint}}"}]
+    },
+    {
+      "title": "Error Rate by Endpoint",
+      "type": "graph",
+      "gridPos": {"x": 6, "y": 0, "w": 6, "h": 8},
+      "targets": [{"expr": "rate(seagles_errors_total[5m])", "legendFormat": "{{error}}"}]
+    },
+    {
+      "title": "Request Volume",
+      "type": "graph",
+      "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+      "targets": [{"expr": "rate(seagles_requests_total[5m])", "legendFormat": "{{endpoint}}"}]
+    },
+    {
+      "title": "Active Users",
+      "type": "stat",
+      "gridPos": {"x": 0, "y": 16, "w": 3, "h": 4},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "fixed"},
+          "thresholds": {"mode": "absolute", "steps": [{"color": "blue"}]}
+        }
+      }
+    },
+    {
+      "title": "Uptime",
+      "type": "stat",
+      "gridPos": {"x": 3, "y": 16, "w": 3, "h": 4},
+      "targets": [{"expr": "seagles_uptime_seconds", "legendFormat": "uptime"}],
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "fixed"},
+          "unit": "s"
+        }
+      }
+    }
+  ],
+  "refresh": "1m",
+  "time": {"from": "now-24h", "to": "now"},
+  "timepicker": {"refresh_intervals": ["1m", "5m", "15m"]}
+}

@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: seagles-firmware-analyzer
+  namespace: security-tools
+  labels:
+    app: seagles-firmware-analyzer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: seagles-firmware-analyzer
+  template:
+    metadata:
+      labels:
+        app: seagles-firmware-analyzer
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+      - name: seagles-firmware-analyzer
+        image: your-registry.com/seagles-firmware-analyzer:v2.0.0
+        ports:
+        - containerPort: 8001
+          name: http
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: seagles-db-secrets
+              key: connection-string
+        - name: NVD_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: seagles-nvd-secret
+              key: api-key
+              optional: true
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 3
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 6
+
+        volumeMounts:
+        - name: firmware-volume
+          mountPath: /firmware
+
+      volumes:
+      - name: firmware-volume
+        persistentVolumeClaim:
+          claimName: seagles-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: seagles-firmware-analyzer
+  namespace: security-tools
+  labels:
+    app: seagles-firmware-analyzer
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8001
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app: seagles-firmware-analyzer

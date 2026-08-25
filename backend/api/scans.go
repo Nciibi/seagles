@@ -1,10 +1,11 @@
 package api
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"time"
 
@@ -116,7 +117,7 @@ func TriggerDeviceScanHandler(db *sql.DB, cfg *config.Config, kevCatalog *kev.KE
 		// The request body is optional; previously it was defined but never
 		// bound, so scan_type / profile_id were silently ignored.
 		var req TriggerScanRequest
-		if err := c.ShouldBindJSON(&req); err != nil && err.Error() != "EOF" {
+		if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
 			fail(c, 400, "Invalid request body: "+err.Error())
 			return
 		}

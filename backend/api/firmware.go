@@ -145,6 +145,12 @@ func AnalyzeFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 			}
 			defer resp.Body.Close()
 
+			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+				slog.Error("Firmware analyzer returned error status", "firmware_id", id, "status", resp.StatusCode)
+				db.Exec(`UPDATE firmware SET analysis_status='failed' WHERE id=$1`, id)
+				return
+			}
+
 			var result struct {
 				Report struct {
 					Entropy struct {
@@ -153,7 +159,20 @@ func AnalyzeFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 					} `json:"entropy"`
 				} `json:"report"`
 			}
-			json.NewDecoder(resp.Body).Decode(&result)
+			if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+				slog.Error("Failed to decode analyzer response", "firmware_id", id, "error", err.Error())
+				db.Exec(`UPDATE firmware SET analysis_status='failed' WHERE id=$1`, id)
+				return
+			}
+
+			// Persist the analysis outcome. Previously only 'pending'/'failed'
+			// were ever written, so firmware stayed stuck in 'pending' forever,
+			// entropy-based risk scoring never saw a score, and analyzed_at
+			// stayed NULL (which also made the review-overdue alert fire eternally).
+			if _, err := db.Exec(`UPDATE firmware SET analysis_status='complete', analyzed_at=NOW(), entropy_score=$1 WHERE id=$2`,
+				result.Report.Entropy.EntropyScore, id); err != nil {
+				slog.Error("Failed to persist firmware analysis result", "firmware_id", id, "error", err.Error())
+			}
 
 			if result.Report.Entropy.Suspicious && f.DeviceID.Valid {
 				alerts.CreateAlert(db, alerts.AlertRequest{

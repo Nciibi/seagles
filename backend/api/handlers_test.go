@@ -750,6 +750,12 @@ func TestRiskBreakdownHandler_Success(t *testing.T) {
 		WithArgs(deviceID).
 		WillReturnRows(sqlmock.NewRows([]string{"entropy_score"}).AddRow(nil))
 
+	// risk.BuildRiskFactors also reads the last scan age (factor the old
+	// inline handler omitted).
+	mock.ExpectQuery(`SELECT started_at FROM scans`).
+		WithArgs(deviceID).
+		WillReturnRows(sqlmock.NewRows([]string{"started_at"}).AddRow(nil))
+
 	w := request(router, "GET", "/api/v1/devices/"+deviceID+"/risk-breakdown", nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())

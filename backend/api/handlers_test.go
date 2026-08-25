@@ -694,8 +694,8 @@ func TestStatsHandler_Success(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT.*COALESCE.*FROM vulnerabilities`).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"critical_vulns", "high_vulns", "medium_vulns", "kev_vulns", "open_alerts", "suspicious_firmware",
-		}).AddRow(2, 5, 8, 1, 12, 0))
+			"critical_vulns", "high_vulns", "medium_vulns", "low_vulns", "kev_vulns", "open_alerts", "suspicious_firmware",
+		}).AddRow(2, 5, 8, 3, 1, 12, 0))
 
 	w := request(router, "GET", "/api/v1/stats", nil)
 	if w.Code != http.StatusOK {
@@ -710,6 +710,7 @@ func TestStatsHandler_Success(t *testing.T) {
 			CriticalVulns      int     `json:"critical_vulns"`
 			HighVulns          int     `json:"high_vulns"`
 			MediumVulns        int     `json:"medium_vulns"`
+			LowVulns           int     `json:"low_vulns"`
 			KEVVulns           int     `json:"kev_vulns"`
 			OpenAlerts         int     `json:"open_alerts"`
 			SuspiciousFirmware int     `json:"suspicious_firmware"`

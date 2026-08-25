@@ -151,19 +151,23 @@ func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, d
 		}
 	}()
 
-	ctx := context.Background()
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		slog.Error("Failed to begin transaction", "error", err.Error())
-		db.Exec(`UPDATE scans SET status='failed', completed_at=NOW() WHERE id=$1`, scanID)
-		return
+	// NOTE: deliberately no transaction here. The previous code mixed
+	// transactional writes (scan/device/vuln rows) with direct pool writes
+	// (alerts, credential-test vulns), so a late failure produced half-
+	// rolled-back state. Holding a transaction open across minutes of network
+	// scanning adds risk without adding consistency; each UPDATE below is
+	// atomic on its own.
+	updateScanStatus := func(status string) {
+		if _, err := db.Exec(`UPDATE scans SET status=$1, completed_at=NOW() WHERE id=$2`, status, scanID); err != nil {
+			slog.Error("Failed to update scan status", "scan_id", scanID, "status", status, "error", err.Error())
+		}
 	}
-	defer tx.Rollback()
 
 	if IsSafelisted(db, ip) {
 		slog.Info("Scan skipped: IP is safelisted", "ip", ip)
-		tx.Exec(`UPDATE scans SET status='skipped', scan_output='Device is safelisted', completed_at=NOW() WHERE id=$1`, scanID)
-		tx.Commit()
+		if _, err := db.Exec(`UPDATE scans SET status='skipped', scan_output='Device is safelisted', completed_at=NOW() WHERE id=$1`, scanID); err != nil {
+			slog.Error("Failed to mark scan skipped", "scan_id", scanID, "error", err.Error())
+		}
 		return
 	}
 
@@ -171,8 +175,7 @@ func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, d
 	result, err := scanner.DeepScan(ip)
 	if err != nil {
 		slog.Error("Deep scan failed", "ip", ip, "error", err.Error())
-		tx.Exec(`UPDATE scans SET status='failed', completed_at=NOW() WHERE id=$1`, scanID)
-		tx.Commit()
+		updateScanStatus("failed")
 		return
 	}
 
@@ -186,26 +189,28 @@ func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, d
 	portsJSON, _ := json.Marshal(openPortNumbers)
 	servicesJSON, _ := json.Marshal(result.Host.Services)
 
-	tx.Exec(`UPDATE scans SET open_ports=$1, services=$2 WHERE id=$3`,
-		portsJSON, servicesJSON, scanID)
+	if _, err := db.Exec(`UPDATE scans SET open_ports=$1, services=$2 WHERE id=$3`,
+		portsJSON, servicesJSON, scanID); err != nil {
+		slog.Error("Failed to store scan results", "scan_id", scanID, "error", err.Error())
+	}
 
 	if result.Host.Hostname != "" {
-		tx.Exec(`UPDATE devices SET hostname=$1 WHERE id=$2`, result.Host.Hostname, deviceID)
+		db.Exec(`UPDATE devices SET hostname=$1 WHERE id=$2`, result.Host.Hostname, deviceID)
 	}
 	if result.Host.Vendor != "" {
-		tx.Exec(`UPDATE devices SET vendor=$1 WHERE id=$2`, result.Host.Vendor, deviceID)
+		db.Exec(`UPDATE devices SET vendor=$1 WHERE id=$2`, result.Host.Vendor, deviceID)
 	}
 	if result.Host.OSMatch != "" {
-		tx.Exec(`UPDATE devices SET os_fingerprint=$1 WHERE id=$2`, result.Host.OSMatch, deviceID)
+		db.Exec(`UPDATE devices SET os_fingerprint=$1 WHERE id=$2`, result.Host.OSMatch, deviceID)
 	}
 	if len(result.Host.RawXML) > 0 {
-		tx.Exec(`UPDATE devices SET raw_nmap=$1 WHERE id=$2`, result.Host.RawXML, deviceID)
+		db.Exec(`UPDATE devices SET raw_nmap=$1 WHERE id=$2`, result.Host.RawXML, deviceID)
 	}
 
 	findings := scanner.DetectProtocols(ip, openPortNumbers)
 	for _, f := range findings {
 		var vulnID string
-		err := tx.QueryRow(`INSERT INTO vulnerabilities (device_id, scan_id, severity, title, description, affected_component)
+		err := db.QueryRow(`INSERT INTO vulnerabilities (device_id, scan_id, severity, title, description, affected_component)
 			VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
 			deviceID, scanID, f.Risk, f.Protocol+" exposure detected", f.Description, fmt.Sprintf("port/%d", f.Port),
 		).Scan(&vulnID)
@@ -226,7 +231,7 @@ func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, d
 		if p == 443 {
 			tlsResult := scanner.CheckTLS(ip, 443)
 			if tlsResult.SupportsTLS10 || tlsResult.SupportsTLS11 || len(tlsResult.WeakCiphers) > 0 {
-				tx.QueryRow(`INSERT INTO vulnerabilities (device_id, scan_id, severity, title, description, affected_component)
+				db.QueryRow(`INSERT INTO vulnerabilities (device_id, scan_id, severity, title, description, affected_component)
 					VALUES ($1, $2, 'high', 'Weak TLS configuration', 'Device supports deprecated TLS versions or weak ciphers', 'tls')
 					RETURNING id`, deviceID, scanID).Scan(new(string))
 				alerts.CreateAlert(db, alerts.AlertRequest{
@@ -251,12 +256,7 @@ func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, d
 		runCredentialTests(db, deviceID, scanID, ip, openPortNumbers, creds, kevCatalog)
 	}
 
-	tx.Exec(`UPDATE scans SET status='complete', completed_at=NOW() WHERE id=$1`, scanID)
-	if err := tx.Commit(); err != nil {
-		slog.Error("Failed to commit transaction", "error", err.Error())
-		db.Exec(`UPDATE scans SET status='failed', completed_at=NOW() WHERE id=$1`, scanID)
-		return
-	}
+	updateScanStatus("complete")
 	risk.UpdateDeviceRiskScore(db, deviceID)
 
 	slog.Info("Scan complete", "device_id", deviceID, "ip", ip,

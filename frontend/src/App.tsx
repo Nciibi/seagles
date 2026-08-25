@@ -1,8 +1,8 @@
-import axios from 'axios'
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom'
 import { useEffect, useState, lazy, Suspense } from 'react'
 import ErrorBoundary from './components/ErrorBoundary'
 import { Loading } from './components/Loading'
+import { logout as apiLogout } from './api/client'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Devices = lazy(() => import('./pages/Devices'))

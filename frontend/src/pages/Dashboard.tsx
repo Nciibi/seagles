@@ -160,7 +160,7 @@ export default function Dashboard() {
               { label: 'Critical (8-10)', color: '#e03131', count: stats?.critical_vulns ?? 0 },
               { label: 'High (6-7.9)', color: '#f08c00', count: stats?.high_vulns ?? 0 },
               { label: 'Medium (3-5.9)', color: '#1c7ed6', count: stats?.medium_vulns ?? 0 },
-              { label: 'Low (0-2.9)', color: '#2f9e44', count: 0 },
+              { label: 'Low (0-2.9)', color: '#2f9e44', count: stats?.low_vulns ?? 0 },
             ].map((item) => (
               <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{ width: '100px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.label}</div>

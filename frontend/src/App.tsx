@@ -45,11 +45,9 @@ export default function App() {
   }, [location])
 
   const handleLogout = async () => {
-    try {
-      await axios.post('/api/v1/auth/logout', {}, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('seagles_token')}` }
-      })
-    } catch {}
+    // Go through the shared API client so the auth header and CSRF token
+    // handling stay consistent with every other call.
+    try { await apiLogout() } catch {}
     localStorage.removeItem('seagles_token')
     localStorage.removeItem('seagles_refresh')
     localStorage.removeItem('seagles_user')

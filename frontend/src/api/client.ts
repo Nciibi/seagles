@@ -22,6 +22,9 @@ api.interceptors.request.use((config) => {
 // Response interceptor: unwrap {data, error} envelope + handle 401 with auto-refresh
 api.interceptors.response.use(
   (response) => {
+    // Rotate the CSRF token whenever the server issues a new one.
+    storeCsrfToken(response.headers?.['x-csrf-token'])
+
     if (response.data?.error) {
       throw new Error(response.data.error)
     }

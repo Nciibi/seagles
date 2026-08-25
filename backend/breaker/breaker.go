@@ -39,6 +39,7 @@ type Breaker struct {
 	failures      int32
 	lastFailure   atomic.Value
 	state         int32
+	probing       int32 // single-flight flag for the half-open probe
 	mu            sync.Mutex
 	onStateChange func(name string, from, to State)
 }

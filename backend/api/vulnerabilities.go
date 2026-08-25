@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/Nciibi/seagles/models"
+	"github.com/Nciibi/seagles/risk"
 	"github.com/Nciibi/seagles/slog"
 )
 
@@ -101,12 +102,9 @@ func ResolveVulnerabilityHandler(db *sql.DB) gin.HandlerFunc {
 						log.Printf("PANIC in risk score update: %v", r)
 					}
 				}()
-				db.Exec(`UPDATE devices SET risk_score = COALESCE(
-					(SELECT LEAST(
-						CASE WHEN EXISTS(SELECT 1 FROM vulnerabilities WHERE device_id=$1 AND is_resolved=FALSE AND title ILIKE '%Default credentials%') THEN 4.0 ELSE 0 END +
-						CASE WHEN EXISTS(SELECT 1 FROM vulnerabilities WHERE device_id=$1 AND is_resolved=FALSE AND title ILIKE '%Telnet%') THEN 3.0 ELSE 0 END +
-						LEAST((SELECT COUNT(*) FROM vulnerabilities WHERE device_id=$1 AND cve_id IS NOT NULL AND is_resolved=FALSE)::float * 0.5, 3.0),
-					10.0)), 0) WHERE id=$1`, deviceID.String)
+if err := risk.UpdateDeviceRiskScore(db, deviceID.String); err != nil {
+				slog.Error("Failed to update risk score", "device_id", deviceID.String, "error", err.Error())
+			}
 			}()
 		}
 

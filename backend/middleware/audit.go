@@ -90,6 +90,16 @@ func ListAuditLogsHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		limit := 100
 		offset := 0
+		if v := c.Query("limit"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n >= 1 && n <= 500 {
+				limit = n
+			}
+		}
+		if v := c.Query("offset"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+				offset = n
+			}
+		}
 
 		rows, err := db.Query(
 			`SELECT id, user_id, username, action, resource, resource_id, detail,

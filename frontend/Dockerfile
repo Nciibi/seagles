@@ -5,7 +5,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM nginx:1.26-alpine
+FROM nginx:1.31-alpine
 RUN addgroup -S seagles && adduser -S -G seagles seagles
 
 COPY --from=builder /app/dist /usr/share/nginx/html

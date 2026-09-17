@@ -120,28 +120,22 @@ func AnalyzeFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 				analyzerURL = "http://firmware-analyzer:8001"
 			}
 
-			filePath := ""
-			if f.FilePath.Valid {
-				filePath = f.FilePath.String
+			reqBody, _ := json.Marshal(map[string]string{"firmware_id": id})
+			req, err := http.NewRequest(http.MethodPost, analyzerURL+"/analyze", bytes.NewReader(reqBody))
+			if err != nil {
+				slog.Error("Failed to create firmware analysis request", "firmware_id", id)
+				db.Exec(`UPDATE firmware SET analysis_status='failed' WHERE id=$1`, id)
+				return
 			}
-			vendor := ""
-			if f.Vendor.Valid {
-				vendor = f.Vendor.String
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+cfg.FirmwareAnalyzerToken)
+			client := &http.Client{
+				Timeout: 120 * time.Second,
+				CheckRedirect: func(req *http.Request, via []*http.Request) error {
+					return http.ErrUseLastResponse
+				},
 			}
-			version := ""
-			if f.Version.Valid {
-				version = f.Version.String
-			}
-
-			reqBody, _ := json.Marshal(map[string]string{
-				"firmware_id": id,
-				"filepath":    filePath,
-				"vendor":      vendor,
-				"version":     version,
-			})
-
-			client := &http.Client{Timeout: 120 * time.Second}
-			resp, err := client.Post(analyzerURL+"/analyze", "application/json", bytes.NewReader(reqBody))
+			resp, err := client.Do(req)
 			if err != nil {
 				slog.Error("Firmware analysis request failed", "firmware_id", id, "error", err.Error())
 				db.Exec(`UPDATE firmware SET analysis_status='failed' WHERE id=$1`, id)

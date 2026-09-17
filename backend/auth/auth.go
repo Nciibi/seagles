@@ -93,9 +93,10 @@ func validateRefreshToken(db *sql.DB, refreshToken string) (*User, error) {
 	var expiresAt time.Time
 	var revoked bool
 	err := db.QueryRow(
-		`SELECT u.id, u.username, u.email, u.role, rt.expires_at, rt.revoked
-		 FROM refresh_tokens rt JOIN users u ON u.id = rt.user_id
-		 WHERE rt.token_hash = $1 AND rt.revoked = FALSE AND rt.expires_at > NOW()`,
+	`SELECT u.id, u.username, u.email, u.role, rt.expires_at, rt.revoked
+	 FROM refresh_tokens rt JOIN users u ON u.id = rt.user_id
+	 WHERE rt.token_hash = $1 AND rt.revoked = FALSE AND rt.expires_at > NOW()
+	 AND u.is_active = TRUE`,
 		tokenHashHex,
 	).Scan(&user.ID, &user.Username, &user.Email, &user.Role, &expiresAt, &revoked)
 	if err == sql.ErrNoRows {

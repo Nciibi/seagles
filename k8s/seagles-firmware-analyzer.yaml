@@ -36,6 +36,11 @@ spec:
             secretKeyRef:
               name: seagles-db-secrets
               key: connection-string
+        - name: FIRMWARE_ANALYZER_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: seagles-analyzer-secret
+              key: token
         - name: NVD_API_KEY
           valueFrom:
             secretKeyRef:

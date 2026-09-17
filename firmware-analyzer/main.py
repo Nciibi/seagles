@@ -227,7 +227,7 @@ async def analyze_firmware(req: AnalyzeRequest, background_tasks: BackgroundTask
         cve_matches=cve_results
     )
 
-    background_tasks.add_task(update_database, req.firmware_id, report)
+    background_tasks.add_task(update_database, firmware_id, report)
 
     logger.info(f"Analysis complete for firmware {req.firmware_id}: entropy={report.entropy.entropy_score:.2f}, "
                 f"strings={report.suspicious_string_count}, cves={len(cve_results)}")

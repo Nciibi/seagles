@@ -15,6 +15,7 @@ type Config struct {
 	NetworkCIDR         string
 	NVDAPIKey           string
 	FirmwareAnalyzerURL string
+	FirmwareAnalyzerToken string
 	JWTSecret           string
 	JWTPrivateKeyFile   string
 	SlackWebhookURL     string

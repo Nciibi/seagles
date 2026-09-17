@@ -96,6 +96,7 @@ services:
       NVD_API_KEY: ${NVD_API_KEY:-}
       JWT_SECRET: ${JWT_SECRET:-}
       FIRMWARE_ANALYZER_URL: http://firmware-analyzer:8001
+      FIRMWARE_ANALYZER_TOKEN: ${FIRMWARE_ANALYZER_TOKEN:?Set FIRMWARE_ANALYZER_TOKEN to a random token of at least 32 characters}
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
       TEAMS_WEBHOOK_URL: ${TEAMS_WEBHOOK_URL:-}
       S3_ENDPOINT: minio:9000

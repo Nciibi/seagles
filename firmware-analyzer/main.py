@@ -176,27 +176,27 @@ async def analyze_firmware(req: AnalyzeRequest, background_tasks: BackgroundTask
 
     entropy_result = {"entropy_score": 0, "suspicious": False, "details": ""}
     try:
-        entropy_result = analyze_file_entropy(req.filepath)
+        entropy_result = analyze_file_entropy(filepath)
     except Exception as e:
         logger.error(f"Entropy analysis failed: {e}")
         entropy_result["details"] = str(e)
 
     suspicious_strings = []
     try:
-        suspicious_strings = find_suspicious_strings(req.filepath)
+        suspicious_strings = find_suspicious_strings(filepath)
     except Exception as e:
         logger.error(f"String extraction failed: {e}")
 
     binwalk_result = {"has_filesystem": False, "signatures_found": [], "raw_output": ""}
     try:
-        binwalk_result = run_binwalk(req.filepath)
+        binwalk_result = run_binwalk(filepath)
     except Exception as e:
         logger.error(f"Binwalk scan failed: {e}")
 
     cve_results = []
-    if req.vendor or req.version:
+    if vendor or version:
         try:
-            raw_cves = lookup_cve(req.vendor, req.version, NVD_API_KEY or None)
+            raw_cves = lookup_cve(vendor, version, NVD_API_KEY or None)
             cve_results = [
                 CVEResult(
                     cve_id=c.get("cve_id", ""),

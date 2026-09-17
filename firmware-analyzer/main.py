@@ -4,7 +4,8 @@ Performs entropy analysis, string extraction, binwalk scanning,
 and CVE lookup on firmware images.
 """
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Header
+import secrets
 from pydantic import BaseModel, Field
 from typing import Optional
 import psycopg2

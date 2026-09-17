@@ -59,10 +59,50 @@ class AnalyzeResponse(BaseModel):
     report: AnalysisReport
 
 class AnalyzeRequest(BaseModel):
-    firmware_id: str = Field(..., min_length=1, max_length=100)
-    filepath: str = Field(..., min_length=1, max_length=500)
-    vendor: str = Field("", max_length=200)
-    version: str = Field("", max_length=100)
+    model_config = ConfigDict(extra="forbid")
+    firmware_id: UUID
+
+
+def require_backend(authorization: Optional[str] = Header(default=None)):
+    token = os.environ.get("FIRMWARE_ANALYZER_TOKEN", "")
+    if len(token) < 32:
+        raise HTTPException(status_code=503, detail="Analyzer authentication is not configured")
+    expected = ("Bearer " + token).encode("utf-8")
+    if authorization is None or not secrets.compare_digest(authorization.encode("utf-8"), expected):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+def registered_firmware(firmware_id: str):
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT file_path, vendor, version FROM firmware WHERE id = %s",
+                    (firmware_id,),
+                )
+                row = cur.fetchone()
+    except Exception:
+        raise HTTPException(status_code=503, detail="Firmware registry unavailable")
+    if row is None:
+        raise HTTPException(status_code=404, detail="Firmware not found")
+    stored_path, vendor, version = row
+    if not stored_path or "://" in stored_path:
+        raise HTTPException(status_code=400, detail="Firmware is not available in local storage")
+    path = Path(stored_path)
+    if ".." in path.parts:
+        raise HTTPException(status_code=400, detail="Invalid firmware storage path")
+    root = Path(os.environ.get("FIRMWARE_ROOT", "/firmware")).resolve()
+    for prefix in (Path("data/firmware-uploads"), Path("/app/data/firmware-uploads")):
+        if path.is_relative_to(prefix):
+            path = root / path.relative_to(prefix)
+            break
+    try:
+        path = path.resolve(strict=True)
+        if not path.is_relative_to(root) or not path.is_file():
+            raise ValueError("Invalid firmware storage path")
+    except (OSError, RuntimeError, ValueError):
+        raise HTTPException(status_code=400, detail="Firmware file is unavailable or outside storage")
+    return str(path), vendor or "", version or ""
 
 class HealthResponse(BaseModel):
     status: str = "ok"

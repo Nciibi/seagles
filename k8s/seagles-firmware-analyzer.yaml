@@ -86,6 +86,8 @@ spec:
         volumeMounts:
         - name: firmware-volume
           mountPath: /firmware
+          subPath: firmware-uploads
+          readOnly: true
 
       volumes:
       - name: firmware-volume

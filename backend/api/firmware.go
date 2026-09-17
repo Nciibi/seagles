@@ -85,6 +85,10 @@ func ListFirmwareHandler(db *sql.DB) gin.HandlerFunc {
 
 func AnalyzeFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if len(cfg.FirmwareAnalyzerToken) < 32 {
+			fail(c, http.StatusServiceUnavailable, "Firmware analyzer authentication is not configured")
+			return
+		}
 		requestID, _ := c.Get("request_id")
 		id := c.Param("id")
 

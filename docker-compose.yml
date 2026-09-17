@@ -145,10 +145,9 @@ services:
     environment:
       DATABASE_URL: postgres://seagles:${DB_PASSWORD}@pgbouncer:5432/seagles?sslmode=disable
       NVD_API_KEY: ${NVD_API_KEY:-}
+      FIRMWARE_ANALYZER_TOKEN: ${FIRMWARE_ANALYZER_TOKEN:?Set FIRMWARE_ANALYZER_TOKEN to a random token of at least 32 characters}
     volumes:
-      - firmware_uploads:/firmware
-    ports:
-      - "8001:8001"
+      - firmware_uploads:/firmware:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
       interval: 30s

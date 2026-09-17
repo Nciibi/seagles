@@ -233,7 +233,7 @@ async def analyze_firmware(req: AnalyzeRequest, background_tasks: BackgroundTask
                 f"strings={report.suspicious_string_count}, cves={len(cve_results)}")
 
     return AnalyzeResponse(
-        firmware_id=req.firmware_id,
+        firmware_id=firmware_id,
         status="complete",
         report=report
     )

@@ -66,6 +66,7 @@ func Load() (*Config, error) {
 		NetworkCIDR:         getEnv("NETWORK_CIDR", "192.168.1.0/24"),
 		NVDAPIKey:           getEnv("NVD_API_KEY", ""),
 		FirmwareAnalyzerURL: getEnv("FIRMWARE_ANALYZER_URL", "http://firmware-analyzer:8001"),
+		FirmwareAnalyzerToken: getEnv("FIRMWARE_ANALYZER_TOKEN", ""),
 		JWTSecret:           getEnv("JWT_SECRET", ""),
 		JWTPrivateKeyFile:   getEnv("JWT_PRIVATE_KEY_FILE", ""),
 		SlackWebhookURL:     getEnv("SLACK_WEBHOOK_URL", ""),

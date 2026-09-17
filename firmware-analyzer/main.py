@@ -6,7 +6,9 @@ and CVE lookup on firmware images.
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Header
 import secrets
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
+from pathlib import Path
+from uuid import UUID
 from typing import Optional
 import psycopg2
 import os

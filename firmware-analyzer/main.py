@@ -169,8 +169,8 @@ async def analyze_firmware(req: AnalyzeRequest, background_tasks: BackgroundTask
     4. CVE lookup via NVD API
     5. Update database with results
     """
-    if not os.path.exists(req.filepath):
-        raise HTTPException(status_code=400, detail=f"File not found: {req.filepath}")
+    firmware_id = str(req.firmware_id)
+    filepath, vendor, version = registered_firmware(firmware_id)
 
     logger.info(f"Starting analysis for firmware {req.firmware_id}")
 

@@ -159,7 +159,7 @@ def update_database(firmware_id: str, report: AnalysisReport):
 def health():
     return HealthResponse()
 
-@app.post("/analyze", response_model=AnalyzeResponse)
+@app.post("/analyze", response_model=AnalyzeResponse, dependencies=[Depends(require_backend)])
 async def analyze_firmware(req: AnalyzeRequest, background_tasks: BackgroundTasks):
     """
     Run full firmware analysis pipeline:

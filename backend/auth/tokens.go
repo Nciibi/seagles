@@ -60,6 +60,50 @@ var (
 	keyIsEphemeral bool
 )
 
+// parseRSAPrivateKeyPEM accepts both private-key encodings that are in real
+// use:
+//
+//   - PKCS#1, "-----BEGIN RSA PRIVATE KEY-----", which is what
+//     `openssl genrsa -traditional` and Go's x509.MarshalPKCS1PrivateKey emit.
+//   - PKCS#8, "-----BEGIN PRIVATE KEY-----", which is what OpenSSL 3.x emits
+//     by default for `openssl genrsa` and `openssl genpkey`.
+//
+// Only PKCS#1 was accepted before, so the documented setup command
+// (`openssl genrsa 2048`) produced a key the server rejected with
+// "invalid RSA private key PEM" on OpenSSL 3.x.
+func parseRSAPrivateKeyPEM(privateKeyPEM string) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode([]byte(privateKeyPEM))
+	if block == nil {
+		return nil, errors.New("invalid RSA private key PEM: no PEM block found")
+	}
+
+	switch block.Type {
+	case "RSA PRIVATE KEY":
+		priv, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse PKCS#1 RSA private key: %w", err)
+		}
+		return priv, nil
+	case "PRIVATE KEY":
+		parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse PKCS#8 private key: %w", err)
+		}
+		priv, ok := parsed.(*rsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("PKCS#8 private key is %T, want an RSA key; "+
+				"generate one with: openssl genrsa 2048", parsed)
+		}
+		return priv, nil
+	case "ENCRYPTED PRIVATE KEY":
+		return nil, errors.New("private key is encrypted; decrypt it first, e.g. " +
+			"openssl pkcs8 -in key.pem -out key-decrypted.pem")
+	default:
+		return nil, fmt.Errorf("unsupported PEM block type %q, want "+
+			"\"RSA PRIVATE KEY\" (PKCS#1) or \"PRIVATE KEY\" (PKCS#8)", block.Type)
+	}
+}
+
 // UsingEphemeralKey reports whether the signing key was auto-generated instead
 // of loaded from JWT_SECRET / JWT_PRIVATE_KEY_FILE.
 //

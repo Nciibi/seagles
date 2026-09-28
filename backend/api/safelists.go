@@ -348,7 +348,10 @@ func DeleteWebhookHandler(db *sql.DB) gin.HandlerFunc {
 
 func TestWebhookHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		id := c.Param("id")
+		id, ok := uuidParam(c, "id")
+		if !ok {
+			return
+		}
 		var webhookURL string
 		err := db.QueryRow(`SELECT url FROM webhooks WHERE id=$1`, id).Scan(&webhookURL)
 		if err != nil {

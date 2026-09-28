@@ -53,6 +53,50 @@ jobs:
       run: go test -v -count=1 ./...
       working-directory: backend
 
+  backend-integration-test:
+    name: Backend Integration Test
+    runs-on: ubuntu-latest
+    # Requires a real PostgreSQL. The tenant-scoping guarantees and migration
+    # re-runnability are enforced by the database, so sqlmock cannot assert
+    # them: without a live database, a schema that leaks data between tenants
+    # is indistinguishable from one that does not.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: seagles
+          POSTGRES_PASSWORD: seagles_test_pw
+          POSTGRES_DB: seagles_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U seagles -d seagles_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://seagles:seagles_test_pw@localhost:5432/seagles_test?sslmode=disable
+      MIGRATIONS_DIR: backend/db/migrations
+      JWT_SECRET: ""
+      RATE_LIMIT_PER_MIN: "1000"
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Install system deps
+      run: sudo apt-get update && sudo apt-get install -y libpcap-dev nmap
+
+    - name: Download Go deps
+      run: go mod download
+      working-directory: backend
+
+    - name: Go test (integration, real PostgreSQL)
+      run: go test -tags=integration -count=1 -v ./tests/...
+      working-directory: backend
+
   openapi-validate:
     name: OpenAPI Validation
     runs-on: ubuntu-latest

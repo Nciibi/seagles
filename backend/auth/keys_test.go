@@ -100,7 +100,7 @@ func TestParseRSAPrivateKeyPEM_RejectsECKeyWithGuidance(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error for an EC key")
 	}
-	if !strings.Contains(err.Error(), "want an RSA key") {
+	if !strings.Contains(err.Error(), "is not an RSA key") {
 		t.Errorf("error should explain that an RSA key is required, got: %v", err)
 	}
 }

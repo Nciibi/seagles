@@ -96,7 +96,7 @@ func parseRSAPrivateKeyPEM(privateKeyPEM string) (*rsa.PrivateKey, error) {
 		}
 		return priv, nil
 	case "EC PRIVATE KEY", "DSA PRIVATE KEY":
-		return nil, fmt.Errorf("PEM block is a %s, not an RSA key; "+
+		return nil, fmt.Errorf("PEM block type %q is not an RSA key; "+
 			"generate one with: openssl genrsa 2048", block.Type)
 	case "ENCRYPTED PRIVATE KEY":
 		return nil, errors.New("private key is encrypted; decrypt it first, e.g. " +

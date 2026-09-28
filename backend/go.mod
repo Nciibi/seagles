@@ -12,6 +12,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/minio/minio-go/v7 v7.2.0
 	golang.org/x/crypto v0.51.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -51,5 +52,4 @@ require (
 	golang.org/x/text v0.37.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/ini.v1 v1.67.2 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

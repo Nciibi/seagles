@@ -117,7 +117,7 @@ func policyAllowsPorts(t *testing.T) (map[int]bool, string) {
 	}
 
 	var docs []struct {
-		Kind string `yaml:"kind"`
+		Kind     string `yaml:"kind"`
 		Metadata struct {
 			Name string `yaml:"name"`
 		} `yaml:"metadata"`
@@ -278,7 +278,7 @@ func TestNetworkPolicyHasDefaultDenyBaseline(t *testing.T) {
 		} `yaml:"metadata"`
 		Spec struct {
 			PodSelector *map[string]interface{} `yaml:"podSelector"`
-			PolicyTypes []string               `yaml:"policyTypes"`
+			PolicyTypes []string                `yaml:"policyTypes"`
 		} `yaml:"spec"`
 	}
 	if err := yaml.Unmarshal(raw, &docs); err != nil {

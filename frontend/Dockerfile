@@ -12,10 +12,11 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Rendered to /etc/nginx/conf.d/default.conf at container start by the nginx
 # image's envsubst entrypoint, which substitutes ${SEAGLES_BACKEND}. There is
-# deliberately no default baked into the image: if the variable is unset the
-# rendered proxy_pass is invalid and nginx exits, so a missing value is a
-# visible CrashLoop rather than a silent 502. Set it in both docker-compose.yml
-# and the Kubernetes manifest.
+# deliberately no default baked into the image: envsubst only replaces
+# variables present in the environment, so an unset value survives into the
+# rendered config and nginx exits with 'unknown "SEAGLES_BACKEND" variable'.
+# A missing value is therefore a visible CrashLoop, not a silent 502. Set it
+# in both docker-compose.yml and the Kubernetes manifest.
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 
 RUN chown -R seagles:seagles /usr/share/nginx/html && \

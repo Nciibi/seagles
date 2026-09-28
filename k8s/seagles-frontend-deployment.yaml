@@ -43,9 +43,9 @@ spec:
           value: "/api/v1"
         # Upstream for the nginx /api/ proxy. The Compose service name
         # ("backend") does not resolve in Kubernetes, so this must be the
-        # Service DNS name. If it is unset, envsubst renders an invalid
-        # proxy_pass and nginx exits, so the failure is a visible CrashLoop
-        # rather than a silent 502 on every API call.
+        # Service DNS name. If it is unset, the literal ${SEAGLES_BACKEND}
+        # survives templating and nginx exits with an unknown-variable error,
+        # so the failure is a visible CrashLoop rather than a silent 502.
         - name: SEAGLES_BACKEND
           value: "http://seagles-backend.security-tools.svc.cluster.local:8080"
 

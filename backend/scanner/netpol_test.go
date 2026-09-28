@@ -1,7 +1,9 @@
 package scanner
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -114,7 +116,7 @@ type netpolDoc struct {
 	} `yaml:"metadata"`
 	Spec struct {
 		PodSelector *map[string]interface{} `yaml:"podSelector"`
-		PolicyTypes []string               `yaml:"policyTypes"`
+		PolicyTypes []string                `yaml:"policyTypes"`
 		Egress      []struct {
 			To []struct {
 				IPBlock *struct {
@@ -237,33 +239,8 @@ func TestNetworkPolicyAllowsEveryScannerPort(t *testing.T) {
 // carry an `except` list, which is what previously excluded all RFC1918 space
 // and made the product inoperable in a cluster.
 func TestNetworkPolicyHasUnrestrictedScanTargetBlock(t *testing.T) {
-	raw, err := os.ReadFile(netpolPath)
-	if err != nil {
-		t.Skipf("network policy not found: %v", err)
-	}
-
-	var docs []struct {
-		Kind     string `yaml:"kind"`
-		Metadata struct {
-			Name string `yaml:"name"`
-		} `yaml:"metadata"`
-		Spec struct {
-			Egress []struct {
-				To []struct {
-					IPBlock *struct {
-						CIDR   string   `yaml:"cidr"`
-						Except []string `yaml:"except"`
-					} `yaml:"ipBlock"`
-				} `yaml:"to"`
-			} `yaml:"egress"`
-		} `yaml:"spec"`
-	}
-	if err := yaml.Unmarshal(raw, &docs); err != nil {
-		t.Fatalf("failed to parse %s: %v", netpolPath, err)
-	}
-
 	found := false
-	for _, d := range docs {
+	for _, d := range loadNetpol(t) {
 		if d.Kind != "NetworkPolicy" || d.Metadata.Name != "seagles-backend" {
 			continue
 		}
@@ -292,26 +269,7 @@ func TestNetworkPolicyHasUnrestrictedScanTargetBlock(t *testing.T) {
 // A deny-all baseline is required, otherwise unrelated workloads in the
 // namespace are unrestricted despite the docs claiming "deny-all default".
 func TestNetworkPolicyHasDefaultDenyBaseline(t *testing.T) {
-	raw, err := os.ReadFile(netpolPath)
-	if err != nil {
-		t.Skipf("network policy not found: %v", err)
-	}
-
-	var docs []struct {
-		Kind     string `yaml:"kind"`
-		Metadata struct {
-			Name string `yaml:"name"`
-		} `yaml:"metadata"`
-		Spec struct {
-			PodSelector *map[string]interface{} `yaml:"podSelector"`
-			PolicyTypes []string                `yaml:"policyTypes"`
-		} `yaml:"spec"`
-	}
-	if err := yaml.Unmarshal(raw, &docs); err != nil {
-		t.Fatalf("failed to parse %s: %v", netpolPath, err)
-	}
-
-	for _, d := range docs {
+	for _, d := range loadNetpol(t) {
 		if d.Kind != "NetworkPolicy" {
 			continue
 		}

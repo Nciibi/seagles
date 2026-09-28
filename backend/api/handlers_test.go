@@ -262,10 +262,10 @@ func TestDeleteDeviceHandler_NotFound(t *testing.T) {
 	router, mock, _ := setupTestRouter(t)
 
 	mock.ExpectExec(`UPDATE devices SET is_active`).
-		WithArgs("nonexistent").
+		WithArgs("00000000-0000-0000-0000-0000000000ff").
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
-	w := request(router, "DELETE", "/api/v1/devices/nonexistent", nil)
+	w := request(router, "DELETE", "/api/v1/devices/00000000-0000-0000-0000-0000000000ff", nil)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", w.Code)
 	}
@@ -344,10 +344,10 @@ func TestGetScanHandler_NotFound(t *testing.T) {
 	router, mock, _ := setupTestRouter(t)
 
 	mock.ExpectQuery(`SELECT id, device_id, started_at, completed_at, status`).
-		WithArgs("nonexistent").
+		WithArgs("00000000-0000-0000-0000-0000000000ff").
 		WillReturnError(sql.ErrNoRows)
 
-	w := request(router, "GET", "/api/v1/scans/nonexistent", nil)
+	w := request(router, "GET", "/api/v1/scans/00000000-0000-0000-0000-0000000000ff", nil)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", w.Code)
 	}
@@ -408,10 +408,10 @@ func TestResolveVulnerabilityHandler_NotFound(t *testing.T) {
 	router, mock, _ := setupTestRouter(t)
 
 	mock.ExpectExec(`UPDATE vulnerabilities SET is_resolved`).
-		WithArgs("nonexistent").
+		WithArgs("00000000-0000-0000-0000-0000000000ff").
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
-	w := request(router, "PATCH", "/api/v1/vulnerabilities/nonexistent/resolve", nil)
+	w := request(router, "PATCH", "/api/v1/vulnerabilities/00000000-0000-0000-0000-0000000000ff/resolve", nil)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", w.Code)
 	}
@@ -466,10 +466,10 @@ func TestAckAlertHandler_NotFound(t *testing.T) {
 	router, mock, _ := setupTestRouter(t)
 
 	mock.ExpectExec(`UPDATE alerts SET is_acknowledged`).
-		WithArgs("nonexistent").
+		WithArgs("00000000-0000-0000-0000-0000000000ff").
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
-	w := request(router, "POST", "/api/v1/alerts/nonexistent/ack", nil)
+	w := request(router, "POST", "/api/v1/alerts/00000000-0000-0000-0000-0000000000ff/ack", nil)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", w.Code)
 	}
@@ -528,10 +528,10 @@ func TestSafelistHandlers(t *testing.T) {
 		router, mock, _ := setupTestRouter(t)
 
 		mock.ExpectExec(`UPDATE safelists SET is_active`).
-			WithArgs("nonexistent").
+			WithArgs("00000000-0000-0000-0000-0000000000ff").
 			WillReturnResult(sqlmock.NewResult(0, 0))
 
-		w := request(router, "DELETE", "/api/v1/safelists/nonexistent", nil)
+		w := request(router, "DELETE", "/api/v1/safelists/00000000-0000-0000-0000-0000000000ff", nil)
 		if w.Code != http.StatusNotFound {
 			t.Fatalf("expected 404, got %d", w.Code)
 		}
@@ -641,10 +641,10 @@ func TestWebhookHandlers(t *testing.T) {
 		router, mock, _ := setupTestRouter(t)
 
 		mock.ExpectExec(`DELETE FROM webhooks`).
-			WithArgs("nonexistent").
+			WithArgs("00000000-0000-0000-0000-0000000000ff").
 			WillReturnResult(sqlmock.NewResult(0, 0))
 
-		w := request(router, "DELETE", "/api/v1/webhooks/nonexistent", nil)
+		w := request(router, "DELETE", "/api/v1/webhooks/00000000-0000-0000-0000-0000000000ff", nil)
 		if w.Code != http.StatusNotFound {
 			t.Fatalf("expected 404, got %d", w.Code)
 		}

@@ -59,6 +59,12 @@ spec:
             secretKeyRef:
               name: seagles-jwt-secret
               key: secret
+        # Fail fast if the secret above is missing. Without a shared key each
+        # replica generates its own RSA key pair, so tokens minted by one pod
+        # are rejected by the others (intermittent 401s) and every rollout
+        # invalidates all sessions.
+        - name: REQUIRE_SHARED_JWT_KEY
+          value: "true"
         - name: FIRMWARE_ANALYZER_TOKEN
           valueFrom:
             secretKeyRef:

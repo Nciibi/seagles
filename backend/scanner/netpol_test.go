@@ -106,9 +106,33 @@ func scannerSourcePorts(t *testing.T) map[int]string {
 	return ports
 }
 
-// policyAllowsPorts returns the set of ports the backend NetworkPolicy permits
-// to its single scan-target ipBlock.
-func policyAllowsPorts(t *testing.T) (map[int]bool, string) {
+// netpolDoc models just enough of a NetworkPolicy for these assertions.
+type netpolDoc struct {
+	Kind     string `yaml:"kind"`
+	Metadata struct {
+		Name string `yaml:"name"`
+	} `yaml:"metadata"`
+	Spec struct {
+		PodSelector *map[string]interface{} `yaml:"podSelector"`
+		PolicyTypes []string               `yaml:"policyTypes"`
+		Egress      []struct {
+			To []struct {
+				IPBlock *struct {
+					CIDR   string   `yaml:"cidr"`
+					Except []string `yaml:"except"`
+				} `yaml:"ipBlock"`
+			} `yaml:"to"`
+			Ports []struct {
+				Port     int    `yaml:"port"`
+				Protocol string `yaml:"protocol"`
+			} `yaml:"ports"`
+		} `yaml:"egress"`
+	} `yaml:"spec"`
+}
+
+// loadNetpol parses every YAML document in the policy file. The file is
+// multi-document, so a plain yaml.Unmarshal would only see the first policy.
+func loadNetpol(t *testing.T) []netpolDoc {
 	t.Helper()
 
 	raw, err := os.ReadFile(netpolPath)
@@ -116,36 +140,38 @@ func policyAllowsPorts(t *testing.T) (map[int]bool, string) {
 		t.Skipf("network policy not found at %s: %v", netpolPath, err)
 	}
 
-	var docs []struct {
-		Kind     string `yaml:"kind"`
-		Metadata struct {
-			Name string `yaml:"name"`
-		} `yaml:"metadata"`
-		Spec struct {
-			PodSelector map[string]interface{} `yaml:"podSelector"`
-			Egress      []struct {
-				To []struct {
-					IPBlock *struct {
-						CIDR   string   `yaml:"cidr"`
-						Except []string `yaml:"except"`
-					} `yaml:"ipBlock"`
-					PodSelector map[string]interface{} `yaml:"podSelector"`
-				} `yaml:"to"`
-				Ports []struct {
-					Port     int    `yaml:"port"`
-					Protocol string `yaml:"protocol"`
-				} `yaml:"ports"`
-			} `yaml:"egress"`
-		} `yaml:"spec"`
+	var docs []netpolDoc
+	dec := yaml.NewDecoder(bytes.NewReader(raw))
+	for {
+		var d netpolDoc
+		err := dec.Decode(&d)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("failed to parse %s: %v", netpolPath, err)
+		}
+		if d.Kind == "" {
+			continue // empty document between separators
+		}
+		docs = append(docs, d)
 	}
-	if err := yaml.Unmarshal(raw, &docs); err != nil {
-		t.Fatalf("failed to parse %s: %v", netpolPath, err)
+
+	if len(docs) == 0 {
+		t.Fatalf("no YAML documents parsed from %s", netpolPath)
 	}
+	return docs
+}
+
+// policyAllowsPorts returns the set of ports the backend NetworkPolicy permits
+// to its single scan-target ipBlock.
+func policyAllowsPorts(t *testing.T) (map[int]bool, string) {
+	t.Helper()
 
 	allowed := map[int]bool{}
 	var cidr string
 
-	for _, d := range docs {
+	for _, d := range loadNetpol(t) {
 		if d.Kind != "NetworkPolicy" || d.Metadata.Name != "seagles-backend" {
 			continue
 		}

@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -25,6 +27,54 @@ import (
 // SIGTERM. Kubernetes' terminationGracePeriodSeconds must exceed this (the
 // backend manifest sets 45s) so the process is never SIGKILLed mid-drain.
 const drainTimeout = 30 * time.Second
+
+const REQUIRE_SHARED_JWT_KEY_MSG = `no JWT signing key is configured, and REQUIRE_SHARED_JWT_KEY is set.
+
+Refusing to start: without a shared key this process generates its own RSA key
+pair, so every replica and every restart uses a different key. Access tokens
+minted by one instance then fail signature verification on the others, users
+see intermittent 401s, and each rollout invalidates every session.
+
+Configure one of:
+  JWT_SECRET             an RSA private key in PEM form (single line, newlines
+                         encoded as \n)
+  JWT_PRIVATE_KEY_FILE   path to a PEM file readable by this process
+
+Generate a key with:
+  openssl genrsa 2048 | tee jwt-private.pem
+  kubectl -n security-tools create secret generic seagles-jwt-secret \
+    --from-file=secret=jwt-private.pem
+
+To run a deliberate single-instance deployment instead, unset
+REQUIRE_SHARED_JWT_KEY.`
+
+// resolveJWTKey returns the PEM signing key from configuration, preferring the
+// inline JWT_SECRET and falling back to JWT_PRIVATE_KEY_FILE.
+//
+// A configured-but-unreadable key file is a hard error. It used to be ignored
+// (`if keyData, err := os.ReadFile(...); err == nil`), which silently fell
+// through to generating a per-process key — turning a missing mount or bad
+// permissions into an authentication outage rather than a startup failure.
+func resolveJWTKey(cfg *config.Config) (string, error) {
+	if key := strings.TrimSpace(cfg.JWTSecret); key != "" {
+		return key, nil
+	}
+
+	if cfg.JWTPrivateKeyFile == "" {
+		return "", nil
+	}
+
+	keyData, err := os.ReadFile(cfg.JWTPrivateKeyFile)
+	if err != nil {
+		return "", fmt.Errorf("JWT_PRIVATE_KEY_FILE is set to %q but could not be read: %w",
+			cfg.JWTPrivateKeyFile, err)
+	}
+	if len(strings.TrimSpace(string(keyData))) == 0 {
+		return "", fmt.Errorf("JWT_PRIVATE_KEY_FILE %q is empty; expected an RSA private key in PEM form",
+			cfg.JWTPrivateKeyFile)
+	}
+	return string(keyData), nil
+}
 
 func main() {
 	cfg, err := config.Load()

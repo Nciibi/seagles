@@ -10,14 +10,14 @@ import (
 )
 
 type Config struct {
-	DatabaseURL         string
-	Port                string
-	NetworkCIDR         string
-	NVDAPIKey           string
-	FirmwareAnalyzerURL string
+	DatabaseURL           string
+	Port                  string
+	NetworkCIDR           string
+	NVDAPIKey             string
+	FirmwareAnalyzerURL   string
 	FirmwareAnalyzerToken string
-	JWTSecret           string
-	JWTPrivateKeyFile   string
+	JWTSecret             string
+	JWTPrivateKeyFile     string
 	// RequireSharedJWTKey makes the process refuse to start when no signing key
 	// is configured. Set it for any deployment running more than one instance:
 	// an auto-generated key is per-process, so tokens issued by one replica are
@@ -40,21 +40,21 @@ type Config struct {
 	AllowedOrigins      []string
 
 	// Data retention (days, 0 = disabled)
-	RetentionScansDays         int
-	RetentionAlertsDays        int
-	RetentionAuditLogDays      int
-	RetentionWebhookDelivDays  int
+	RetentionScansDays        int
+	RetentionAlertsDays       int
+	RetentionAuditLogDays     int
+	RetentionWebhookDelivDays int
 
 	// Webhook retry
 	WebhookRetryMaxAttempts int
 	WebhookRetryBaseDelayMs int
 
 	// SMTP / Email
-	SMTPServer  string
-	SMTPPort    int
-	SMTPUser    string
-	SMTPPass    string
-	SMTPFrom    string
+	SMTPServer string
+	SMTPPort   int
+	SMTPUser   string
+	SMTPPass   string
+	SMTPFrom   string
 
 	// TLS
 	TLSEnabled  bool
@@ -66,30 +66,30 @@ func Load() (*Config, error) {
 	_ = godotenv.Load(".env", "../.env")
 
 	cfg := &Config{
-		DatabaseURL:         getEnv("DATABASE_URL", ""),
-		Port:                getEnv("PORT", "8080"),
-		NetworkCIDR:         getEnv("NETWORK_CIDR", "192.168.1.0/24"),
-		NVDAPIKey:           getEnv("NVD_API_KEY", ""),
-		FirmwareAnalyzerURL: getEnv("FIRMWARE_ANALYZER_URL", "http://firmware-analyzer:8001"),
+		DatabaseURL:           getEnv("DATABASE_URL", ""),
+		Port:                  getEnv("PORT", "8080"),
+		NetworkCIDR:           getEnv("NETWORK_CIDR", "192.168.1.0/24"),
+		NVDAPIKey:             getEnv("NVD_API_KEY", ""),
+		FirmwareAnalyzerURL:   getEnv("FIRMWARE_ANALYZER_URL", "http://firmware-analyzer:8001"),
 		FirmwareAnalyzerToken: getEnv("FIRMWARE_ANALYZER_TOKEN", ""),
-		JWTSecret:           getEnv("JWT_SECRET", ""),
-		JWTPrivateKeyFile:   getEnv("JWT_PRIVATE_KEY_FILE", ""),
-		RequireSharedJWTKey: getEnv("REQUIRE_SHARED_JWT_KEY", "") == "true",
-		SlackWebhookURL:     getEnv("SLACK_WEBHOOK_URL", ""),
-		TeamsWebhookURL:     getEnv("TEAMS_WEBHOOK_URL", ""),
-		S3Endpoint:          getEnv("S3_ENDPOINT", ""),
-		S3Bucket:            getEnv("S3_BUCKET", "seagles-firmware"),
-		S3AccessKey:         getEnv("S3_ACCESS_KEY", ""),
-		S3SecretKey:         getEnv("S3_SECRET_KEY", ""),
-		RedisURL:            getEnv("REDIS_URL", ""),
-		RateLimitPerMin:     getEnvInt("RATE_LIMIT_PER_MIN", 60),
-		ScanMaxConcurrent:   getEnvInt("SCAN_MAX_CONCURRENT", 20),
-		LogLevel:            getEnv("LOG_LEVEL", "info"),
-		LogFormat:           getEnv("LOG_FORMAT", "kv"),
-		DBMaxOpenConns:      getEnvInt("DB_MAX_OPEN_CONNS", 25),
-		DBMaxIdleConns:      getEnvInt("DB_MAX_IDLE_CONNS", 5),
-		DBConnMaxLifetime:   time.Duration(getEnvInt("DB_CONN_MAX_LIFETIME_MINUTES", 5)) * time.Minute,
-		AllowedOrigins:      getAllowedOrigins(getEnv("ALLOWED_ORIGINS", "")),
+		JWTSecret:             getEnv("JWT_SECRET", ""),
+		JWTPrivateKeyFile:     getEnv("JWT_PRIVATE_KEY_FILE", ""),
+		RequireSharedJWTKey:   getEnv("REQUIRE_SHARED_JWT_KEY", "") == "true",
+		SlackWebhookURL:       getEnv("SLACK_WEBHOOK_URL", ""),
+		TeamsWebhookURL:       getEnv("TEAMS_WEBHOOK_URL", ""),
+		S3Endpoint:            getEnv("S3_ENDPOINT", ""),
+		S3Bucket:              getEnv("S3_BUCKET", "seagles-firmware"),
+		S3AccessKey:           getEnv("S3_ACCESS_KEY", ""),
+		S3SecretKey:           getEnv("S3_SECRET_KEY", ""),
+		RedisURL:              getEnv("REDIS_URL", ""),
+		RateLimitPerMin:       getEnvInt("RATE_LIMIT_PER_MIN", 60),
+		ScanMaxConcurrent:     getEnvInt("SCAN_MAX_CONCURRENT", 20),
+		LogLevel:              getEnv("LOG_LEVEL", "info"),
+		LogFormat:             getEnv("LOG_FORMAT", "kv"),
+		DBMaxOpenConns:        getEnvInt("DB_MAX_OPEN_CONNS", 25),
+		DBMaxIdleConns:        getEnvInt("DB_MAX_IDLE_CONNS", 5),
+		DBConnMaxLifetime:     time.Duration(getEnvInt("DB_CONN_MAX_LIFETIME_MINUTES", 5)) * time.Minute,
+		AllowedOrigins:        getAllowedOrigins(getEnv("ALLOWED_ORIGINS", "")),
 
 		RetentionScansDays:        getEnvInt("RETENTION_SCANS_DAYS", 90),
 		RetentionAlertsDays:       getEnvInt("RETENTION_ALERTS_DAYS", 90),

@@ -1,3 +1,39 @@
+# Shared storage for the backend and the firmware analyzer.
+#
+# WHY THIS IS A SHARED CLAIM
+# --------------------------
+# The backend stages an uploaded firmware image on local disk
+# (data/firmware-uploads) and records that path in the firmware table. The
+# firmware-analyzer pod is a different workload, so it can only read the file
+# through a shared volume. This claim is therefore load-bearing for firmware
+# analysis whenever S3/MinIO is not in use.
+#
+# READWRITEMANY IS REQUIRED
+# -------------------------
+# The backend Deployment runs 3 replicas and the HPA scales it to 10. A
+# ReadWriteOnce volume can only be attached by pods on a single node, so with
+# RWO the pods beyond the first are stuck in ContainerCreating with
+# "Multi-Attach error for volume" / "FailedAttachVolume". That silently pins
+# the backend to one node and defeats the autoscaler entirely.
+#
+# ReadWriteMany requires a StorageClass that actually supports it (CephFS, NFS,
+# Azure Files, AWS EFS, Longhorn, ...). storageClassName is intentionally not
+# hardcoded: "standard" is a legacy GKE/AWS name that does not resolve on EKS,
+# AKS or vanilla Kubernetes, and hardcoding it left the claim Pending on most
+# clusters. Override it below for your environment, e.g.:
+#
+#   storageClassName: "cephfs"
+#
+# ALTERNATIVE: OBJECT STORAGE INSTEAD OF A SHARED FILESYSTEM
+# --------------------------------------------------------
+# Setting S3_ENDPOINT on the backend makes firmware uploads go to MinIO/S3 and
+# removes this claim from the API tier entirely, which is the better
+# architecture. It is not yet complete: firmware-analyzer currently rejects an
+# "s3://" path with HTTP 400 ("Firmware is not available in local storage"), so
+# firmware ANALYSIS does not work in object-storage mode yet. Until that gap is
+# closed, keep this claim mounted if you need firmware analysis.
+#
+# Do not set both S3_ENDPOINT and rely on this volume for analysis.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -6,9 +42,10 @@ metadata:
   labels:
     app: seagles-backend
 spec:
+  # Must be ReadWriteMany: see above. ReadWriteOnce deadlocks the HPA.
   accessModes:
-  - ReadWriteOnce
+  - ReadWriteMany
   resources:
     requests:
       storage: 10Gi
-  storageClassName: standard
+  # storageClassName: <your RWX-capable class>

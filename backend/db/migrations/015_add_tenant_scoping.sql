@@ -197,9 +197,10 @@ DECLARE
     col   TEXT;
     parent TEXT;
     cname TEXT;
+    entry TEXT;
 BEGIN
-    FOREACH spec IN ARRAY spec LOOP
-        parts  := string_to_array(spec, '|');
+    FOREACH entry IN ARRAY spec LOOP
+        parts  := string_to_array(entry, '|');
         tbl    := parts[1];
         col    := parts[2];
         parent := parts[3];

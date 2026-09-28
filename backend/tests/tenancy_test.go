@@ -15,6 +15,8 @@ package tests
 import (
 	"database/sql"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	_ "github.com/lib/pq"
@@ -220,4 +222,29 @@ func TestMigrationsAreReRunnableOnPostgres(t *testing.T) {
 			}
 		}
 	}
+}
+
+// discoverMigrationSQL reads the real migration files, keyed by name.
+func discoverMigrationSQL(t *testing.T) (map[string]string, error) {
+	t.Helper()
+	dir := os.Getenv("MIGRATIONS_DIR")
+	if dir == "" {
+		dir = filepath.Join("..", "db", "migrations")
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]string)
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
+			continue
+		}
+		b, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		if err != nil {
+			return nil, err
+		}
+		out[e.Name()] = string(b)
+	}
+	return out, nil
 }

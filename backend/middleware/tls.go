@@ -9,8 +9,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/Nciibi/seagles/slog"
+	"github.com/gin-gonic/gin"
 )
 
 type TLSConfig struct {

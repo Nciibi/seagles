@@ -22,10 +22,10 @@ type RateLimitRule struct {
 }
 
 type RateLimiter struct {
-	mu          sync.Mutex
-	visitors    map[string]*visitor
-	fallback    *RateLimitRule
-	rules       []RateLimitRule
+	mu       sync.Mutex
+	visitors map[string]*visitor
+	fallback *RateLimitRule
+	rules    []RateLimitRule
 }
 
 func NewRateLimiter(defaultLimit int, window time.Duration) *RateLimiter {
@@ -126,7 +126,7 @@ func RateLimitMiddleware(rl *RateLimiter) gin.HandlerFunc {
 
 		c.Header("X-RateLimit-Limit", strconv.Itoa(limit))
 		c.Header("X-RateLimit-Remaining", strconv.Itoa(remaining))
-		c.Header("X-RateLimit-Reset", strconv.Itoa(int(time.Now().Add(30 * time.Second).Unix())))
+		c.Header("X-RateLimit-Reset", strconv.Itoa(int(time.Now().Add(30*time.Second).Unix())))
 
 		if !allowed {
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
@@ -137,5 +137,3 @@ func RateLimitMiddleware(rl *RateLimiter) gin.HandlerFunc {
 		c.Next()
 	}
 }
-
-

@@ -14,9 +14,9 @@ import (
 )
 
 type csrfStore struct {
-	mu       sync.RWMutex
-	tokens   map[string]time.Time
-	maxAge   time.Duration
+	mu     sync.RWMutex
+	tokens map[string]time.Time
+	maxAge time.Duration
 }
 
 var globalCSRF = &csrfStore{

@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"io"
+	"strings"
 	"testing"
 )
 
@@ -100,5 +102,96 @@ func TestFilepathExt(t *testing.T) {
 		if result != tt.expected {
 			t.Errorf("filepathExt(%q) = %q, want %q", tt.path, result, tt.expected)
 		}
+	}
+}
+
+// Regression guard: a client that sets a default Content-Type on every request
+// sends an empty body with GET and DELETE. json.Unmarshal fails on that, so
+// every DELETE /devices/:id and DELETE /safelists/:id returned 400 instead of
+// succeeding.
+func TestSanitizeInput_EmptyJSONBodyOnBodilessMethods(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	methods := []string{http.MethodGet, http.MethodHead, http.MethodDelete, http.MethodOptions}
+	for _, method := range methods {
+		t.Run(method, func(t *testing.T) {
+			r := gin.New()
+			r.Use(SanitizeInput(DefaultXSSConfig))
+			r.Handle(method, "/x", func(c *gin.Context) {
+				c.JSON(http.StatusOK, gin.H{"ok": true})
+			})
+
+			req := httptest.NewRequest(method, "/x", nil)
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != http.StatusOK {
+				t.Fatalf("%s with an empty application/json body returned %d, want 200: %s",
+					method, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+// A POST that legitimately has no body (for example /alerts/:id/ack) must not
+// be rejected as malformed JSON either.
+func TestSanitizeInput_EmptyJSONBodyOnPost(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	r := gin.New()
+	r.Use(SanitizeInput(DefaultXSSConfig))
+	r.POST("/ack", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"ok": true}) })
+
+	for _, body := range []string{"", "   ", "\n"} {
+		req := httptest.NewRequest(http.MethodPost, "/ack", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("POST with body %q returned %d, want 200: %s", body, w.Code, w.Body.String())
+		}
+	}
+}
+
+// Genuinely malformed JSON on a POST must still be rejected.
+func TestSanitizeInput_MalformedJSONStillRejected(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	r := gin.New()
+	r.Use(SanitizeInput(DefaultXSSConfig))
+	r.POST("/x", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"ok": true}) })
+
+	req := httptest.NewRequest(http.MethodPost, "/x", strings.NewReader(`{"a":`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("malformed JSON returned %d, want 400", w.Code)
+	}
+}
+
+// The handler must still receive the body intact after sanitisation.
+func TestSanitizeInput_BodyReachesHandler(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	var got string
+	r := gin.New()
+	r.Use(SanitizeInput(DefaultXSSConfig))
+	r.POST("/x", func(c *gin.Context) {
+		b, _ := io.ReadAll(c.Request.Body)
+		got = string(b)
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/x", strings.NewReader(`{"name":"cam-01"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if !strings.Contains(got, "cam-01") {
+		t.Errorf("handler received %q, want the original payload", got)
 	}
 }

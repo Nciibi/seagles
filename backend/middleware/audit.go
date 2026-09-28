@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/Nciibi/seagles/slog"
+	"github.com/gin-gonic/gin"
 )
 
 type AuditEntry struct {
@@ -115,18 +115,18 @@ func ListAuditLogsHandler(db *sql.DB) gin.HandlerFunc {
 		defer rows.Close()
 
 		type AuditLogEntry struct {
-			ID         string     `json:"id"`
-			UserID     *string    `json:"user_id"`
-			Username   string     `json:"username"`
-			Action     string     `json:"action"`
-			Resource   string     `json:"resource"`
-			ResourceID *string    `json:"resource_id"`
-			Detail     *string    `json:"detail"`
-			IPAddress  string     `json:"ip_address"`
-			UserAgent  string     `json:"user_agent"`
-			StatusCode int        `json:"status_code"`
-			LatencyMs  int        `json:"latency_ms"`
-			CreatedAt  time.Time  `json:"created_at"`
+			ID         string    `json:"id"`
+			UserID     *string   `json:"user_id"`
+			Username   string    `json:"username"`
+			Action     string    `json:"action"`
+			Resource   string    `json:"resource"`
+			ResourceID *string   `json:"resource_id"`
+			Detail     *string   `json:"detail"`
+			IPAddress  string    `json:"ip_address"`
+			UserAgent  string    `json:"user_agent"`
+			StatusCode int       `json:"status_code"`
+			LatencyMs  int       `json:"latency_ms"`
+			CreatedAt  time.Time `json:"created_at"`
 		}
 
 		var entries []AuditLogEntry

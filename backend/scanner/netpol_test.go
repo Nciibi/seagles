@@ -39,7 +39,8 @@ func scannerSourcePorts(t *testing.T) map[int]string {
 			return
 		}
 		if prev, dup := ports[p]; dup {
-			t.Logf("port %d appears in both %s and %s", p, prev, origin)
+			_ = prev // a port may legitimately be dialled by several probes
+			_ = dup
 		}
 		ports[p] = origin
 	}

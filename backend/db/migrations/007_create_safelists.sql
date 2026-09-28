@@ -38,7 +38,7 @@ VALUES
     ('aggressive', 'Full scan — port discovery, credential testing, protocol probing, TLS checks', FALSE, FALSE, TRUE),
     ('gentle', 'Gentle scan — port discovery only, no credential testing (safe for fragile ICS/IoMT devices)', TRUE, TRUE, FALSE),
     ('standard', 'Standard scan — port discovery and protocol probing, no credential testing', TRUE, FALSE, FALSE)
-ON CONFLICT (name) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 CREATE INDEX IF NOT EXISTS idx_safelists_active ON safelists(is_active) WHERE is_active = TRUE;
 CREATE INDEX IF NOT EXISTS idx_scan_scopes_active ON scan_scopes(is_active) WHERE is_active = TRUE;

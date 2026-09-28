@@ -90,7 +90,10 @@ func AnalyzeFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 		requestID, _ := c.Get("request_id")
-		id := c.Param("id")
+		id, ok := uuidParam(c, "id")
+		if !ok {
+			return
+		}
 
 		var f models.Firmware
 		err := db.QueryRow(`SELECT id, device_id, version, vendor, file_path

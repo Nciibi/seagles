@@ -70,7 +70,10 @@ func ListAlertsHandler(db *sql.DB) gin.HandlerFunc {
 func AckAlertHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestID, _ := c.Get("request_id")
-		id := c.Param("id")
+		id, ok := uuidParam(c, "id")
+		if !ok {
+			return
+		}
 
 		result, err := db.Exec(`UPDATE alerts SET is_acknowledged=true, acknowledged_at=NOW() WHERE id=$1`, id)
 		if err != nil {

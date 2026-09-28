@@ -79,7 +79,10 @@ func ListSessionsHandler(db *sql.DB) gin.HandlerFunc {
 
 func RevokeSessionHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		sessionID := c.Param("id")
+		sessionID, ok := uuidParam(c, "id")
+		if !ok {
+			return
+		}
 
 		result, err := db.Exec(`UPDATE refresh_tokens SET revoked = TRUE WHERE id = $1`, sessionID)
 		if err != nil {

@@ -73,7 +73,10 @@ func StatsHandler(db *sql.DB) gin.HandlerFunc {
 func RiskBreakdownHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestID, _ := c.Get("request_id")
-		deviceID := c.Param("id")
+		deviceID, ok := uuidParam(c, "id")
+		if !ok {
+			return
+		}
 
 		result := risk.GetRiskBreakdown(db, deviceID)
 		if errMsg, ok := result["error"].(string); ok {

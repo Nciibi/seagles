@@ -85,7 +85,10 @@ func ListDevicesHandler(db *sql.DB) gin.HandlerFunc {
 func GetDeviceHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestID, _ := c.Get("request_id")
-		id := c.Param("id")
+		id, ok := uuidParam(c, "id")
+		if !ok {
+			return
+		}
 
 		var d models.Device
 		err := db.QueryRow(`SELECT id, ip_address, mac_address, hostname, vendor, device_type,
@@ -127,7 +130,10 @@ func GetDeviceHandler(db *sql.DB) gin.HandlerFunc {
 func DeleteDeviceHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestID, _ := c.Get("request_id")
-		id := c.Param("id")
+		id, ok := uuidParam(c, "id")
+		if !ok {
+			return
+		}
 
 		result, err := db.Exec(`UPDATE devices SET is_active = false WHERE id = $1`, id)
 		if err != nil {

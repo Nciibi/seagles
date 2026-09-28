@@ -61,7 +61,10 @@ func ListScansHandler(db *sql.DB) gin.HandlerFunc {
 func GetScanHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestID, _ := c.Get("request_id")
-		id := c.Param("id")
+		id, ok := uuidParam(c, "id")
+		if !ok {
+			return
+		}
 
 		var s models.Scan
 		err := db.QueryRow(`SELECT id, device_id, started_at, completed_at, status,
@@ -100,7 +103,10 @@ func GetScanHandler(db *sql.DB) gin.HandlerFunc {
 func TriggerDeviceScanHandler(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestID, _ := c.Get("request_id")
-		deviceID := c.Param("id")
+		deviceID, ok := uuidParam(c, "id")
+		if !ok {
+			return
+		}
 
 		var ip string
 		err := db.QueryRow(`SELECT ip_address FROM devices WHERE id = $1`, deviceID).Scan(&ip)

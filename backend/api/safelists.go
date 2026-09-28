@@ -94,7 +94,10 @@ func CreateSafelistHandler(db *sql.DB) gin.HandlerFunc {
 
 func DeleteSafelistHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		id := c.Param("id")
+		id, ok := uuidParam(c, "id")
+		if !ok {
+			return
+		}
 		result, err := db.Exec(`UPDATE safelists SET is_active = FALSE WHERE id = $1`, id)
 		if err != nil {
 			failInternal(c, 500, "Failed to delete safelist entry: ", err)
@@ -230,7 +233,10 @@ func CreateScanScopeHandler(db *sql.DB) gin.HandlerFunc {
 
 func DeleteScanScopeHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		id := c.Param("id")
+		id, ok := uuidParam(c, "id")
+		if !ok {
+			return
+		}
 		result, err := db.Exec(`UPDATE scan_scopes SET is_active = FALSE WHERE id = $1`, id)
 		if err != nil {
 			fail(c, 500, "Failed to delete scan scope")
@@ -322,7 +328,10 @@ func CreateWebhookHandler(db *sql.DB) gin.HandlerFunc {
 
 func DeleteWebhookHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		id := c.Param("id")
+		id, ok := uuidParam(c, "id")
+		if !ok {
+			return
+		}
 		result, err := db.Exec(`DELETE FROM webhooks WHERE id = $1`, id)
 		if err != nil {
 			fail(c, 500, "Failed to delete webhook")

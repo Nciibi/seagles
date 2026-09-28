@@ -79,7 +79,10 @@ func ListVulnerabilitiesHandler(db *sql.DB) gin.HandlerFunc {
 func ResolveVulnerabilityHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestID, _ := c.Get("request_id")
-		id := c.Param("id")
+		id, ok := uuidParam(c, "id")
+		if !ok {
+			return
+		}
 
 		result, err := db.Exec(`UPDATE vulnerabilities SET is_resolved=true, resolved_at=NOW() WHERE id=$1`, id)
 		if err != nil {

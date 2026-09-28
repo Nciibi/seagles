@@ -16,13 +16,31 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    # Proxy API requests to Go backend
+    # Proxy API requests to the Go backend.
+    #
+    # SEAGLES_BACKEND is substituted at container start by the nginx image's
+    # envsubst entrypoint. It must be set:
+    #   compose -> http://backend:8080
+    #   k8s     -> http://seagles-backend.<ns>.svc.cluster.local:8080
+    # It was previously hardcoded to "backend", which is the Docker Compose
+    # service name only, so every /api/ request from the Kubernetes frontend
+    # returned 502.
+    #
+    # If it is unset, envsubst yields "proxy_pass /api/;", nginx refuses to
+    # start ("invalid URL prefix") and the pod CrashLoops. That is deliberate:
+    # a misconfiguration is loudly visible rather than a silent 502.
     location /api/ {
-        proxy_pass http://backend:8080/api/;
+        proxy_pass ${SEAGLES_BACKEND}/api/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Firmware uploads are up to 256M and must not be cut off by the
+        # default 60s proxy timeout while the analyzer inspects the image.
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_request_buffering off;
     }
 
     # Cache static assets

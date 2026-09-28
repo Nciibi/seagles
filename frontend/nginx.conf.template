@@ -26,9 +26,11 @@ server {
     # service name only, so every /api/ request from the Kubernetes frontend
     # returned 502.
     #
-    # If it is unset, envsubst yields "proxy_pass /api/;", nginx refuses to
-    # start ("invalid URL prefix") and the pod CrashLoops. That is deliberate:
-    # a misconfiguration is loudly visible rather than a silent 502.
+    # If it is unset, the entrypoint's envsubst leaves "${SEAGLES_BACKEND}"
+    # untouched (it only substitutes variables that exist in the environment),
+    # nginx then fails to parse the config with 'unknown "SEAGLES_BACKEND"
+    # variable' and exits. That is deliberate: a misconfiguration is loudly
+    # visible as a CrashLoop rather than a silent 502 on every API call.
     location /api/ {
         proxy_pass ${SEAGLES_BACKEND}/api/;
         proxy_set_header Host $host;

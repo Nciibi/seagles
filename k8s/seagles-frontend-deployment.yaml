@@ -26,7 +26,8 @@ spec:
         ports:
         # Unprivileged: capabilities.drop is [ALL], so no CAP_NET_BIND_SERVICE
         # and binding 80 would fail. Must stay in sync with the EXPOSE in
-        # frontend/Dockerfile and the "listen" directive in frontend/nginx.conf.
+        # frontend/Dockerfile and the "listen" directive in
+        # frontend/nginx.conf.template.
         - containerPort: 8080
           name: http
 
@@ -40,6 +41,13 @@ spec:
         env:
         - name: VITE_API_URL
           value: "/api/v1"
+        # Upstream for the nginx /api/ proxy. The Compose service name
+        # ("backend") does not resolve in Kubernetes, so this must be the
+        # Service DNS name. If it is unset, envsubst renders an invalid
+        # proxy_pass and nginx exits, so the failure is a visible CrashLoop
+        # rather than a silent 502 on every API call.
+        - name: SEAGLES_BACKEND
+          value: "http://seagles-backend.security-tools.svc.cluster.local:8080"
 
         resources:
           requests:

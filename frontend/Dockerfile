@@ -9,7 +9,14 @@ FROM nginx:1.26-alpine
 RUN addgroup -S seagles && adduser -S -G seagles seagles
 
 COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Rendered to /etc/nginx/conf.d/default.conf at container start by the nginx
+# image's envsubst entrypoint, which substitutes ${SEAGLES_BACKEND}. There is
+# deliberately no default baked into the image: if the variable is unset the
+# rendered proxy_pass is invalid and nginx exits, so a missing value is a
+# visible CrashLoop rather than a silent 502. Set it in both docker-compose.yml
+# and the Kubernetes manifest.
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 
 RUN chown -R seagles:seagles /usr/share/nginx/html && \
     chmod -R 444 /usr/share/nginx/html && \
@@ -18,7 +25,7 @@ RUN chown -R seagles:seagles /usr/share/nginx/html && \
 
 USER seagles
 
-# Unprivileged port (see nginx.conf). Binding 80 would require
+# Unprivileged port (see nginx.conf.template). Binding 80 would require
 # CAP_NET_BIND_SERVICE, which the Kubernetes manifest drops.
 EXPOSE 8080
 

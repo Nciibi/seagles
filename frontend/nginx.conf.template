@@ -36,11 +36,11 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # Firmware uploads are up to 256M and must not be cut off by the
-        # default 60s proxy timeout while the analyzer inspects the image.
+        # Firmware uploads are up to 256M. nginx's default proxy_read_timeout
+        # is 60s, which cuts off a large upload mid-transfer and returns 504
+        # to the browser.
         proxy_read_timeout 300s;
         proxy_send_timeout 300s;
-        proxy_request_buffering off;
     }
 
     # Cache static assets

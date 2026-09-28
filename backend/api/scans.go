@@ -9,7 +9,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/Nciibi/seagles/alerts"
 	"github.com/Nciibi/seagles/config"
 	"github.com/Nciibi/seagles/kev"
@@ -17,6 +16,7 @@ import (
 	"github.com/Nciibi/seagles/risk"
 	"github.com/Nciibi/seagles/scanner"
 	"github.com/Nciibi/seagles/slog"
+	"github.com/gin-gonic/gin"
 )
 
 type TriggerScanRequest struct {

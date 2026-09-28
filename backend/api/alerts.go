@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
 	"github.com/Nciibi/seagles/models"
 	"github.com/Nciibi/seagles/slog"
+	"github.com/gin-gonic/gin"
 )
 
 func ListAlertsHandler(db *sql.DB) gin.HandlerFunc {

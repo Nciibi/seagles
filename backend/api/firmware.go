@@ -15,14 +15,14 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/Nciibi/seagles/alerts"
 	"github.com/Nciibi/seagles/config"
 	"github.com/Nciibi/seagles/middleware"
 	"github.com/Nciibi/seagles/models"
 	"github.com/Nciibi/seagles/slog"
+	"github.com/gin-gonic/gin"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 const maxUploadSize = 256 << 20
@@ -314,13 +314,13 @@ func UploadFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 		slog.Info("Firmware uploaded", "firmware_id", firmwareID, "filename", header.Filename, "size", written)
 
 		success(c, gin.H{
-			"firmware_id":       firmwareID,
-			"filename":          header.Filename,
-			"size_bytes":        written,
-			"checksum_sha256":   checksum,
-			"storage_path":      finalPath,
-			"analysis_status":   "pending",
-			"message":           fmt.Sprintf("Firmware uploaded. Use POST /firmware/%s/analyze to start analysis.", firmwareID),
+			"firmware_id":     firmwareID,
+			"filename":        header.Filename,
+			"size_bytes":      written,
+			"checksum_sha256": checksum,
+			"storage_path":    finalPath,
+			"analysis_status": "pending",
+			"message":         fmt.Sprintf("Firmware uploaded. Use POST /firmware/%s/analyze to start analysis.", firmwareID),
 		})
 	}
 }

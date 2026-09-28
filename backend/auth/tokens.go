@@ -267,13 +267,14 @@ func GenerateAccessToken(user User) (*SignedToken, error) {
 	exp := now.Add(AccessTokenTTL)
 
 	claims := &Claims{
-		Sub:       user.ID,
-		Name:      user.Username,
-		Role:      user.Role,
-		JTI:       tokenID,
-		TokenType: AccessToken,
-		IAT:       now.Unix(),
-		Exp:       exp.Unix(),
+		Sub:                user.ID,
+		Name:               user.Username,
+		Role:               user.Role,
+		JTI:                tokenID,
+		TokenType:          AccessToken,
+		IAT:                now.Unix(),
+		Exp:                exp.Unix(),
+		MustChangePassword: user.MustChangePassword,
 	}
 
 	token, err := signRS256(claims)

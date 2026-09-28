@@ -361,5 +361,3 @@ func TestWebhookHandler(db *sql.DB) gin.HandlerFunc {
 		success(c, gin.H{"status": "test_webhook_sent"})
 	}
 }
-
-

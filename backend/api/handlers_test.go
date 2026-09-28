@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/Nciibi/seagles/config"
 	"github.com/Nciibi/seagles/models"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/lib/pq"
 )
 
@@ -53,9 +53,9 @@ func setupTestRouter(t *testing.T) (*gin.Engine, sqlmock.Sqlmock, *config.Config
 		{
 			protected.GET("/stats", StatsHandler(db))
 			protected.GET("/devices", ListDevicesHandler(db))
-		protected.GET("/devices/:id", GetDeviceHandler(db))
-		protected.GET("/devices/:id/risk-breakdown", RiskBreakdownHandler(db))
-		protected.DELETE("/devices/:id", DeleteDeviceHandler(db))
+			protected.GET("/devices/:id", GetDeviceHandler(db))
+			protected.GET("/devices/:id/risk-breakdown", RiskBreakdownHandler(db))
+			protected.DELETE("/devices/:id", DeleteDeviceHandler(db))
 			protected.GET("/scans", ListScansHandler(db))
 			protected.GET("/scans/:id", GetScanHandler(db))
 			protected.GET("/vulnerabilities", ListVulnerabilitiesHandler(db))
@@ -424,7 +424,7 @@ func TestListAlertsHandler_Success(t *testing.T) {
 	rows := sqlmock.NewRows([]string{
 		"id", "device_id", "severity", "alert_type", "title", "description",
 		"triggered_at", "acknowledged_at", "is_acknowledged", "metadata",
-	}	).AddRow(
+	}).AddRow(
 		uuid.NewString(), nil, "high", "telnet_open", "Telnet exposed",
 		nil, now, nil, false, []byte("null"),
 	)
@@ -673,9 +673,9 @@ func TestWebhookHandlers(t *testing.T) {
 	t.Run("TestWebhook_NotFound", func(t *testing.T) {
 		router, mock, _ := setupTestRouter(t)
 
-	mock.ExpectQuery(`SELECT url FROM webhooks`).
-		WithArgs("nonexistent").
-		WillReturnError(sql.ErrNoRows)
+		mock.ExpectQuery(`SELECT url FROM webhooks`).
+			WithArgs("nonexistent").
+			WillReturnError(sql.ErrNoRows)
 
 		w := request(router, "POST", "/api/v1/webhooks/nonexistent/test", nil)
 		if w.Code != http.StatusNotFound {

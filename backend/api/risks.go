@@ -3,9 +3,9 @@ package api
 import (
 	"database/sql"
 
-	"github.com/gin-gonic/gin"
 	"github.com/Nciibi/seagles/risk"
 	"github.com/Nciibi/seagles/slog"
+	"github.com/gin-gonic/gin"
 )
 
 func StatsHandler(db *sql.DB) gin.HandlerFunc {
@@ -85,4 +85,3 @@ func RiskBreakdownHandler(db *sql.DB) gin.HandlerFunc {
 		success(c, result)
 	}
 }
-

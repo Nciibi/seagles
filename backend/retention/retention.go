@@ -8,6 +8,7 @@ import (
 	"github.com/Nciibi/seagles/config"
 	"github.com/Nciibi/seagles/slog"
 )
+
 func StartRetentionJob(db *sql.DB, cfg *config.Config) {
 	ticker := time.NewTicker(24 * time.Hour)
 	defer ticker.Stop()

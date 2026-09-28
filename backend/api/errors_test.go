@@ -1,14 +1,15 @@
 package api
 
 import (
-	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"regexp"
 	"strings"
 	"testing"
 
-	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -130,5 +131,40 @@ func TestDeleteDevice_MalformedIDNeverQueries(t *testing.T) {
 	}
 }
 
-var _ = sql.ErrNoRows
-var _ sqlmock.Sqlmock
+// scanAPISourcesForErrorConcatenation finds handler code that puts a raw error
+// into a client response.
+func scanAPISourcesForErrorConcatenation(t *testing.T) []string {
+	t.Helper()
+
+	dir := "."
+	if _, err := os.Stat("router.go"); err != nil {
+		t.Skipf("api package sources not reachable from %s: %v", dir, err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("failed to read api sources: %v", err)
+	}
+
+	// fail(c, <status>, "..." + err.Error()) and the c.JSON equivalent.
+	leak := regexp.MustCompile(
+		`(?:fail\(c,\s*\d+,|"error":)\s*"(?:[^"\\]|\\.)*"\s*\+\s*(?:err|scanErr|dbErr|mErr)\.Error\(\)`)
+
+	var offenders []string
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") ||
+			strings.HasSuffix(e.Name(), "_test.go") {
+			continue
+		}
+		content, err := os.ReadFile(e.Name())
+		if err != nil {
+			t.Fatalf("failed to read %s: %v", e.Name(), err)
+		}
+		for i, line := range strings.Split(string(content), "\n") {
+			if leak.MatchString(line) {
+				offenders = append(offenders,
+					fmt.Sprintf("%s:%d: %s", e.Name(), i+1, strings.TrimSpace(line)))
+			}
+		}
+	}
+	return offenders
+}

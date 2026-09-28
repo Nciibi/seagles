@@ -172,11 +172,11 @@ services:
     depends_on:
       - backend
     ports:
-      - "3000:80"
+      - "3000:8080"
     environment:
       VITE_API_URL: /api/v1
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/"]
       interval: 30s
       timeout: 10s
       retries: 3

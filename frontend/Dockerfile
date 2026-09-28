@@ -18,9 +18,11 @@ RUN chown -R seagles:seagles /usr/share/nginx/html && \
 
 USER seagles
 
-EXPOSE 80
+# Unprivileged port (see nginx.conf). Binding 80 would require
+# CAP_NET_BIND_SERVICE, which the Kubernetes manifest drops.
+EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/ || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

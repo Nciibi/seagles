@@ -18,6 +18,11 @@ type Config struct {
 	FirmwareAnalyzerToken string
 	JWTSecret           string
 	JWTPrivateKeyFile   string
+	// RequireSharedJWTKey makes the process refuse to start when no signing key
+	// is configured. Set it for any deployment running more than one instance:
+	// an auto-generated key is per-process, so tokens issued by one replica are
+	// rejected by the others.
+	RequireSharedJWTKey bool
 	SlackWebhookURL     string
 	TeamsWebhookURL     string
 	S3Endpoint          string
@@ -69,6 +74,7 @@ func Load() (*Config, error) {
 		FirmwareAnalyzerToken: getEnv("FIRMWARE_ANALYZER_TOKEN", ""),
 		JWTSecret:           getEnv("JWT_SECRET", ""),
 		JWTPrivateKeyFile:   getEnv("JWT_PRIVATE_KEY_FILE", ""),
+		RequireSharedJWTKey: getEnv("REQUIRE_SHARED_JWT_KEY", "") == "true",
 		SlackWebhookURL:     getEnv("SLACK_WEBHOOK_URL", ""),
 		TeamsWebhookURL:     getEnv("TEAMS_WEBHOOK_URL", ""),
 		S3Endpoint:          getEnv("S3_ENDPOINT", ""),

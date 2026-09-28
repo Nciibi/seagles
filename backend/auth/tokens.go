@@ -54,7 +54,25 @@ var (
 	globalKeyPair   *KeyPair
 	globalKeyPairMu sync.RWMutex
 	tokenIssuer     = "seagles"
+
+	// keyIsEphemeral records that the active key pair was generated in-process
+	// rather than loaded from configuration. See UsingEphemeralKey.
+	keyIsEphemeral bool
 )
+
+// UsingEphemeralKey reports whether the signing key was auto-generated instead
+// of loaded from JWT_SECRET / JWT_PRIVATE_KEY_FILE.
+//
+// An ephemeral key is fine for a single local process, but it is invalid for
+// any deployment running more than one instance: every instance generates its
+// own key, so a token minted by one instance fails signature verification on
+// the others, users see intermittent 401s, and every rollout invalidates all
+// sessions. main() uses this to fail fast instead.
+func UsingEphemeralKey() bool {
+	globalKeyPairMu.RLock()
+	defer globalKeyPairMu.RUnlock()
+	return keyIsEphemeral
+}
 
 func LoadOrGenerateKeys(privateKeyPEM string) error {
 	globalKeyPairMu.Lock()
@@ -73,6 +91,7 @@ func LoadOrGenerateKeys(privateKeyPEM string) error {
 			PrivateKey: priv,
 			PublicKey:  &priv.PublicKey,
 		}
+		keyIsEphemeral = false
 		slog.Info("Loaded existing RSA key pair")
 		return nil
 	}
@@ -85,7 +104,11 @@ func LoadOrGenerateKeys(privateKeyPEM string) error {
 		PrivateKey: priv,
 		PublicKey:  &priv.PublicKey,
 	}
-	slog.Info("Generated new RSA key pair")
+	keyIsEphemeral = true
+	slog.Warn("Generated an ephemeral RSA key pair: it is NOT shared with any " +
+		"other instance and is lost on restart. This is only safe for a single " +
+		"local process. Set JWT_SECRET (RSA private key PEM) or " +
+		"JWT_PRIVATE_KEY_FILE for any multi-replica deployment.")
 	return nil
 }
 

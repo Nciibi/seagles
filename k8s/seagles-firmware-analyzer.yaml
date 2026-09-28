@@ -31,6 +31,21 @@ spec:
             - ALL
 
         env:
+        # Root the analyzer resolves stored firmware paths against. It must
+        # point at the same directory the backend writes to: the backend
+        # stages uploads in <claim>/firmware-uploads (see
+        # backend/api/firmware.go) and stores "data/firmware-uploads/<name>"
+        # in the firmware table, which main.py re-roots under FIRMWARE_ROOT.
+        #
+        # This replaces a `subPath: firmware-uploads` mount, which could not
+        # start at all on a fresh claim: the kubelet requires a subPath
+        # directory to already exist and will not create it, so the pod failed
+        # with "MountVolume.SetUp failed: failed to prepare subPath" until the
+        # backend happened to have written there first. Mounting the claim
+        # whole and pointing FIRMWARE_ROOT at the subdirectory removes that
+        # ordering dependency.
+        - name: FIRMWARE_ROOT
+          value: "/firmware/firmware-uploads"
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
@@ -84,14 +99,15 @@ spec:
           failureThreshold: 6
 
         volumeMounts:
+        # The whole claim, not a subPath: see the FIRMWARE_ROOT note above.
         - name: firmware-volume
           mountPath: /firmware
-          subPath: firmware-uploads
           readOnly: true
 
       volumes:
       - name: firmware-volume
         persistentVolumeClaim:
+          # ReadWriteMany: see seagles-pvc.yaml.
           claimName: seagles-data-pvc
 ---
 apiVersion: v1

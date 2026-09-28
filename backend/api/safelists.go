@@ -73,7 +73,7 @@ func CreateSafelistHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req CreateSafelistRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			fail(c, 400, "Invalid request: "+err.Error())
+			failInternal(c, 400, "Invalid request body", err)
 			return
 		}
 
@@ -212,7 +212,7 @@ func CreateScanScopeHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req CreateScanScopeRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			fail(c, 400, "CIDR is required: "+err.Error())
+			failInternal(c, 400, "Invalid request body", err)
 			return
 		}
 
@@ -299,7 +299,7 @@ func CreateWebhookHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req CreateWebhookRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			fail(c, 400, "Invalid request: "+err.Error())
+			failInternal(c, 400, "Invalid request body", err)
 			return
 		}
 
@@ -354,7 +354,7 @@ func TestWebhookHandler(db *sql.DB) gin.HandlerFunc {
 		body, _ := json.Marshal(testPayload)
 		resp, err := http.Post(webhookURL, "application/json", bytes.NewReader(body))
 		if err != nil {
-			fail(c, 502, "Failed to send test webhook: "+err.Error())
+			failInternal(c, 502, "Failed to send test webhook", err)
 			return
 		}
 		resp.Body.Close()

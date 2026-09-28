@@ -118,7 +118,7 @@ func TriggerDeviceScanHandler(db *sql.DB, cfg *config.Config, kevCatalog *kev.KE
 		// bound, so scan_type / profile_id were silently ignored.
 		var req TriggerScanRequest
 		if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
-			fail(c, 400, "Invalid request body: "+err.Error())
+			failInternal(c, 400, "Invalid request body", err)
 			return
 		}
 		scanType := req.ScanType

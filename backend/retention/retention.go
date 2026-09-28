@@ -9,14 +9,31 @@ import (
 	"github.com/Nciibi/seagles/slog"
 )
 
-func StartRetentionJob(db *sql.DB, cfg *config.Config) {
-	ticker := time.NewTicker(24 * time.Hour)
+// retentionInterval is how often the purge runs after the initial pass.
+const retentionInterval = 24 * time.Hour
+
+// StartRetentionJob purges expired rows once at startup and then on a daily
+// interval until stop is closed.
+//
+// The stop channel is required: main() waits on this goroutine during
+// graceful shutdown, so a loop that only ranged over ticker.C would never
+// return and wg.Wait() would block forever. The container would then be
+// SIGKILLed at the end of its termination grace period, dropping any scan,
+// alert dispatch or webhook retry still in flight.
+func StartRetentionJob(db *sql.DB, cfg *config.Config, stop <-chan struct{}) {
+	ticker := time.NewTicker(retentionInterval)
 	defer ticker.Stop()
 
 	runOnce(db, cfg)
 
-	for range ticker.C {
-		runOnce(db, cfg)
+	for {
+		select {
+		case <-stop:
+			slog.Info("Retention job stopped")
+			return
+		case <-ticker.C:
+			runOnce(db, cfg)
+		}
 	}
 }
 

@@ -374,7 +374,9 @@ func ChangePasswordHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		_, err = db.Exec(`UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2`, newHash, userID)
+		// Clear the rotation flag: this is the first time the operator has chosen
+		// their own password, so the deployment is no longer on a known credential.
+		_, err = db.Exec(`UPDATE users SET password_hash = $1, must_change_password = FALSE, updated_at = NOW() WHERE id = $2`, newHash, userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Failed to update password"})
 			return
@@ -635,5 +637,45 @@ func ListUsersHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, gin.H{"data": users, "error": nil})
+	}
+}
+
+// RequirePasswordChange refuses every request except the endpoints an account
+// needs in order to change its password. It is applied to the protected route
+// group after AuthMiddleware.
+//
+// The flag travels in the JWT rather than being read from the database on each
+// request, so the check costs nothing. The trade-off is that a flag set after
+// the token was minted is not observed until the next login; that is why
+// ChangePasswordHandler revokes all sessions when it clears the flag, forcing
+// re-authentication with a fresh token.
+func RequirePasswordChange() gin.HandlerFunc {
+	// Paths a user must still reach while rotation is pending.
+	allowed := map[string]bool{
+		"/api/v1/auth/change-password": true,
+		"/api/v1/auth/me":              true,
+		"/api/v1/auth/logout":          true,
+		"/api/v1/auth/permissions":     true,
+	}
+
+	return func(c *gin.Context) {
+		user, exists := c.Get("user")
+		if !exists {
+			c.Next()
+			return
+		}
+		u, ok := user.(User)
+		if !ok || !u.MustChangePassword {
+			c.Next()
+			return
+		}
+		if allowed[c.Request.URL.Path] {
+			c.Next()
+			return
+		}
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+			"data":  nil,
+			"error": "Password change required before using this endpoint",
+		})
 	}
 }

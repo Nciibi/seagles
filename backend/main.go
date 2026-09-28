@@ -16,9 +16,9 @@ import (
 	"github.com/Nciibi/seagles/config"
 	"github.com/Nciibi/seagles/db"
 	"github.com/Nciibi/seagles/kev"
+	"github.com/Nciibi/seagles/retention"
 	"github.com/Nciibi/seagles/scanner"
 	"github.com/Nciibi/seagles/slog"
-	"github.com/Nciibi/seagles/retention"
 )
 
 // drainTimeout is how long in-flight HTTP requests get to finish after

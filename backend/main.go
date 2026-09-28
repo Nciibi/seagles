@@ -21,6 +21,11 @@ import (
 	"github.com/Nciibi/seagles/retention"
 )
 
+// drainTimeout is how long in-flight HTTP requests get to finish after
+// SIGTERM. Kubernetes' terminationGracePeriodSeconds must exceed this (the
+// backend manifest sets 45s) so the process is never SIGKILLed mid-drain.
+const drainTimeout = 30 * time.Second
+
 func main() {
 	cfg, err := config.Load()
 	if err != nil {

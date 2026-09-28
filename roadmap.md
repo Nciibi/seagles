@@ -142,7 +142,7 @@
 **Files:** `backend/api/swagger.json`, `backend/api/swagger.go`, `docs/api.md`
 
 ### 4.6 Developer Documentation
-- [x] Architecture Decision Records (`docs/adr.md` — 9 ADRs)
+- [x] Architecture Decision Records (`docs/adr.md` — 22 ADRs)
 - [x] Codebase walkthrough (`docs/architecture.md`)
 - [x] Troubleshooting guide (`docs/troubleshooting.md`)
 - [x] Development setup guide (`docs/setup.md`)

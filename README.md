@@ -56,6 +56,9 @@ open http://localhost:3000
 
 Default credentials: `admin` / `changeme`
 
+The first login is forced to change that password before any other endpoint can
+be used, so the deployment never sits on a published credential.
+
 Trigger your first network scan:
 
 ```bash
@@ -180,7 +183,7 @@ See `.env.example` for the complete list.
 | [docs/api.md](docs/api.md) | Complete API reference with request/response schemas |
 | [docs/architecture.md](docs/architecture.md) | Architecture diagrams, data flow, middleware chain |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Common issues and solutions |
-| [docs/adr.md](docs/adr.md) | Architecture Decision Records (15 decisions) |
+| [docs/adr.md](docs/adr.md) | Architecture Decision Records (22 decisions) |
 | [CHANGELOG.md](CHANGELOG.md) | Release history and version tracking |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute code |
 | [SECURITY.md](SECURITY.md) | Vulnerability disclosure policy |

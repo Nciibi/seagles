@@ -132,6 +132,9 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 
 		protected := v1.Group("")
 		protected.Use(auth.AuthMiddleware())
+		// Accounts still on their initial password may only reach the
+		// endpoints needed to change it. Must run after AuthMiddleware.
+		protected.Use(auth.RequirePasswordChange())
 		{
 			protected.GET("/ws", WSHandler(cfg.AllowedOrigins))
 			protected.GET("/auth/me", auth.MeHandler())

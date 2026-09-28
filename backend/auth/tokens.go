@@ -43,6 +43,9 @@ type Claims struct {
 	TokenType TokenType `json:"type"`
 	IAT       int64     `json:"iat"`
 	Exp       int64     `json:"exp"`
+	// MustChangePassword is copied from the User so RequirePasswordChange can
+	// gate endpoints without a database round trip.
+	MustChangePassword bool `json:"mcp,omitempty"`
 }
 
 type SignedToken struct {
@@ -299,10 +302,11 @@ func ValidateAccessToken(tokenStr string) (*User, error) {
 	}
 
 	return &User{
-		ID:       claims.Sub,
-		Username: claims.Name,
-		Role:     claims.Role,
-		TokenID:  claims.JTI,
+		ID:                 claims.Sub,
+		Username:           claims.Name,
+		Role:               claims.Role,
+		TokenID:            claims.JTI,
+		MustChangePassword: claims.MustChangePassword,
 	}, nil
 }
 

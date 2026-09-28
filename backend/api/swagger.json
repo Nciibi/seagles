@@ -133,6 +133,7 @@
       "post": {
         "tags": ["Auth"],
         "summary": "Authenticate user",
+        "security": [],
         "requestBody": {
           "required": true,
           "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } }
@@ -147,6 +148,7 @@
       "post": {
         "tags": ["Auth"],
         "summary": "Refresh access token",
+        "security": [],
         "requestBody": {
           "required": true,
           "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RefreshRequest" } } }
@@ -207,8 +209,32 @@
       "get": {
         "tags": ["System"],
         "summary": "Health check",
+        "security": [],
         "responses": {
           "200": { "description": "Service is healthy" }
+        }
+      }
+    },
+    "/livez": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Liveness probe (process only, no dependency checks)",
+        "security": [],
+        "description": "Returns 200 as long as the HTTP server is serving. Performs no database query and no dependency check, so a PostgreSQL, Redis, MinIO or firmware-analyzer outage cannot cause an orchestrator to restart healthy pods. This is the endpoint the Kubernetes livenessProbe and startupProbe target.",
+        "responses": {
+          "200": { "description": "Process is alive" }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Readiness probe (database-gated)",
+        "security": [],
+        "description": "Returns 200 when the pod can serve traffic and 503 when the database is unreachable. Unreachable optional dependencies (Redis, MinIO, firmware analyzer) are reported in the body via the degraded and unavailable fields but deliberately do NOT fail readiness, so a partial outage does not remove every pod from service. This is the endpoint the Kubernetes readinessProbe targets.",
+        "responses": {
+          "200": { "description": "Ready to serve traffic" },
+          "503": { "description": "Database unreachable; not serving" }
         }
       }
     },

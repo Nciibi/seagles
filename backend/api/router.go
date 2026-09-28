@@ -6,14 +6,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/Nciibi/seagles/auth"
 	"github.com/Nciibi/seagles/config"
-	"github.com/Nciibi/seagles/kev"
 	dbpkg "github.com/Nciibi/seagles/db"
+	"github.com/Nciibi/seagles/kev"
 	"github.com/Nciibi/seagles/middleware"
 	"github.com/Nciibi/seagles/slog"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 func success(c *gin.Context, data interface{}) {
@@ -22,16 +22,6 @@ func success(c *gin.Context, data interface{}) {
 
 func fail(c *gin.Context, status int, msg string) {
 	c.JSON(status, gin.H{"data": nil, "error": msg})
-}
-
-type HealthStatus struct {
-	Status  string `json:"status"`
-	Service string `json:"service"`
-	Version string `json:"version"`
-	DBOK    bool   `json:"db_ok"`
-	RedisOK bool   `json:"redis_ok"`
-	MinIOOK bool   `json:"minio_ok"`
-	FAOK    bool   `json:"fa_ok"`
 }
 
 func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.Engine {
@@ -115,7 +105,8 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 	r.Use(middleware.RateLimitMiddleware(rl))
 	r.Use(middleware.MetricsMiddleware())
 	r.Use(middleware.SanitizeInput(middleware.DefaultXSSConfig))
-	r.Use(middleware.AuditLogger(db, "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/health", "/api/v1/ws"))
+	r.Use(middleware.AuditLogger(db, "/api/v1/auth/login", "/api/v1/auth/refresh",
+		"/api/v1/health", "/api/v1/livez", "/api/v1/readyz", "/api/v1/ws"))
 
 	v1 := r.Group("/api/v1")
 	{
@@ -126,52 +117,18 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 		v1.GET("/swagger.json", SwaggerJSONHandler())
 		v1.GET("/docs", SwaggerUIHandler())
 
-		v1.GET("/health", func(c *gin.Context) {
-			dbOk := dbpkg.IsHealthy()
-			allOk := true
-			if !dbOk {
-				allOk = false
-			}
+		// One shared probe instance so /health and /readyz share the same
+		// dependency cache instead of each opening its own connections.
+		deps := &depProbe{}
 
-			hs := HealthStatus{
-				Status:  "ok",
-				Service: "seagles-api",
-				Version: "2.1.0",
-				DBOK:    dbOk,
-				RedisOK: cfg.RedisURL == "",
-				MinIOOK: cfg.S3Endpoint == "",
-				FAOK:    cfg.FirmwareAnalyzerURL == "",
-			}
-
-			if cfg.RedisURL != "" {
-				hs.RedisOK = middleware.CheckRedis(cfg.RedisURL)
-				if !hs.RedisOK {
-					allOk = false
-				}
-			}
-			if cfg.S3Endpoint != "" {
-				hs.MinIOOK = middleware.CheckMinIO(cfg.S3Endpoint)
-				if !hs.MinIOOK {
-					allOk = false
-				}
-			}
-			if cfg.FirmwareAnalyzerURL != "" {
-				hs.FAOK = middleware.CheckFirmwareAnalyzer(cfg.FirmwareAnalyzerURL)
-				if !hs.FAOK {
-					allOk = false
-				}
-			}
-
-			if !allOk {
-				hs.Status = "degraded"
-			}
-
-			statusCode := http.StatusOK
-			if !dbOk {
-				statusCode = http.StatusServiceUnavailable
-			}
-			c.JSON(statusCode, hs)
-		})
+		// Liveness: process only, no dependency checks. Never restart the pod
+		// because a downstream service is down.
+		v1.GET("/livez", LivezHandler())
+		// Readiness: gated on the database, reports optional-dependency
+		// degradation without failing.
+		v1.GET("/readyz", ReadyzHandler(cfg, deps, dbpkg.IsHealthy))
+		// Full diagnostics for operators and the container HEALTHCHECK.
+		v1.GET("/health", HealthHandler(cfg, deps, dbpkg.IsHealthy))
 
 		protected := v1.Group("")
 		protected.Use(auth.AuthMiddleware())

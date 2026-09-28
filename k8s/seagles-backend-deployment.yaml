@@ -25,10 +25,11 @@ spec:
       - name: seagles-backend
         image: your-registry.com/seagles-backend:v2.0.0
         ports:
+        # The API serves both the REST surface and the Prometheus exposition
+        # (/api/v1/metrics) from a single listener on PORT (8080). There is no
+        # separate metrics listener, so no 9090 containerPort is declared.
         - containerPort: 8080
           name: http
-        - containerPort: 9090
-          name: metrics
 
         securityContext:
           allowPrivilegeEscalation: false
@@ -81,32 +82,43 @@ spec:
             cpu: 1
             memory: 512Mi
 
+        # Liveness: process-only endpoint. It performs no database query and no
+        # dependency check, so a PostgreSQL/Redis/MinIO outage can never make
+        # kubelet restart otherwise-healthy pods (which would turn a partial
+        # outage into a total one).
         livenessProbe:
           httpGet:
-            path: /health
+            path: /api/v1/livez
             port: http
-          initialDelaySeconds: 15
           periodSeconds: 20
-          timeoutSeconds: 5
+          timeoutSeconds: 3
           failureThreshold: 3
 
+        # Readiness: gated on the database. Optional dependencies that are down
+        # are reported as degraded in the body but do not fail the check.
         readinessProbe:
           httpGet:
-            path: /health
+            path: /api/v1/readyz
             port: http
-          initialDelaySeconds: 5
           periodSeconds: 10
           timeoutSeconds: 3
-          failureThreshold: 2
+          failureThreshold: 3
 
+        # Startup: /api/v1/livez succeeds as soon as the HTTP server is bound,
+        # so this gates initialisation (migrations, RSA key load) without
+        # waiting on dependencies.
         startupProbe:
           httpGet:
-            path: /health
+            path: /api/v1/livez
             port: http
-          initialDelaySeconds: 3
           periodSeconds: 5
           timeoutSeconds: 3
-          failureThreshold: 12
+          failureThreshold: 30
+
+        # main.go drains for up to 30s on SIGTERM. Kubernetes' default grace
+        # period is also 30s, so the container would be SIGKILLed at the exact
+        # moment the drain expires. Allow headroom above the drain timeout.
+        terminationGracePeriodSeconds: 45
 
         volumeMounts:
         - name: tmp-volume

@@ -48,7 +48,7 @@ func TestRunOnce_PurgesAllTables(t *testing.T) {
 	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM audit_log WHERE created_at < NOW() - make_interval(days => $1)")).
 		WithArgs(90).
 		WillReturnResult(sqlmock.NewResult(0, 10))
-	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM webhook_deliveries WHERE created_at < NOW() - make_interval(days => $1)")).
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM webhook_deliveries WHERE delivered_at < NOW() - make_interval(days => $1)")).
 		WithArgs(14).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 

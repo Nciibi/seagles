@@ -163,6 +163,8 @@ Permissions follow the pattern `<resource>:<action>`. Admins get `<resource>:*` 
 | DELETE /sessions/:id | ✗ | ✗ | ✗ | ✓ |
 | GET /stats | ✓ | ✓ | ✓ | ✓ |
 | GET /health | Public | Public | Public | Public |
+| GET /livez | Public | Public | Public | Public |
+| GET /readyz | Public | Public | Public | Public |
 | GET /kev/status | ✓ | ✓ | ✓ | ✓ |
 | GET /metrics | Public | Public | Public | Public |
 | GET /swagger.json | Public | Public | Public | Public |
@@ -726,7 +728,9 @@ Returns the role, permission list, and hierarchy level for the current user.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/health` | Public | Health check — returns DB + service status |
+| GET | `/health` | Public | Detailed health — DB + dependency status (`degraded` on partial outage) |
+| GET | `/livez` | Public | Liveness — process only, no dependency checks |
+| GET | `/readyz` | Public | Readiness — 503 when the database is unreachable |
 | GET | `/stats` | Authenticated | Dashboard statistics (counts, averages) |
 | GET | `/kev/status` | Authenticated | CISA KEV catalog update status |
 
@@ -752,10 +756,59 @@ Returns the role, permission list, and hierarchy level for the current user.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/health` | Health check — returns DB + service status |
+| GET | `/health` | Detailed health — DB + dependency status (`degraded` on partial outage) |
+| GET | `/livez` | Liveness — process only, no dependency checks |
+| GET | `/readyz` | Readiness — 503 when the database is unreachable |
 | GET | `/metrics` | Prometheus metrics endpoint |
 | GET | `/swagger.json` | OpenAPI 3.0 specification |
 | GET | `/docs` | Swagger UI documentation explorer |
+
+### Orchestrator probe endpoints
+
+`/livez`, `/readyz` and `/health` are deliberately separate, and each is used
+by a different consumer:
+
+| Endpoint | Checks | Returns non-2xx when | Used by |
+|----------|--------|----------------------|---------|
+| `/api/v1/livez` | Nothing — process is serving | Never (always 200) | Kubernetes `livenessProbe`, `startupProbe` |
+| `/api/v1/readyz` | Database only | Database unreachable (503) | Kubernetes `readinessProbe` |
+| `/api/v1/health` | Database + Redis + MinIO + firmware analyzer | Database unreachable (503) | Container `HEALTHCHECK`, operator diagnostics |
+
+Liveness never inspects a dependency, so a database, Redis, MinIO or
+firmware-analyzer outage cannot make Kubernetes restart healthy pods.
+
+Readiness fails only on the database. Optional dependencies that are down are
+reported in the body but do not fail the check, so a partial outage does not
+remove every pod from service and turn a degraded system into a fully
+unavailable one.
+
+**Response (GET /api/v1/readyz) — ready, one optional dependency down:**
+```json
+{
+  "status": "ready",
+  "service": "seagles-api",
+  "db_ok": true,
+  "degraded": true,
+  "unavailable": { "firmware_analyzer": true }
+}
+```
+
+**Response (GET /api/v1/readyz) — not ready (HTTP 503):**
+```json
+{
+  "status": "not_ready",
+  "service": "seagles-api",
+  "db_ok": false,
+  "degraded": false
+}
+```
+
+> **Note:** the probe paths are a contract between the Go routes and files Go
+> does not compile — `k8s/seagles-backend-deployment.yaml`, `backend/Dockerfile`
+> and `docker-compose.yml`. There is no root-level `/health`; the only health
+> route is `/api/v1/health`. Changing a probe path requires updating all of
+> those files in the same change, and `backend/api/health_test.go` asserts the
+> routes are registered.
 
 **Response (GET /swagger.json):**
 ```json

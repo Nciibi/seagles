@@ -12,10 +12,8 @@ spec:
     targetPort: http
     protocol: TCP
     name: http
-  - port: 9090
-    targetPort: metrics
-    protocol: TCP
-    name: metrics
+  # /api/v1/metrics is served by the same 8080 listener; there is no separate
+  # metrics port to route.
   selector:
     app: seagles-backend
 ---

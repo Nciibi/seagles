@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	_ "github.com/lib/pq"
 	"github.com/Nciibi/seagles/slog"
+	_ "github.com/lib/pq"
 )
 
 type DBMonitor struct {
@@ -107,35 +107,148 @@ func Connect(databaseURL string, maxOpenConns, maxIdleConns int, connMaxLifetime
 	return db
 }
 
-func RunMigrations(db *sql.DB) {
-	migrationsDir := findMigrationsDir()
-	entries, err := os.ReadDir(migrationsDir)
+// Migration is a single numbered SQL file on disk.
+type Migration struct {
+	Version  string
+	Path     string
+	Content  string
+	Checksum string
+}
+
+// DiscoverMigrations reads every *.sql file in dir, in lexical order. The
+// files are zero-padded (001_, 015_), so lexical order is apply order.
+func DiscoverMigrations(dir string) ([]Migration, error) {
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		slog.Fatal("Failed to read migrations directory", "path", migrationsDir, "error", err.Error())
+		return nil, fmt.Errorf("read migrations directory %s: %w", dir, err)
 	}
 
-	var sqlFiles []string
+	var out []Migration
 	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".sql") {
-			sqlFiles = append(sqlFiles, entry.Name())
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
+			continue
 		}
-	}
-	sort.Strings(sqlFiles)
-
-	for _, file := range sqlFiles {
-		filePath := filepath.Join(migrationsDir, file)
-		content, err := os.ReadFile(filePath)
+		content, err := os.ReadFile(filepath.Join(dir, entry.Name()))
 		if err != nil {
-			slog.Fatal("Failed to read migration file", "file", file, "error", err.Error())
+			return nil, fmt.Errorf("read migration %s: %w", entry.Name(), err)
+		}
+		sum := sha256.Sum256(content)
+		out = append(out, Migration{
+			Version:  entry.Name(),
+			Path:     filepath.Join(dir, entry.Name()),
+			Content:  string(content),
+			Checksum: hex.EncodeToString(sum[:]),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Version < out[j].Version })
+	return out, nil
+}
+
+const migrationTableDDL = `
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version    TEXT PRIMARY KEY,
+    checksum   TEXT NOT NULL,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`
+
+func ensureMigrationTable(db *sql.DB) error {
+	if _, err := db.Exec(migrationTableDDL); err != nil {
+		return fmt.Errorf("create schema_migrations: %w", err)
+	}
+	return nil
+}
+
+func appliedMigrations(db *sql.DB) (map[string]string, error) {
+	rows, err := db.Query(`SELECT version, checksum FROM schema_migrations`)
+	if err != nil {
+		return nil, fmt.Errorf("read schema_migrations: %w", err)
+	}
+	defer rows.Close()
+
+	out := make(map[string]string)
+	for rows.Next() {
+		var version, checksum string
+		if err := rows.Scan(&version, &checksum); err != nil {
+			return nil, fmt.Errorf("scan schema_migrations: %w", err)
+		}
+		out[version] = checksum
+	}
+	return out, rows.Err()
+}
+
+// RunMigrations applies every migration that has not been applied yet, each in
+// its own transaction, and records it in schema_migrations.
+//
+// Why this exists: the previous implementation re-executed every file on every
+// boot and relied entirely on each file being individually idempotent. That is
+// fragile now that migrations are non-trivial. Two concrete failures observed
+// against PostgreSQL 16 while adding tenant scoping:
+//
+//  1. A migration that fails part-way leaves earlier statements committed,
+//     because psql-style multi-statement Exec is not atomic. Re-running then
+//     executes a file whose preconditions a previous partial run destroyed.
+//  2. Migration 015 replaces the global unique constraint on users.username
+//     with a tenant-scoped one. Re-running 006 afterwards fails with
+//     "there is no unique or exclusion constraint matching the ON CONFLICT
+//     specification", so the database could not be migrated at all.
+//
+// Applying each file exactly once, transactionally, removes both failure
+// modes and makes the applied set auditable in the database itself.
+func RunMigrations(db *sql.DB) error {
+	migrationsDir := findMigrationsDir()
+	migrations, err := DiscoverMigrations(migrationsDir)
+	if err != nil {
+		return err
+	}
+
+	if err := ensureMigrationTable(db); err != nil {
+		return err
+	}
+
+	applied, err := appliedMigrations(db)
+	if err != nil {
+		return err
+	}
+
+	for _, m := range migrations {
+		if prev, ok := applied[m.Version]; ok {
+			if prev != m.Checksum {
+				return fmt.Errorf(
+					"migration %s was modified after it was applied "+
+						"(recorded checksum %s, file checksum %s); "+
+						"add a new migration instead of editing an applied one",
+					m.Version, prev[:12], m.Checksum[:12])
+			}
+			continue
 		}
 
-		slog.Info("Running migration", "file", file)
-		if _, err := db.Exec(string(content)); err != nil {
-			slog.Fatal("Migration failed", "file", file, "error", err.Error())
+		slog.Info("Running migration", "file", m.Version)
+
+		tx, err := db.Begin()
+		if err != nil {
+			return fmt.Errorf("begin migration %s: %w", m.Version, err)
+		}
+
+		if _, err := tx.Exec(m.Content); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("migration %s failed: %w", m.Version, err)
+		}
+
+		if _, err := tx.Exec(
+			`INSERT INTO schema_migrations (version, checksum) VALUES ($1, $2)`,
+			m.Version, m.Checksum,
+		); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("record migration %s: %w", m.Version, err)
+		}
+
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("commit migration %s: %w", m.Version, err)
 		}
 	}
 
-	slog.Info("All migrations completed successfully")
+	slog.Info("Migrations up to date", "count", len(migrations))
+	return nil
 }
 
 func findMigrationsDir() string {

@@ -106,7 +106,9 @@ func main() {
 	database := db.Connect(cfg.DatabaseURL, cfg.DBMaxOpenConns, cfg.DBMaxIdleConns, cfg.DBConnMaxLifetime)
 	defer database.Close()
 
-	db.RunMigrations(database)
+	if err := db.RunMigrations(database); err != nil {
+		log.Fatalf("Database migration failed: %v", err)
+	}
 
 	var wg sync.WaitGroup
 

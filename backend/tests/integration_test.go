@@ -15,12 +15,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"github.com/Nciibi/seagles/api"
 	"github.com/Nciibi/seagles/auth"
 	"github.com/Nciibi/seagles/config"
 	"github.com/Nciibi/seagles/db"
 	"github.com/Nciibi/seagles/kev"
+	"github.com/gin-gonic/gin"
 )
 
 var (
@@ -45,7 +45,9 @@ func TestMain(m *testing.M) {
 
 	auth.SetJWTSecret(testCfg.JWTSecret)
 	testDB = db.Connect(testCfg.DatabaseURL, testCfg.DBMaxOpenConns, testCfg.DBMaxIdleConns, testCfg.DBConnMaxLifetime)
-	db.RunMigrations(testDB)
+	if err := db.RunMigrations(testDB); err != nil {
+		panic("Failed to run migrations: " + err.Error())
+	}
 
 	kevCatalog := kev.StartKEVUpdater("../../data/cisa-kev.json")
 	testRouter = api.NewRouter(testDB, testCfg, kevCatalog)
@@ -108,10 +110,10 @@ func TestLoginEndpoint(t *testing.T) {
 
 	var resp struct {
 		Data struct {
-			Token        string      `json:"token"`
-			ExpiresIn    int64       `json:"expires_in"`
-			RefreshToken string      `json:"refresh_token"`
-			User         auth.User   `json:"user"`
+			Token        string    `json:"token"`
+			ExpiresIn    int64     `json:"expires_in"`
+			RefreshToken string    `json:"refresh_token"`
+			User         auth.User `json:"user"`
 		} `json:"data"`
 		Error interface{} `json:"error"`
 	}

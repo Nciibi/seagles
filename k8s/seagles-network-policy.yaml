@@ -1,3 +1,32 @@
+# Seagles network policies.
+#
+# Apply order does not matter: NetworkPolicy rules are additive allow-lists,
+# so a pod may reach a destination if ANY policy selects it and ANY rule in
+# that policy allows the traffic. Nothing here denies by omission unless a
+# pod is selected by a policy with that policyType.
+#
+# The three policies below are the first three layers. The deny-all baseline
+# that follows selects every pod in the namespace and, because it lists no
+# rules, isolates anything not explicitly allowed above.
+#
+# ---------------------------------------------------------------------------
+# SCAN TARGET CIDR — READ BEFORE DEPLOYING
+# ---------------------------------------------------------------------------
+# Seagles is a network scanner. The backend pod must be able to open TCP
+# connections to the networks an operator has authorised for scanning,
+# otherwise every probe fails and the product reports an empty network.
+#
+# The previous version of this file allowed egress only to 0.0.0.0/0 on
+# ports 80 and 443 with all RFC1918 space excluded. In Kubernetes that meant
+# Seagles could reach nothing except public web servers: no SSH (22), Telnet
+# (23), Modbus (502), RTSP (554), MQTT (1883), ADB (5555) or BACnet (47808).
+# The core product was inoperable.
+#
+# Change SCAN_TARGET_CIDR below to the network you are authorised to scan, and
+# keep NETWORK_CIDR in the backend Deployment consistent with it. Scan only
+# networks you own or have written permission to test.
+# ---------------------------------------------------------------------------
+
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -22,8 +51,52 @@ spec:
     - port: 8080
       protocol: TCP
   egress:
+  # --- Authorised scan targets -------------------------------------------
+  # One rule per CIDR. The port list is the exact union of every port the
+  # scanner dials, taken from the code:
+  #   nmap -p            scanner/nmap.go
+  #   DetectProtocols    scanner/protocols.go (23, 5555, 1883, 502, 554, 8443, 8883)
+  #   credential tests   api/scans.go (22, 23, 80)
+  #   TLS check          api/scans.go (443)
   - to:
-    - namespaceSelector: {}
+    - ipBlock:
+        cidr: 192.168.1.0/24
+    ports:
+    - port: 22
+      protocol: TCP
+    - port: 23
+      protocol: TCP
+    - port: 80
+      protocol: TCP
+    - port: 443
+      protocol: TCP
+    - port: 502
+      protocol: TCP
+    - port: 554
+      protocol: TCP
+    - port: 1883
+      protocol: TCP
+    - port: 1884
+      protocol: TCP
+    - port: 5555
+      protocol: TCP
+    - port: 8080
+      protocol: TCP
+    - port: 8443
+      protocol: TCP
+    - port: 8883
+      protocol: TCP
+    - port: 47808
+      protocol: TCP
+
+  # --- Datastores ---------------------------------------------------------
+  # Scoped to the namespace that actually runs them. A bare
+  # "namespaceSelector: {}" would match a pod labelled app=postgresql in ANY
+  # namespace in the cluster.
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: storage
       podSelector:
         matchLabels:
           app: postgresql
@@ -31,7 +104,9 @@ spec:
     - port: 5432
       protocol: TCP
   - to:
-    - namespaceSelector: {}
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: storage
       podSelector:
         matchLabels:
           app: redis
@@ -39,13 +114,17 @@ spec:
     - port: 6379
       protocol: TCP
   - to:
-    - namespaceSelector: {}
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: storage
       podSelector:
         matchLabels:
           app: minio
     ports:
     - port: 9000
       protocol: TCP
+
+  # --- Firmware analyzer --------------------------------------------------
   - to:
     - podSelector:
         matchLabels:
@@ -53,6 +132,11 @@ spec:
     ports:
     - port: 8001
       protocol: TCP
+
+  # --- Threat intelligence feeds (NVD, CISA KEV, EPSS) ---------------------
+  # Public HTTPS only. All RFC1918 space stays excluded here so this rule can
+  # never become a back door to internal networks; internal access is granted
+  # explicitly by the scan-target and datastore rules above.
   - to:
     - ipBlock:
         cidr: 0.0.0.0/0
@@ -65,14 +149,22 @@ spec:
       protocol: TCP
     - port: 80
       protocol: TCP
+
+  # --- DNS ----------------------------------------------------------------
+  # TCP/53 is required as well as UDP/53: responses larger than a UDP datagram
+  # fall back to TCP, and without it large records are silently truncated.
   - ports:
-      - port: 53
-        protocol: UDP
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP
     to:
-      - namespaceSelector: {}
-        podSelector:
-          matchLabels:
-            k8s-app: kube-dns
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -92,7 +184,9 @@ spec:
         matchLabels:
           kubernetes.io/metadata.name: ingress-nginx
     ports:
-    - port: 80
+    # The container listens on 8080 (unprivileged, see frontend/nginx.conf).
+    # Allowing 80 here blocked all ingress once the port was changed.
+    - port: 8080
       protocol: TCP
   egress:
   - to:
@@ -103,13 +197,17 @@ spec:
     - port: 8080
       protocol: TCP
   - ports:
-      - port: 53
-        protocol: UDP
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP
     to:
-      - namespaceSelector: {}
-        podSelector:
-          matchLabels:
-            k8s-app: kube-dns
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -133,7 +231,9 @@ spec:
       protocol: TCP
   egress:
   - to:
-    - namespaceSelector: {}
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: storage
       podSelector:
         matchLabels:
           app: postgresql
@@ -153,10 +253,32 @@ spec:
     - port: 80
       protocol: TCP
   - ports:
-      - port: 53
-        protocol: UDP
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP
     to:
-      - namespaceSelector: {}
-        podSelector:
-          matchLabels:
-            k8s-app: kube-dns
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+---
+# Deny-all baseline. An empty podSelector matches every pod in the namespace
+# and, with both policyTypes set and no rules, isolates anything the policies
+# above do not explicitly allow.
+#
+# Without this, any other workload in the security-tools namespace is
+# completely unrestricted, even though docs/setup.md described the policies as
+# "deny-all default".
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: security-tools
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress

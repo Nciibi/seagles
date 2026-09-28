@@ -18,7 +18,7 @@ COPY . .
 # which the runtime stage provides.
 RUN CGO_ENABLED=1 GOOS=linux go build -trimpath -o seagles .
 
-FROM alpine:3.19
+FROM alpine:3.24
 RUN apk add --no-cache nmap ca-certificates tzdata libpcap
 
 RUN addgroup -S seagles && adduser -S -G seagles seagles

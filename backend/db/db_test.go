@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
-	"regexp"
 	"testing"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
@@ -88,4 +87,3 @@ func TestFindMigrationsDir_CWDRelativeFallback(t *testing.T) {
 		t.Errorf("findMigrationsDir() = %q, want %q", got, fallback)
 	}
 }
-

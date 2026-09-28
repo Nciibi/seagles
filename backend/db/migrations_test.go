@@ -2,7 +2,6 @@ package db
 
 import (
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
 	"os"
 	"path/filepath"
@@ -212,7 +211,7 @@ func TestRunMigrations_MissingDirectory(t *testing.T) {
 // The real migration set must be internally consistent: the tenant-scoping
 // migration relies on the tables earlier ones create.
 func TestDiscoverMigrations_RealSetIsOrdered(t *testing.T) {
-	dir := filepath.Join("..", "..", "db", "migrations")
+	dir := filepath.Join("..", "db", "migrations")
 	if _, err := os.Stat(dir); err != nil {
 		t.Skipf("migrations not found at %s: %v", dir, err)
 	}
@@ -244,7 +243,7 @@ func TestDiscoverMigrations_RealSetIsOrdered(t *testing.T) {
 // this; the new one does not need it for correctness, but a file that is not
 // idempotent will still fail for anyone who applies migrations by hand.
 func TestRealMigrations_AreIdempotentSafe(t *testing.T) {
-	dir := filepath.Join("..", "..", "db", "migrations")
+	dir := filepath.Join("..", "db", "migrations")
 	if _, err := os.Stat(dir); err != nil {
 		t.Skipf("migrations not found: %v", err)
 	}
@@ -295,5 +294,3 @@ func trimSpace(s string) string {
 	}
 	return s[start:end]
 }
-
-var _ = sql.ErrNoRows

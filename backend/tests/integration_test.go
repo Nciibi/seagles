@@ -57,6 +57,20 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// csrfToken fetches a fresh CSRF token. Tokens are single-use, so every
+// unsafe request needs its own.
+//
+// Unauthenticated unsafe requests (POST /auth/login, POST /auth/refresh) are
+// NOT covered by the Bearer exemption in CSRFMiddleware, so they must present
+// a token. The test helper acquired tokens implicitly via any safe request,
+// which is how the frontend behaves.
+func csrfToken() string {
+	req := httptest.NewRequest("GET", "/api/v1/health", nil)
+	w := httptest.NewRecorder()
+	testRouter.ServeHTTP(w, req)
+	return w.Header().Get("X-CSRF-Token")
+}
+
 func request(method, path string, body interface{}, token string) *httptest.ResponseRecorder {
 	var reqBody []byte
 	if body != nil {
@@ -67,6 +81,11 @@ func request(method, path string, body interface{}, token string) *httptest.Resp
 	req.Header.Set("Content-Type", "application/json")
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
+	} else if method != "GET" && method != "HEAD" && method != "OPTIONS" {
+		// No Bearer token, so the CSRF exemption does not apply.
+		if tok := csrfToken(); tok != "" {
+			req.Header.Set("X-CSRF-Token", tok)
+		}
 	}
 
 	w := httptest.NewRecorder()
@@ -80,21 +99,20 @@ func TestHealthEndpoint(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 
+	// /health returns the HealthStatus object directly; it is not wrapped in
+	// the {"data": ...} envelope used by the rest of the API.
 	var resp struct {
-		Data struct {
-			Status  string `json:"status"`
-			Service string `json:"service"`
-			DBOK    bool   `json:"db_ok"`
-		} `json:"data"`
-		Error interface{} `json:"error"`
+		Status  string `json:"status"`
+		Service string `json:"service"`
+		DBOK    bool   `json:"db_ok"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
-	if resp.Data.Status != "ok" {
-		t.Fatalf("expected status=ok, got %s", resp.Data.Status)
+	if resp.Status != "ok" {
+		t.Fatalf("expected status=ok, got %q (body: %s)", resp.Status, w.Body.String())
 	}
-	if !resp.Data.DBOK {
+	if !resp.DBOK {
 		t.Fatal("expected db_ok=true")
 	}
 }

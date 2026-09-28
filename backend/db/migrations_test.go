@@ -260,10 +260,13 @@ func TestRealMigrations_NoUnguardedAddConstraint(t *testing.T) {
 		t.Fatalf("DiscoverMigrations: %v", err)
 	}
 
+	// A constraint name is an identifier and is never followed by "(", so
+	// matching an identifier keeps "ADD CONSTRAINT x CHECK (...)" working
+	// instead of swallowing the CHECK expression.
 	addConstraintRE := regexp.MustCompile(
-		`(?i)ALTER\s+TABLE\s+([^\s]+)\s+ADD\s+CONSTRAINT\s+([^\s]+?);?\s*$`)
+		`(?i)ALTER\s+TABLE\s+([^\s]+)\s+ADD\s+CONSTRAINT\s+([A-Za-z_][A-Za-z0-9_$]*)`)
 	dropConstraintRE := regexp.MustCompile(
-		`(?i)ALTER\s+TABLE\s+([^\s]+)\s+DROP\s+CONSTRAINT\s+IF\s+EXISTS\s+([^\s]+?);?\s*$`)
+		`(?i)ALTER\s+TABLE\s+([^\s]+)\s+DROP\s+CONSTRAINT\s+IF\s+EXISTS\s+([A-Za-z_][A-Za-z0-9_$]*)`)
 
 	for _, m := range got {
 		lines := splitLines(m.Content)

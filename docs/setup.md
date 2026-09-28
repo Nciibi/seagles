@@ -236,14 +236,14 @@ Production-ready manifests are in `k8s/`:
 
 | Manifest | Purpose |
 |---|---|
-| `seagles-backend-deployment.yaml` | Backend API deployment (2 replicas) |
+| `seagles-backend-deployment.yaml` | Backend API deployment (3 replicas, HPA 2–10) |
 | `seagles-firmware-analyzer.yaml` | Firmware analyzer deployment + service (port 8001) |
-| `seagles-frontend-deployment.yaml` | Frontend nginx deployment (2 replicas) |
+| `seagles-frontend-deployment.yaml` | Frontend nginx deployment (2 replicas, port 8080) |
 | `seagles-service.yaml` | ClusterIP services for backend + frontend |
 | `seagles-ingress.yaml` | HTTPS ingress with TLS |
 | `seagles-hpa.yaml` | Horizontal Pod Autoscaler (CPU > 70%) |
 | `seagles-network-policy.yaml` | Pod isolation, deny-all default |
-| `seagles-pvc.yaml` | Persistent volume claims for PostgreSQL |
+| `seagles-pvc.yaml` | Shared firmware claim (**ReadWriteMany** — see below) |
 | `seagles-rbac.yaml` | Least-privilege ServiceAccount + Role |
 
 ```bash
@@ -253,10 +253,67 @@ kubectl apply -f k8s/
 
 **Prerequisites (not included in `k8s/`):**
 
-- Secrets: `seagles-db-secrets` (key `connection-string`), `seagles-jwt-secret` (key `secret`), `seagles-s3-secrets` (keys `access-key`, `secret-key`) in the `security-tools` namespace
-- PostgreSQL, Redis, and MinIO must be reachable cluster-wide — the NetworkPolicy expects pods labeled `app: postgresql`, `app: redis`, and `app: minio`, and the backend defaults to `minio-service.storage.svc.cluster.local:9000`
+- Secrets: `seagles-db-secrets` (key `connection-string`), `seagles-jwt-secret` (key `secret`), `seagles-s3-secrets` (keys `access-key`, `secret-key`), `seagles-analyzer-secret` (key `token`) in the `security-tools` namespace
+- PostgreSQL, Redis, and MinIO must be reachable cluster-wide — the NetworkPolicy expects pods labeled `app: postgresql`, `app: redis`, and `app: minio` in the `storage` namespace, and the backend defaults to `minio-service.storage.svc.cluster.local:9000`
 
 **Note:** Update image tags and registry URLs in the manifests before deploying.
+
+### Required configuration before first apply
+
+Four values must match the manifests or the platform will not work. Each has a
+default that is wrong for a real cluster.
+
+**1. Scan target network.** `seagles-network-policy.yaml` allows the backend to
+reach exactly one CIDR, and `NETWORK_CIDR` in the backend Deployment must be the
+same value. If they disagree, probes are silently dropped and the platform
+reports an empty network — a blocked probe looks identical to a closed port.
+
+```yaml
+# seagles-network-policy.yaml  (the scan-target ipBlock egress rule)
+cidr: 192.168.1.0/24
+# seagles-backend-deployment.yaml
+- name: NETWORK_CIDR
+  value: "192.168.1.0/24"
+```
+
+The allowed port list (22, 23, 80, 443, 502, 554, 1883, 1884, 5555, 8080, 8443,
+8883, 47808) is derived from the scanner's own code and is enforced by
+`backend/scanner/netpol_test.go`, so adding a port to the scanner without
+allowing it in the policy fails the test suite.
+
+**2. Shared JWT signing key.** The backend sets `REQUIRE_SHARED_JWT_KEY=true`,
+so it refuses to start until a key is provided. Without a shared key each
+replica generates its own RSA key pair, tokens issued by one pod are rejected
+by the others, and every rollout invalidates all sessions.
+
+```bash
+openssl genrsa 2048 | tee jwt-private.pem
+kubectl -n security-tools create secret generic seagles-jwt-secret \
+  --from-file=secret=jwt-private.pem
+```
+
+Both PKCS#1 (`BEGIN RSA PRIVATE KEY`) and PKCS#8 (`BEGIN PRIVATE KEY`, the
+OpenSSL 3.x default) are accepted.
+
+**3. ReadWriteMany StorageClass.** `seagles-pvc.yaml` requests `ReadWriteMany`,
+because the backend runs up to 10 replicas and a `ReadWriteOnce` volume can
+only attach on one node — which silently pins the backend to a single node and
+makes the HPA inert. `storageClassName` is intentionally unset so the cluster
+default applies; set it to an RWX-capable class (CephFS, NFS, Azure Files, AWS
+EFS, Longhorn) if your default is `ReadWriteOnce` only.
+
+**4. Frontend upstream.** The frontend nginx proxies `/api/` to
+`SEAGLES_BACKEND`, which is set per environment
+(`http://backend:8080` in Compose, the Service DNS name in Kubernetes). If it
+is unset, nginx exits with an unknown-variable error rather than silently
+serving 502s.
+
+**Note on firmware analysis:** the shared claim is load-bearing — the backend
+stages uploads on local disk and the analyzer pod reads them through that
+volume. Setting `S3_ENDPOINT` moves firmware into MinIO and removes the claim
+from the API tier, but firmware *analysis* does not yet work in that mode:
+`firmware-analyzer` rejects an `s3://` path with HTTP 400. Keep the claim
+mounted if you need firmware analysis.
 
 ---
 

@@ -137,7 +137,7 @@ func LoginHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req LoginRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"data": nil, "error": "Invalid credentials format: " + err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"data": nil, "error": "Invalid request format"})
 			return
 		}
 
@@ -204,7 +204,7 @@ func RegisterHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req RegisterRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"data": nil, "error": "Invalid request: " + err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"data": nil, "error": "Invalid request"})
 			return
 		}
 
@@ -248,7 +248,7 @@ func RefreshTokenHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req RefreshRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"data": nil, "error": "Invalid request: " + err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"data": nil, "error": "Invalid request"})
 			return
 		}
 
@@ -351,7 +351,7 @@ func ChangePasswordHandler(db *sql.DB) gin.HandlerFunc {
 
 		var req ChangePasswordRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"data": nil, "error": "Invalid request: " + err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"data": nil, "error": "Invalid request"})
 			return
 		}
 
@@ -629,7 +629,8 @@ func ListUsersHandler(db *sql.DB) gin.HandlerFunc {
 			users = append(users, u)
 		}
 		if err := rows.Err(); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Failed to iterate users: " + err.Error()})
+			slog.Error("list_users_failed", "error", err.Error())
+			c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Failed to list users"})
 			return
 		}
 		if users == nil {

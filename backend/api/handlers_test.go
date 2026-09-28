@@ -234,11 +234,14 @@ func TestGetDeviceHandler_NotFound(t *testing.T) {
 func TestGetDeviceHandler_DBError(t *testing.T) {
 	router, mock, _ := setupTestRouter(t)
 
+	// A well-formed UUID, so the request reaches the database and the failure
+	// is the simulated connection error rather than input validation.
+	deviceID := uuid.NewString()
 	mock.ExpectQuery(`SELECT id, ip_address, mac_address, hostname, vendor, device_type`).
-		WithArgs("fail-id").
+		WithArgs(deviceID).
 		WillReturnError(assertAnError("connection timeout"))
 
-	w := request(router, "GET", "/api/v1/devices/fail-id", nil)
+	w := request(router, "GET", "/api/v1/devices/"+deviceID, nil)
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}

@@ -48,6 +48,18 @@ func SanitizeInput(cfg XSSConfig) gin.HandlerFunc {
 			return
 		}
 
+		// These methods carry no meaningful JSON payload in this API. Parsing
+		// anyway is actively harmful: a client that sets a default
+		// Content-Type on every request (axios instances, Postman, generic HTTP
+		// clients) sends an empty body with GET and DELETE, json.Unmarshal fails
+		// on it, and the request is rejected with 400. That broke every
+		// DELETE /devices/:id, DELETE /safelists/:id and DELETE /sessions/:id.
+		switch c.Request.Method {
+		case http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodDelete:
+			c.Next()
+			return
+		}
+
 		body, err := io.ReadAll(io.LimitReader(c.Request.Body, cfg.MaxBodyLength))
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
@@ -56,6 +68,17 @@ func SanitizeInput(cfg XSSConfig) gin.HandlerFunc {
 			return
 		}
 		c.Request.Body.Close()
+
+		// An empty body on a method that may or may not take one is not
+		// malformed JSON. Endpoints such as POST /alerts/:id/ack and
+		// POST /devices/:id/scan accept no body at all, and handlers decide
+		// that with ShouldBindJSON's own error handling.
+		if len(bytes.TrimSpace(body)) == 0 {
+			c.Request.Body = io.NopCloser(bytes.NewReader(body))
+			c.Request.ContentLength = int64(len(body))
+			c.Next()
+			return
+		}
 
 		var raw interface{}
 		if err := json.Unmarshal(body, &raw); err != nil {
@@ -109,17 +132,17 @@ func sanitizeValue(v interface{}, cfg XSSConfig) interface{} {
 }
 
 var allowedFirmwareMIMETypes = map[string]string{
-	"application/octet-stream":               "bin",
-	"application/x-executable":               "elf",
-	"application/x-sharedlib":                "so",
-	"application/gzip":                       "gz",
-	"application/x-gzip":                     "gz",
-	"application/x-tar":                      "tar",
-	"application/x-bzip2":                    "bz2",
-	"application/x-xz":                       "xz",
-	"application/zip":                        "zip",
-	"application/x-rar-compressed":           "rar",
-	"application/x-7z-compressed":            "7z",
+	"application/octet-stream":     "bin",
+	"application/x-executable":     "elf",
+	"application/x-sharedlib":      "so",
+	"application/gzip":             "gz",
+	"application/x-gzip":           "gz",
+	"application/x-tar":            "tar",
+	"application/x-bzip2":          "bz2",
+	"application/x-xz":             "xz",
+	"application/zip":              "zip",
+	"application/x-rar-compressed": "rar",
+	"application/x-7z-compressed":  "7z",
 }
 
 var firmwareMagicBytes = []struct {

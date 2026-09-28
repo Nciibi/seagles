@@ -25,6 +25,12 @@ type User struct {
 	// TokenID carries the JTI of the access token this User was built from.
 	// It is internal only (never serialized to clients).
 	TokenID string `json:"-"`
+
+	// MustChangePassword is true for accounts still using their initial
+	// password, such as the seeded administrator. While it is set, every
+	// endpoint except the password-change endpoints is refused, so a
+	// deployment can never sit indefinitely on a publicly known credential.
+	MustChangePassword bool `json:"must_change_password"`
 }
 
 type LoginRequest struct {
@@ -138,9 +144,11 @@ func LoginHandler(db *sql.DB) gin.HandlerFunc {
 		var user User
 		var passwordHash string
 		err := db.QueryRow(
-			`SELECT id, username, email, role, password_hash FROM users WHERE username = $1 AND is_active = TRUE`,
+			`SELECT id, username, email, role, password_hash, must_change_password
+			 FROM users WHERE username = $1 AND is_active = TRUE`,
 			req.Username,
-		).Scan(&user.ID, &user.Username, &user.Email, &user.Role, &passwordHash)
+		).Scan(&user.ID, &user.Username, &user.Email, &user.Role, &passwordHash,
+			&user.MustChangePassword)
 
 		if err == sql.ErrNoRows {
 			slog.Warn("login_failed", "username", req.Username, "reason", "invalid_credentials")

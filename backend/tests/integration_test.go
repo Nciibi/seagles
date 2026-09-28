@@ -180,8 +180,7 @@ func TestUnauthorizedAccess(t *testing.T) {
 }
 
 func TestForbiddenAccess(t *testing.T) {
-	// Register a viewer
-	registerResp := request("POST", "/auth/login", map[string]string{
+	loginResp := request("POST", "/auth/login", map[string]string{
 		"username": "admin",
 		"password": "changeme",
 	}, "")
@@ -191,11 +190,14 @@ func TestForbiddenAccess(t *testing.T) {
 			Token string `json:"token"`
 		} `json:"data"`
 	}
-	json.Unmarshal(registerResp.Body.Bytes(), &loginData)
+	json.Unmarshal(loginResp.Body.Bytes(), &loginData)
 
-	w := request("DELETE", "/devices/nonexistent-id", nil, loginData.Data.Token)
-	if w.Code != http.StatusForbidden && w.Code != http.StatusOK {
-		t.Fatalf("expected 403 or 404, got %d", w.Code)
+	// A well-formed but nonexistent id, so the request is authorised and
+	// reaches the query. A malformed id is rejected earlier with 400.
+	missing := "00000000-0000-0000-0000-0000000000ff"
+	w := request("DELETE", "/devices/"+missing, nil, loginData.Data.Token)
+	if w.Code != http.StatusForbidden && w.Code != http.StatusNotFound {
+		t.Fatalf("expected 403 or 404, got %d: %s", w.Code, w.Body.String())
 	}
 }
 

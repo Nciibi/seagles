@@ -46,6 +46,7 @@ func main() {
 	var wg sync.WaitGroup
 
 	stopAlertMonitor := make(chan struct{})
+	stopRetention := make(chan struct{})
 
 	kevCatalog := kev.StartKEVUpdater("data/cisa-kev.json")
 	kev.StartEPSSUpdater(database)
@@ -68,7 +69,7 @@ func main() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			retention.StartRetentionJob(database, cfg)
+			retention.StartRetentionJob(database, cfg, stopRetention)
 		}()
 		slog.Info("Data retention job enabled",
 			"scans_days", cfg.RetentionScansDays,
@@ -116,9 +117,11 @@ func main() {
 	}
 
 	// Signal background workers to stop BEFORE waiting on them, otherwise
-	// StartAlertMonitor (infinite ticker loop) and the passive monitor
-	// (which blocks on its quit channel) would deadlock wg.Wait() forever.
+	// StartAlertMonitor (infinite ticker loop), the passive monitor (which
+	// blocks on its quit channel) and StartRetentionJob (infinite ticker loop)
+	// would deadlock wg.Wait() forever.
 	close(stopAlertMonitor)
+	close(stopRetention)
 	passiveMonitor.Stop()
 
 	slog.Info("Waiting for background goroutines to finish...")

@@ -35,13 +35,23 @@ func main() {
 	slog.SetLevel(parseLogLevel(cfg.LogLevel))
 	slog.SetFormat(cfg.LogFormat)
 
-	jwtKey := cfg.JWTSecret
-	if jwtKey == "" && cfg.JWTPrivateKeyFile != "" {
-		if keyData, err := os.ReadFile(cfg.JWTPrivateKeyFile); err == nil {
-			jwtKey = string(keyData)
-		}
+	jwtKey, err := resolveJWTKey(cfg)
+	if err != nil {
+		log.Fatalf("%v", err)
 	}
 	auth.SetJWTSecret(jwtKey)
+
+	if auth.UsingEphemeralKey() {
+		// An auto-generated key is unique to this process. A single local
+		// instance is fine; a second replica or a restart silently invalidates
+		// every issued token.
+		if cfg.RequireSharedJWTKey {
+			log.Fatalf(REQUIRE_SHARED_JWT_KEY_MSG)
+		}
+		slog.Warn("Starting with an auto-generated JWT signing key. This is " +
+			"acceptable for a single local instance only. Set REQUIRE_SHARED_JWT_KEY=true " +
+			"along with JWT_SECRET or JWT_PRIVATE_KEY_FILE for any multi-replica deployment.")
+	}
 
 	database := db.Connect(cfg.DatabaseURL, cfg.DBMaxOpenConns, cfg.DBMaxIdleConns, cfg.DBConnMaxLifetime)
 	defer database.Close()

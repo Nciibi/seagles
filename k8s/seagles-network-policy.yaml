@@ -90,9 +90,11 @@ spec:
       protocol: TCP
 
   # --- Datastores ---------------------------------------------------------
-  # Scoped to the namespace that actually runs them. A bare
-  # "namespaceSelector: {}" would match a pod labelled app=postgresql in ANY
-  # namespace in the cluster.
+  # Scoped to the "storage" namespace, which is the namespace the backend
+  # Deployment already assumes via minio-service.storage.svc.cluster.local.
+  # A bare "namespaceSelector: {}" would match a pod labelled app=postgresql
+  # in ANY namespace in the cluster. If you run PostgreSQL, Redis or MinIO in
+  # a different namespace, change the label here to match.
   - to:
     - namespaceSelector:
         matchLabels:

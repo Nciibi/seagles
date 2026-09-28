@@ -42,6 +42,13 @@ spec:
             - NET_ADMIN
 
         env:
+        # Network the scanner is authorised to probe. This must match the
+        # SCAN_TARGET_CIDR in seagles-network-policy.yaml — if the policy does
+        # not allow egress to this range, every probe fails and the platform
+        # reports an empty network. Scan only networks you own or have written
+        # permission to test.
+        - name: NETWORK_CIDR
+          value: "192.168.1.0/24"
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:

@@ -137,6 +137,7 @@ func TestLoadedKeySignsAndVerifies(t *testing.T) {
 
 	signed, err := signRS256(&Claims{
 		Sub:       "user-1",
+		Name:      "operator",
 		Role:      "admin",
 		JTI:       "jti-1",
 		TokenType: AccessToken,
@@ -146,12 +147,19 @@ func TestLoadedKeySignsAndVerifies(t *testing.T) {
 		t.Fatalf("failed to sign token: %v", err)
 	}
 
-	claims, err := ValidateAccessToken(signed)
+	// ValidateAccessToken returns the principal built from the claims.
+	user, err := ValidateAccessToken(signed)
 	if err != nil {
 		t.Fatalf("failed to validate token: %v", err)
 	}
-	if claims.Sub != "user-1" || claims.Role != "admin" {
-		t.Errorf("claims round-trip failed: %+v", claims)
+	if user.Username != "user-1" {
+		t.Errorf("username = %q, want user-1", user.Username)
+	}
+	if user.Role != "admin" {
+		t.Errorf("role = %q, want admin", user.Role)
+	}
+	if user.TokenID != "jti-1" {
+		t.Errorf("token id = %q, want jti-1", user.TokenID)
 	}
 }
 

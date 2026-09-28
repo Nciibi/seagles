@@ -109,20 +109,31 @@ func main() {
 
 	slog.Info("Shutting down server", "signal", sig.String())
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
-	}
-
-	// Signal background workers to stop BEFORE waiting on them, otherwise
-	// StartAlertMonitor (infinite ticker loop), the passive monitor (which
-	// blocks on its quit channel) and StartRetentionJob (infinite ticker loop)
-	// would deadlock wg.Wait() forever.
+	// Stop the background workers FIRST so they wind down in parallel with the
+	// HTTP drain rather than competing with it. They are periodic jobs with no
+	// dependency on in-flight requests, so signalling them early cannot lose
+	// request state — and it gives a long-running retention purge the whole
+	// grace period to finish instead of being SIGKILLed at the end of it.
+	//
+	// Every one of these loops must observe its stop channel: an infinite
+	// `for range ticker.C` would make the wg.Wait() below block forever, the
+	// container would be SIGKILLed at terminationGracePeriodSeconds, and any
+	// scan, alert dispatch or webhook retry still running would be dropped.
 	close(stopAlertMonitor)
 	close(stopRetention)
 	passiveMonitor.Stop()
+
+	ctx, cancel := context.WithTimeout(context.Background(), drainTimeout)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		// Requests outlived the drain budget. Log rather than log.Fatalf:
+		// the background workers still need to be reaped, and exiting here
+		// would skip wg.Wait() and turn a slow drain into a hard kill.
+		slog.Error("HTTP drain exceeded budget, forcing close",
+			"error", err.Error(), "timeout", drainTimeout.String())
+		_ = srv.Close()
+	}
 
 	slog.Info("Waiting for background goroutines to finish...")
 	wg.Wait()

@@ -3,19 +3,19 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/Nciibi/seagles/db"
 )
 
 func main() {
-	h, err := db.Connect(os.Args[1], 5, 2, 60000000000)
-	if err != nil {
-		fmt.Println("connect error:", err)
-		os.Exit(1)
+	h := db.Connect(os.Args[1], 5, 2, 5*time.Minute)
+	for i := 1; i <= 3; i++ {
+		fmt.Printf("--- run %d ---\n", i)
+		if err := db.RunMigrations(h); err != nil {
+			fmt.Println("MIGRATION FAILED:", err)
+			os.Exit(1)
+		}
 	}
-	if err := db.RunMigrations(h); err != nil {
-		fmt.Println("MIGRATION FAILED:", err)
-		os.Exit(1)
-	}
-	fmt.Println("MIGRATIONS OK")
+	fmt.Println("ALL RUNS OK")
 }

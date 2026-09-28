@@ -32,10 +32,6 @@ spec:
             name: seagles-backend
             port:
               name: http
-      - path: /ws
-        pathType: Prefix
-        backend:
-          service:
-            name: seagles-backend
-            port:
-              name: http
+      # The WebSocket endpoint is /api/v1/ws and is already covered by the
+      # /api rule above. A separate /ws path here 404'd, because the backend
+      # registers the socket only inside the versioned /api/v1 group.

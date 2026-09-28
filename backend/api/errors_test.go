@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -79,7 +80,8 @@ func TestUUIDParam_RejectsMalformedIDs(t *testing.T) {
 	}{
 		{"not-a-uuid", http.StatusBadRequest},
 		{"12345", http.StatusBadRequest},
-		{"'; DROP TABLE devices; --", http.StatusBadRequest},
+		// Encoded, because httptest.NewRequest rejects a raw space in the path.
+		{url.PathEscape("'; DROP TABLE devices; --"), http.StatusBadRequest},
 		{`00000000-0000-0000-0000-00000000000Z`, http.StatusBadRequest},
 		{uuid.NewString(), http.StatusOK},
 	}

@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -186,4 +188,13 @@ func TestEphemeralKeysAreNotInterchangeable(t *testing.T) {
 		t.Error("token from another instance validated; ephemeral keys must not " +
 			"be interchangeable (this is what REQUIRE_SHARED_JWT_KEY prevents)")
 	}
+}
+
+func generateECKey(t *testing.T) *ecdsa.PrivateKey {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("failed to generate EC key: %v", err)
+	}
+	return key
 }

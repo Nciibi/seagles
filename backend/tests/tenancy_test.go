@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	_ "github.com/lib/pq"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -268,4 +269,68 @@ func discoverMigrationSQL(t *testing.T) (map[string]string, error) {
 		out[e.Name()] = string(b)
 	}
 	return out, nil
+}
+
+// A fresh install must be usable. The seeded admin account shipped with a
+// bcrypt hash that did not verify against the documented password
+// ("admin / changeme"), so the only administrator could never log in and the
+// deployment was unusable. Verified by comparing the seeded hash against
+// candidate passwords: no match.
+func TestFreshInstallDefaultAdminCanLogIn(t *testing.T) {
+	conn := tenancyDB(t)
+
+	var hash string
+	var mustChange bool
+	err := conn.QueryRow(
+		`SELECT password_hash, must_change_password FROM users WHERE username='admin'`,
+	).Scan(&hash, &mustChange)
+	if err != nil {
+		t.Fatalf("seeded admin account is missing: %v", err)
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte("changeme")); err != nil {
+		t.Fatalf("the documented default password does not verify against the "+
+			"seeded hash: %v. A fresh install would be unusable.", err)
+	}
+
+	if !mustChange {
+		t.Error("the seeded account must be flagged for password rotation; " +
+			"otherwise a deployment sits indefinitely on a published credential")
+	}
+}
+
+// Rotating the password must clear the flag so the deployment stops being
+// gated.
+func TestChangingPasswordClearsRotationFlag(t *testing.T) {
+	conn := tenancyDB(t)
+
+	var userID string
+	if err := conn.QueryRow(`SELECT id FROM users WHERE username='admin'`).Scan(&userID); err != nil {
+		t.Fatalf("seeded admin missing: %v", err)
+	}
+
+	newHash, err := bcrypt.GenerateFromPassword([]byte("a-brand-new-password"), 12)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(
+		`UPDATE users SET password_hash=$1, must_change_password=FALSE WHERE id=$2`,
+		string(newHash), userID,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	var mustChange bool
+	var stored string
+	if err := conn.QueryRow(
+		`SELECT must_change_password, password_hash FROM users WHERE id=$1`, userID,
+	).Scan(&mustChange, &stored); err != nil {
+		t.Fatal(err)
+	}
+	if mustChange {
+		t.Error("must_change_password should be false after rotation")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(stored), []byte("a-brand-new-password")); err != nil {
+		t.Errorf("rotated hash does not verify: %v", err)
+	}
 }

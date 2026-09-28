@@ -24,6 +24,40 @@ func fail(c *gin.Context, status int, msg string) {
 	c.JSON(status, gin.H{"data": nil, "error": msg})
 }
 
+// failInternal reports a server-side failure without disclosing its cause.
+//
+// Database and network errors carry schema detail: table and column names,
+// constraint names, index definitions, sometimes the offending value. Returning
+// err.Error() to the client hands an attacker a map of the schema and turns an
+// ordinary 500 into a reconnaissance tool. The real error is logged with the
+// request id, which the client already receives in X-Request-ID, so an
+// operator can correlate the two without the client learning anything.
+func failInternal(c *gin.Context, status int, publicMsg string, err error) {
+	requestID, _ := c.Get("request_id")
+	slog.Error(publicMsg,
+		"request_id", requestID,
+		"path", c.Request.URL.Path,
+		"method", c.Request.Method,
+		"status", status,
+		"error", err.Error())
+	c.JSON(status, gin.H{"data": nil, "error": publicMsg})
+}
+
+// uuidParam validates a path parameter used as a UUID column value.
+//
+// Without this, a malformed id reaches Postgres and fails with
+// "invalid input syntax for type uuid", which the handler then reports as a
+// 500. That is both the wrong status class for a client mistake and, before
+// failInternal, a way to probe the schema.
+func uuidParam(c *gin.Context, name string) (string, bool) {
+	raw := c.Param(name)
+	if _, err := uuid.Parse(raw); err != nil {
+		fail(c, http.StatusBadRequest, "Invalid "+name+": must be a UUID")
+		return "", false
+	}
+	return raw, true
+}
+
 func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 

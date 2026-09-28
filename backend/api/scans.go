@@ -33,7 +33,7 @@ func ListScansHandler(db *sql.DB) gin.HandlerFunc {
 			FROM scans ORDER BY started_at DESC LIMIT 100`)
 		if err != nil {
 			slog.Error("Failed to query scans", "request_id", requestID, "error", err.Error())
-			fail(c, 500, "Failed to query scans: "+err.Error())
+			failInternal(c, 500, "Failed to query scans: ", err)
 			return
 		}
 		defer rows.Close()
@@ -48,7 +48,7 @@ func ListScansHandler(db *sql.DB) gin.HandlerFunc {
 			scans = append(scans, s.ToJSON())
 		}
 		if err := rows.Err(); err != nil {
-			fail(c, 500, "Failed to iterate scans: "+err.Error())
+			failInternal(c, 500, "Failed to iterate scans: ", err)
 			return
 		}
 		if scans == nil {
@@ -75,7 +75,7 @@ func GetScanHandler(db *sql.DB) gin.HandlerFunc {
 		}
 		if err != nil {
 			slog.Error("Failed to query scan", "request_id", requestID, "scan_id", id, "error", err.Error())
-			fail(c, 500, "Failed to query scan: "+err.Error())
+			failInternal(c, 500, "Failed to query scan: ", err)
 			return
 		}
 
@@ -110,7 +110,7 @@ func TriggerDeviceScanHandler(db *sql.DB, cfg *config.Config, kevCatalog *kev.KE
 		}
 		if err != nil {
 			slog.Error("Failed to query device", "request_id", requestID, "device_id", deviceID, "error", err.Error())
-			fail(c, 500, "Failed to query device: "+err.Error())
+			failInternal(c, 500, "Failed to query device: ", err)
 			return
 		}
 
@@ -131,7 +131,7 @@ func TriggerDeviceScanHandler(db *sql.DB, cfg *config.Config, kevCatalog *kev.KE
 			deviceID, scanType, nullableString(req.ProfileID)).Scan(&scanID)
 		if err != nil {
 			slog.Error("Failed to create scan", "request_id", requestID, "device_id", deviceID, "error", err.Error())
-			fail(c, 500, "Failed to create scan: "+err.Error())
+			failInternal(c, 500, "Failed to create scan: ", err)
 			return
 		}
 

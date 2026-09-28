@@ -41,7 +41,7 @@ func ListFirmwareHandler(db *sql.DB) gin.HandlerFunc {
 			ORDER BY f.analyzed_at DESC NULLS LAST`)
 		if err != nil {
 			slog.Error("Failed to query firmware", "request_id", requestID, "error", err.Error())
-			fail(c, 500, "Failed to query firmware: "+err.Error())
+			failInternal(c, 500, "Failed to query firmware: ", err)
 			return
 		}
 		defer rows.Close()
@@ -73,7 +73,7 @@ func ListFirmwareHandler(db *sql.DB) gin.HandlerFunc {
 			firmwareList = append(firmwareList, entry)
 		}
 		if err := rows.Err(); err != nil {
-			fail(c, 500, "Failed to iterate firmware: "+err.Error())
+			failInternal(c, 500, "Failed to iterate firmware: ", err)
 			return
 		}
 		if firmwareList == nil {
@@ -102,7 +102,7 @@ func AnalyzeFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 		}
 		if err != nil {
 			slog.Error("Failed to query firmware", "request_id", requestID, "firmware_id", id, "error", err.Error())
-			fail(c, 500, "Failed to query firmware: "+err.Error())
+			failInternal(c, 500, "Failed to query firmware: ", err)
 			return
 		}
 

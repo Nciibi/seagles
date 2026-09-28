@@ -55,7 +55,7 @@ func ListDevicesHandler(db *sql.DB) gin.HandlerFunc {
 		rows, err := db.Query(query, args...)
 		if err != nil {
 			slog.Error("Failed to query devices", "request_id", requestID, "error", err.Error())
-			fail(c, 500, "Failed to query devices: "+err.Error())
+			failInternal(c, 500, "Failed to query devices: ", err)
 			return
 		}
 		defer rows.Close()
@@ -72,7 +72,7 @@ func ListDevicesHandler(db *sql.DB) gin.HandlerFunc {
 			devices = append(devices, d.ToJSON())
 		}
 		if err := rows.Err(); err != nil {
-			fail(c, 500, "Failed to iterate devices: "+err.Error())
+			failInternal(c, 500, "Failed to iterate devices: ", err)
 			return
 		}
 		if devices == nil {
@@ -100,7 +100,7 @@ func GetDeviceHandler(db *sql.DB) gin.HandlerFunc {
 		}
 		if err != nil {
 			slog.Error("Failed to query device", "request_id", requestID, "device_id", id, "error", err.Error())
-			fail(c, 500, "Failed to query device: "+err.Error())
+			failInternal(c, 500, "Failed to query device: ", err)
 			return
 		}
 
@@ -132,7 +132,7 @@ func DeleteDeviceHandler(db *sql.DB) gin.HandlerFunc {
 		result, err := db.Exec(`UPDATE devices SET is_active = false WHERE id = $1`, id)
 		if err != nil {
 			slog.Error("Failed to delete device", "request_id", requestID, "device_id", id, "error", err.Error())
-			fail(c, 500, "Failed to delete device: "+err.Error())
+			failInternal(c, 500, "Failed to delete device: ", err)
 			return
 		}
 		n, _ := result.RowsAffected()

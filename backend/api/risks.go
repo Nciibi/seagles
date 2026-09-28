@@ -24,7 +24,7 @@ func StatsHandler(db *sql.DB) gin.HandlerFunc {
 		`).Scan(&totalDevices, &onlineDevices, &avgRiskScore)
 		if err != nil {
 			slog.Error("Failed to query stats", "request_id", requestID, "error", err.Error())
-			fail(c, 500, "Failed to query stats: "+err.Error())
+			failInternal(c, 500, "Failed to query stats: ", err)
 			return
 		}
 
@@ -42,7 +42,7 @@ func StatsHandler(db *sql.DB) gin.HandlerFunc {
 		`).Scan(&criticalVulns, &highVulns, &mediumVulns, &lowVulns, &kevVulns, &openAlerts, &suspiciousFirmware)
 		if err != nil {
 			slog.Error("Failed to query stats counts", "request_id", requestID, "error", err.Error())
-			fail(c, 500, "Failed to query stats counts: "+err.Error())
+			failInternal(c, 500, "Failed to query stats counts: ", err)
 			return
 		}
 

@@ -69,7 +69,7 @@ func ListSessionsHandler(db *sql.DB) gin.HandlerFunc {
 			sessions = append(sessions, s)
 		}
 		if err := rows.Err(); err != nil {
-			fail(c, 500, "Failed to iterate sessions: "+err.Error())
+			failInternal(c, 500, "Failed to iterate sessions: ", err)
 			return
 		}
 

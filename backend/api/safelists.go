@@ -38,7 +38,7 @@ func ListSafelistHandler(db *sql.DB) gin.HandlerFunc {
 		rows, err := db.Query(`SELECT id, entry_type, value, reason, created_by, created_at, is_active
 			FROM safelists ORDER BY created_at DESC`)
 		if err != nil {
-			fail(c, 500, "Failed to query safelists: "+err.Error())
+			failInternal(c, 500, "Failed to query safelists: ", err)
 			return
 		}
 		defer rows.Close()
@@ -59,7 +59,7 @@ func ListSafelistHandler(db *sql.DB) gin.HandlerFunc {
 			entries = append(entries, e)
 		}
 		if err := rows.Err(); err != nil {
-			fail(c, 500, "Failed to iterate safelists: "+err.Error())
+			failInternal(c, 500, "Failed to iterate safelists: ", err)
 			return
 		}
 		if entries == nil {
@@ -84,7 +84,7 @@ func CreateSafelistHandler(db *sql.DB) gin.HandlerFunc {
 			VALUES ($1, $2, $3, $4) RETURNING id`,
 			req.EntryType, req.Value, nullableString(req.Reason), userID).Scan(&id)
 		if err != nil {
-			fail(c, 500, "Failed to create safelist entry: "+err.Error())
+			failInternal(c, 500, "Failed to create safelist entry: ", err)
 			return
 		}
 
@@ -97,7 +97,7 @@ func DeleteSafelistHandler(db *sql.DB) gin.HandlerFunc {
 		id := c.Param("id")
 		result, err := db.Exec(`UPDATE safelists SET is_active = FALSE WHERE id = $1`, id)
 		if err != nil {
-			fail(c, 500, "Failed to delete safelist entry: "+err.Error())
+			failInternal(c, 500, "Failed to delete safelist entry: ", err)
 			return
 		}
 		n, _ := result.RowsAffected()
@@ -220,7 +220,7 @@ func CreateScanScopeHandler(db *sql.DB) gin.HandlerFunc {
 		err := db.QueryRow(`INSERT INTO scan_scopes (cidr, label) VALUES ($1, $2) RETURNING id`,
 			req.CIDR, nullableString(req.Label)).Scan(&id)
 		if err != nil {
-			fail(c, 500, "Failed to create scan scope: "+err.Error())
+			failInternal(c, 500, "Failed to create scan scope: ", err)
 			return
 		}
 
@@ -312,7 +312,7 @@ func CreateWebhookHandler(db *sql.DB) gin.HandlerFunc {
 			VALUES ($1, $2, $3, $4) RETURNING id`,
 			req.Name, req.URL, req.WebhookType, req.MinSeverity).Scan(&id)
 		if err != nil {
-			fail(c, 500, "Failed to create webhook: "+err.Error())
+			failInternal(c, 500, "Failed to create webhook: ", err)
 			return
 		}
 

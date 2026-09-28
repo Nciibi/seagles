@@ -42,7 +42,7 @@ func ListAlertsHandler(db *sql.DB) gin.HandlerFunc {
 		rows, err := db.Query(query, args...)
 		if err != nil {
 			slog.Error("Failed to query alerts", "request_id", requestID, "error", err.Error())
-			fail(c, 500, "Failed to query alerts: "+err.Error())
+			failInternal(c, 500, "Failed to query alerts: ", err)
 			return
 		}
 		defer rows.Close()
@@ -57,7 +57,7 @@ func ListAlertsHandler(db *sql.DB) gin.HandlerFunc {
 			alertList = append(alertList, a.ToJSON())
 		}
 		if err := rows.Err(); err != nil {
-			fail(c, 500, "Failed to iterate alerts: "+err.Error())
+			failInternal(c, 500, "Failed to iterate alerts: ", err)
 			return
 		}
 		if alertList == nil {
@@ -75,7 +75,7 @@ func AckAlertHandler(db *sql.DB) gin.HandlerFunc {
 		result, err := db.Exec(`UPDATE alerts SET is_acknowledged=true, acknowledged_at=NOW() WHERE id=$1`, id)
 		if err != nil {
 			slog.Error("Failed to acknowledge alert", "request_id", requestID, "alert_id", id, "error", err.Error())
-			fail(c, 500, "Failed to acknowledge alert: "+err.Error())
+			failInternal(c, 500, "Failed to acknowledge alert: ", err)
 			return
 		}
 		n, _ := result.RowsAffected()

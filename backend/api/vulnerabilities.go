@@ -50,7 +50,7 @@ func ListVulnerabilitiesHandler(db *sql.DB) gin.HandlerFunc {
 		rows, err := db.Query(query, args...)
 		if err != nil {
 			slog.Error("Failed to query vulnerabilities", "request_id", requestID, "error", err.Error())
-			fail(c, 500, "Failed to query vulnerabilities: "+err.Error())
+			failInternal(c, 500, "Failed to query vulnerabilities: ", err)
 			return
 		}
 		defer rows.Close()
@@ -66,7 +66,7 @@ func ListVulnerabilitiesHandler(db *sql.DB) gin.HandlerFunc {
 			vulns = append(vulns, v.ToJSON())
 		}
 		if err := rows.Err(); err != nil {
-			fail(c, 500, "Failed to iterate vulnerabilities: "+err.Error())
+			failInternal(c, 500, "Failed to iterate vulnerabilities: ", err)
 			return
 		}
 		if vulns == nil {
@@ -84,7 +84,7 @@ func ResolveVulnerabilityHandler(db *sql.DB) gin.HandlerFunc {
 		result, err := db.Exec(`UPDATE vulnerabilities SET is_resolved=true, resolved_at=NOW() WHERE id=$1`, id)
 		if err != nil {
 			slog.Error("Failed to resolve vulnerability", "request_id", requestID, "vuln_id", id, "error", err.Error())
-			fail(c, 500, "Failed to resolve vulnerability: "+err.Error())
+			failInternal(c, 500, "Failed to resolve vulnerability: ", err)
 			return
 		}
 		n, _ := result.RowsAffected()

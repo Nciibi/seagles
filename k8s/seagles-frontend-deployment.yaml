@@ -24,7 +24,10 @@ spec:
       - name: seagles-frontend
         image: your-registry.com/seagles-frontend:v2.0.0
         ports:
-        - containerPort: 80
+        # Unprivileged: capabilities.drop is [ALL], so no CAP_NET_BIND_SERVICE
+        # and binding 80 would fail. Must stay in sync with the EXPOSE in
+        # frontend/Dockerfile and the "listen" directive in frontend/nginx.conf.
+        - containerPort: 8080
           name: http
 
         securityContext:

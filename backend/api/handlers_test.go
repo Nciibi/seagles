@@ -672,14 +672,27 @@ func TestWebhookHandlers(t *testing.T) {
 
 	t.Run("TestWebhook_NotFound", func(t *testing.T) {
 		router, mock, _ := setupTestRouter(t)
+		missing := "00000000-0000-0000-0000-0000000000ff"
 
 		mock.ExpectQuery(`SELECT url FROM webhooks`).
-			WithArgs("nonexistent").
+			WithArgs(missing).
 			WillReturnError(sql.ErrNoRows)
 
-		w := request(router, "POST", "/api/v1/webhooks/nonexistent/test", nil)
+		w := request(router, "POST", "/api/v1/webhooks/"+missing+"/test", nil)
 		if w.Code != http.StatusNotFound {
 			t.Fatalf("expected 404, got %d", w.Code)
+		}
+	})
+
+	// A malformed id is a client error and must be rejected before it reaches
+	// the database, which would otherwise fail with
+	// "invalid input syntax for type uuid" and surface as a 500.
+	t.Run("TestWebhook_MalformedIDIs400", func(t *testing.T) {
+		router, _, _ := setupTestRouter(t)
+
+		w := request(router, "POST", "/api/v1/webhooks/not-a-uuid/test", nil)
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for a malformed id, got %d: %s", w.Code, w.Body.String())
 		}
 	})
 }

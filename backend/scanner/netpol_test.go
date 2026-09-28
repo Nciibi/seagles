@@ -38,10 +38,8 @@ func scannerSourcePorts(t *testing.T) map[int]string {
 			t.Errorf("%s references invalid port %d", origin, p)
 			return
 		}
-		if prev, dup := ports[p]; dup {
-			_ = prev // a port may legitimately be dialled by several probes
-			_ = dup
-		}
+		// A port may legitimately be dialled by several probes (23 is both a
+		// Telnet detection and a Telnet credential target); last writer wins.
 		ports[p] = origin
 	}
 

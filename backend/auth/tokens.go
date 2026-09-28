@@ -79,13 +79,9 @@ func LoadOrGenerateKeys(privateKeyPEM string) error {
 	defer globalKeyPairMu.Unlock()
 
 	if privateKeyPEM != "" {
-		block, _ := pem.Decode([]byte(privateKeyPEM))
-		if block == nil || block.Type != "RSA PRIVATE KEY" {
-			return errors.New("invalid RSA private key PEM")
-		}
-		priv, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+		priv, err := parseRSAPrivateKeyPEM(privateKeyPEM)
 		if err != nil {
-			return fmt.Errorf("failed to parse RSA private key: %w", err)
+			return err
 		}
 		globalKeyPair = &KeyPair{
 			PrivateKey: priv,

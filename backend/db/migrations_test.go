@@ -239,34 +239,87 @@ func TestDiscoverMigrations_RealSetIsOrdered(t *testing.T) {
 	}
 }
 
-// Every migration must be individually re-runnable. The old runner relied on
-// this; the new one does not need it for correctness, but a file that is not
-// idempotent will still fail for anyone who applies migrations by hand.
+// Every migration must be individually re-runnable. Anyone applying
+// migrations by hand, or restoring a dump, will execute files more than once,
+// and a statement that fails on the second pass breaks them.
+//
+// An ADD CONSTRAINT is only safe when the immediately preceding statement
+// drops that same constraint with IF EXISTS. Postgres has no
+// "ADD CONSTRAINT IF NOT EXISTS", so 012 pairs a DROP with its ADD for exactly
+// this reason.
 func TestRealMigrations_AreIdempotentSafe(t *testing.T) {
 	dir := filepath.Join("..", "db", "migrations")
 	if _, err := os.Stat(dir); err != nil {
-		t.Skipf("migrations not found: %v", err)
+		t.Fatalf("migrations not found at %s: %v", dir, err)
 	}
 	got, err := DiscoverMigrations(dir)
 	if err != nil {
 		t.Fatalf("DiscoverMigrations: %v", err)
 	}
 
-	// Statements that fail when executed twice. Everything else must carry an
-	// idempotency guard (IF NOT EXISTS / IF EXISTS / ON CONFLICT).
-	unguarded := regexp.MustCompile(
-		`(?im)^\s*ALTER\s+TABLE\s+\S+\s+ADD\s+CONSTRAINT\s`)
+	addConstraintRE := regexp.MustCompile(
+		`(?i)ALTER\s+TABLE\s+(\S+)\s+ADD\s+CONSTRAINT\s+(\S+)`)
+	dropConstraintRE := regexp.MustCompile(
+		`(?i)ALTER\s+TABLE\s+(\S+)\s+DROP\s+CONSTRAINT\s+IF\s+EXISTS\s+(\S+)`)
+	unguardedRE := regexp.MustCompile(
+		`(?i)^(CREATE\s+(UNIQUE\s+)?INDEX|INSERT\s+INTO|UPDATE\s|DELETE\s+FROM)`)
+	insertHasOnConflictRE := regexp.MustCompile(`(?i)ON\s+CONFLICT`)
 
 	for _, m := range got {
-		for _, line := range splitLines(m.Content) {
-			if unguarded.MatchString(line) && !regexp.MustCompile(`(?i)DROP\s+CONSTRAINT`).MatchString(m.Content) {
-				t.Errorf("%s: %q is not idempotent; an unguarded ADD CONSTRAINT "+
-					"fails on the second run. Pair it with DROP CONSTRAINT IF EXISTS "+
+		lines := splitLines(m.Content)
+		for i, line := range lines {
+			stmt := stripSQLComment(line)
+			if stmt == "" {
+				continue
+			}
+
+			if add := addConstraintRE.FindStringSubmatch(stmt); add != nil {
+				prev := previousStatement(lines, i)
+				drop := dropConstraintRE.FindStringSubmatch(prev)
+				if drop != nil && drop[1] == add[1] && drop[2] == add[2] {
+					continue // guarded by the DROP immediately above
+				}
+				t.Errorf("%s line %d: %q adds a constraint with no preceding "+
+					"DROP CONSTRAINT IF EXISTS, so a second application fails. "+
+					"Postgres has no ADD CONSTRAINT IF NOT EXISTS; pair the two, "+
 					"or move the change into a new migration that runs once.",
-					m.Version, trimSpace(line))
+					m.Version, i+1, trimSpace(stmt))
+				continue
+			}
+
+			if unguardedRE.MatchString(stmt) {
+				isInsert := regexp.MustCompile(`(?i)^INSERT\s+INTO`).MatchString(stmt)
+				if isInsert && insertHasOnConflictRE.MatchString(stmt) {
+					continue
+				}
+				// A statement is only guarded if it names IF NOT EXISTS/IF
+				// EXISTS itself.
+				if !regexp.MustCompile(`(?i)IF\s+NOT\s+EXISTS|IF\s+EXISTS`).MatchString(stmt) {
+					t.Errorf("%s line %d: %q has no idempotency guard "+
+						"(IF NOT EXISTS / IF EXISTS / ON CONFLICT) and will fail "+
+						"if applied twice", m.Version, i+1, trimSpace(stmt))
+				}
 			}
 		}
 	}
+}
+
+// previousStatement returns the nearest preceding non-empty, non-comment line.
+func previousStatement(lines []string, i int) string {
+	for j := i - 1; j >= 0; j-- {
+		s := stripSQLComment(lines[j])
+		if s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+func stripSQLComment(line string) string {
+	if idx := strings.Index(line, "--"); idx >= 0 {
+		line = line[:idx]
+	}
+	return trimSpace(line)
 }
 
 func splitLines(s string) []string {

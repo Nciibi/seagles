@@ -193,29 +193,28 @@ DECLARE
         'webhook_deliveries|webhook_id|webhooks|webhook'
     ];
     parts  TEXT[];
-    child  TEXT;
-    col    TEXT;
+    tbl   TEXT;
+    col   TEXT;
     parent TEXT;
-    suffix TEXT;
-    cname  TEXT;
+    cname TEXT;
 BEGIN
-    FOREACH child IN ARRAY spec LOOP
-        parts  := string_to_array(child, '|');
-        col    := parts[1];
-        parent := parts[2];
-        suffix := parts[3];
-        cname  := parts[1] || '_' || suffix || '_tenant_fkey';
+    FOREACH spec IN ARRAY spec LOOP
+        parts  := string_to_array(spec, '|');
+        tbl    := parts[1];
+        col    := parts[2];
+        parent := parts[3];
+        cname  := tbl || '_' || col || '_tenant_fkey';
 
-        IF to_regclass('public.' || parts[1]) IS NULL THEN
+        IF to_regclass('public.' || tbl) IS NULL THEN
             CONTINUE;
         END IF;
 
-        EXECUTE format('ALTER TABLE public.%I DROP CONSTRAINT IF EXISTS %I', parts[1], cname);
+        EXECUTE format('ALTER TABLE public.%I DROP CONSTRAINT IF EXISTS %I', tbl, cname);
         EXECUTE format(
             'ALTER TABLE public.%I ADD CONSTRAINT %I ' ||
             'FOREIGN KEY (tenant_id, %I) REFERENCES public.%I (tenant_id, id) ' ||
             'ON DELETE CASCADE',
-            parts[1], cname, col, parent);
+            tbl, cname, col, parent);
     END LOOP;
 END
 $$;

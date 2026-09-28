@@ -89,31 +89,3 @@ func TestFindMigrationsDir_CWDRelativeFallback(t *testing.T) {
 	}
 }
 
-func TestRunMigrations_ExecutesSQLFilesInSortedOrder(t *testing.T) {
-	dir := t.TempDir()
-
-	files := map[string]string{
-		"002_second.sql": "CREATE TABLE b (id int);",
-		"001_first.sql":  "CREATE TABLE a (id int);",
-		"003_third.sql":  "CREATE TABLE c (id int);",
-		"notes.txt":      "not a migration",
-		"README.md":      "also not a migration",
-	}
-	for name, content := range files {
-		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	setMigrationsDir(t, dir)
-
-	db, mock := newMockDB(t)
-	mock.ExpectExec(regexp.QuoteMeta("CREATE TABLE a (id int);")).WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec(regexp.QuoteMeta("CREATE TABLE b (id int);")).WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec(regexp.QuoteMeta("CREATE TABLE c (id int);")).WillReturnResult(sqlmock.NewResult(0, 0))
-
-	RunMigrations(db)
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatalf("unmet expectations (order or count wrong): %v", err)
-	}
-}

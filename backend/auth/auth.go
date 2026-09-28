@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/Nciibi/seagles/cache"
 	"github.com/Nciibi/seagles/slog"
+	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -93,7 +93,7 @@ func validateRefreshToken(db *sql.DB, refreshToken string) (*User, error) {
 	var expiresAt time.Time
 	var revoked bool
 	err := db.QueryRow(
-	`SELECT u.id, u.username, u.email, u.role, rt.expires_at, rt.revoked
+		`SELECT u.id, u.username, u.email, u.role, rt.expires_at, rt.revoked
 	 FROM refresh_tokens rt JOIN users u ON u.id = rt.user_id
 	 WHERE rt.token_hash = $1 AND rt.revoked = FALSE AND rt.expires_at > NOW()
 	 AND u.is_active = TRUE`,
@@ -619,7 +619,7 @@ func ListUsersHandler(db *sql.DB) gin.HandlerFunc {
 			users = append(users, u)
 		}
 		if err := rows.Err(); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Failed to iterate users: "+err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Failed to iterate users: " + err.Error()})
 			return
 		}
 		if users == nil {

@@ -74,7 +74,7 @@ func TestParseRSAPrivateKeyPEM_RejectsGarbage(t *testing.T) {
 	}{
 		{"empty", "", "no PEM block found"},
 		{"not PEM at all", "just a string", "no PEM block found"},
-		{"truncated PKCS#1", "-----BEGIN RSA PRIVATE KEY-----\nZm9v\n", "PKCS#1"},
+		{"truncated PKCS#1", "-----BEGIN RSA PRIVATE KEY-----\nZm9v\n-----END RSA PRIVATE KEY-----\n", "PKCS#1"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -152,8 +152,11 @@ func TestLoadedKeySignsAndVerifies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to validate token: %v", err)
 	}
-	if user.Username != "user-1" {
-		t.Errorf("username = %q, want user-1", user.Username)
+	if user.ID != "user-1" {
+		t.Errorf("id = %q, want user-1", user.ID)
+	}
+	if user.Username != "operator" {
+		t.Errorf("username = %q, want operator", user.Username)
 	}
 	if user.Role != "admin" {
 		t.Errorf("role = %q, want admin", user.Role)

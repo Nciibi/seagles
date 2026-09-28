@@ -224,13 +224,33 @@ func TestMigrationsAreReRunnableOnPostgres(t *testing.T) {
 	}
 }
 
-// discoverMigrationSQL reads the real migration files, keyed by name.
+// discoverMigrationSQL reads the real migration files, keyed by name. It
+// resolves the directory itself so the test does not depend on the caller's
+// working directory or on MIGRATIONS_DIR being set correctly.
 func discoverMigrationSQL(t *testing.T) (map[string]string, error) {
 	t.Helper()
-	dir := os.Getenv("MIGRATIONS_DIR")
-	if dir == "" {
-		dir = filepath.Join("..", "db", "migrations")
+
+	var candidates []string
+	if env := os.Getenv("MIGRATIONS_DIR"); env != "" {
+		candidates = append(candidates, env)
 	}
+	candidates = append(candidates,
+		filepath.Join("..", "db", "migrations"),
+		filepath.Join("..", "..", "db", "migrations"),
+		filepath.Join("db", "migrations"),
+	)
+
+	var dir string
+	for _, c := range candidates {
+		if info, err := os.Stat(c); err == nil && info.IsDir() {
+			dir = c
+			break
+		}
+	}
+	if dir == "" {
+		return nil, fmt.Errorf("no migrations directory found in any of %v", candidates)
+	}
+
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err

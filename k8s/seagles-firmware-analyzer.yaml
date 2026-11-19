@@ -109,12 +109,23 @@ spec:
         - name: firmware-volume
           mountPath: /firmware
           readOnly: true
+        # Read-only rootfs: give Python/binwalk bounded scratch space.
+        - name: tmp-volume
+          mountPath: /tmp
+        - name: home-volume
+          mountPath: /home/seagles
 
       volumes:
       - name: firmware-volume
         persistentVolumeClaim:
           # ReadWriteMany: see seagles-pvc.yaml.
           claimName: seagles-data-pvc
+      - name: tmp-volume
+        emptyDir:
+          sizeLimit: 256Mi
+      - name: home-volume
+        emptyDir:
+          sizeLimit: 64Mi
 ---
 apiVersion: v1
 kind: Service

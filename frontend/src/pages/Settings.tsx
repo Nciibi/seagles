@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import {
   getSafelists, createSafelist, deleteSafelist,
   getWebhooks, createWebhook, deleteWebhook,
-  getScanProfiles, getScanScopes, createScanScope, deleteScanScope,
+  getScanProfiles, createScanProfile, updateScanProfile, deleteScanProfile,
+  getScanScopes, createScanScope, deleteScanScope, testWebhook,
   getUsers, createUser,
   type SafelistEntry, type Webhook, type ScanProfile, type ScanScope, type User,
 } from '../api/client'
@@ -11,16 +12,28 @@ type Tab = 'safelists' | 'webhooks' | 'profiles' | 'scopes' | 'users'
 
 export default function Settings() {
   const [tab, setTab] = useState<Tab>('safelists')
-  const user = JSON.parse(localStorage.getItem('seagles_user') || '{}')
-  const isAdmin = user.role === 'admin'
+  let isAdmin = false
+  try {
+    isAdmin = JSON.parse(localStorage.getItem('seagles_user') || '{}').role === 'admin'
+  } catch {
+    isAdmin = false
+  }
 
   return (
     <div>
       <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '20px' }}>Settings</h1>
 
-      <div className="tab-bar">
+      <div className="tab-bar" role="tablist" aria-label="Settings sections">
         {(['safelists', 'webhooks', 'profiles', 'scopes', 'users'] as Tab[]).map((t) => (
-          <div key={t} className={`tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
+          <div
+            key={t}
+            role="tab"
+            aria-selected={tab === t}
+            tabIndex={tab === t ? 0 : -1}
+            className={`tab ${tab === t ? 'active' : ''}`}
+            onClick={() => setTab(t)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTab(t) } }}
+          >
             {t === 'safelists' ? '🛡️ Safelists' :
              t === 'webhooks' ? '🔔 Webhooks' :
              t === 'profiles' ? '📋 Scan Profiles' :
@@ -31,7 +44,7 @@ export default function Settings() {
 
       {tab === 'safelists' && <SafelistsTab isAdmin={isAdmin} />}
       {tab === 'webhooks' && <WebhooksTab isAdmin={isAdmin} />}
-      {tab === 'profiles' && <ProfilesTab />}
+      {tab === 'profiles' && <ProfilesTab isAdmin={isAdmin} />}
       {tab === 'scopes' && <ScopesTab isAdmin={isAdmin} />}
       {tab === 'users' && <UsersTab isAdmin={isAdmin} />}
     </div>
@@ -80,7 +93,7 @@ function SafelistsTab({ isAdmin }: { isAdmin: boolean }) {
         </form>
       )}
 
-      <div className="card table-wrapper" style={{ overflow: 'hidden' }}>
+      <div className="card table-wrapper">
         <table className="data-table">
           <thead><tr><th>Type</th><th>Value</th><th>Reason</th><th>Status</th>{isAdmin && <th>Action</th>}</tr></thead>
           <tbody>
@@ -104,6 +117,7 @@ function SafelistsTab({ isAdmin }: { isAdmin: boolean }) {
 
 function WebhooksTab({ isAdmin }: { isAdmin: boolean }) {
   const [webhooks, setWebhooks] = useState<Webhook[]>([])
+  const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState({ name: '', url: '', webhook_type: 'slack', min_severity: 'high' })
 
   const fetch = async () => {
@@ -118,6 +132,7 @@ function WebhooksTab({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <div>
+      {error && <div className="card" role="alert" style={{ padding: '12px 16px', marginBottom: '16px', color: '#ff6b6b', borderColor: '#e03131' }}>{error}</div>}
       {isAdmin && (
         <form onSubmit={handleAdd} className="card" style={{ padding: '20px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div style={{ minWidth: '160px' }}>
@@ -149,7 +164,7 @@ function WebhooksTab({ isAdmin }: { isAdmin: boolean }) {
         </form>
       )}
 
-      <div className="card table-wrapper" style={{ overflow: 'hidden' }}>
+      <div className="card table-wrapper">
         <table className="data-table">
           <thead><tr><th>Name</th><th>Type</th><th>Min Severity</th><th>Status</th><th>Last Triggered</th>{isAdmin && <th>Action</th>}</tr></thead>
           <tbody>
@@ -162,7 +177,13 @@ function WebhooksTab({ isAdmin }: { isAdmin: boolean }) {
                 <td><span className={`badge badge-${w.min_severity}`}>{w.min_severity}</span></td>
                 <td>{w.is_active ? <span style={{ color: '#69db7c' }}>Active</span> : <span style={{ color: 'var(--text-muted)' }}>Inactive</span>}</td>
                 <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{w.last_triggered || 'Never'}</td>
-                {isAdmin && <td><button className="btn btn-danger" onClick={async () => { await deleteWebhook(w.id); fetch() }} style={{ padding: '2px 10px', fontSize: '0.75rem' }}>Delete</button></td>}
+                {isAdmin && <td style={{ whiteSpace: 'nowrap' }}>
+                  <button className="btn btn-ghost" aria-label={`Test webhook ${w.name}`} onClick={async () => {
+                    try { await testWebhook(w.id); setError(null) }
+                    catch (e) { console.error('Webhook test failed:', e); setError('Webhook test failed') }
+                  }} style={{ padding: '2px 10px', fontSize: '0.75rem' }}>Test</button>
+                  <button className="btn btn-danger" onClick={async () => { await deleteWebhook(w.id); fetch() }} style={{ padding: '2px 10px', fontSize: '0.75rem' }}>Delete</button>
+                </td>}
               </tr>
             ))}
           </tbody>
@@ -172,29 +193,106 @@ function WebhooksTab({ isAdmin }: { isAdmin: boolean }) {
   )
 }
 
-function ProfilesTab() {
+function ProfilesTab({ isAdmin }: { isAdmin: boolean }) {
   const [profiles, setProfiles] = useState<ScanProfile[]>([])
-  useEffect(() => { getScanProfiles().then(r => setProfiles(r.data ?? [])).catch(e => console.error('Failed to fetch scan profiles:', e)) }, [])
+  const [error, setError] = useState<string | null>(null)
+  const [editing, setEditing] = useState<string | null>(null)
+  const [form, setForm] = useState({
+    name: '', description: '', skip_credential_test: false,
+    skip_protocol_probe: false, max_port_count: 13, timeout_seconds: 90,
+  })
+
+  const fetch = async () => {
+    try { setProfiles((await getScanProfiles()).data ?? []) }
+    catch (e) { console.error('Failed to fetch scan profiles:', e); setError('Failed to load scan profiles') }
+  }
+  useEffect(() => { fetch() }, [])
+
+  const resetForm = () => {
+    setForm({ name: '', description: '', skip_credential_test: false, skip_protocol_probe: false, max_port_count: 13, timeout_seconds: 90 })
+    setEditing(null)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    try {
+      if (editing) await updateScanProfile(editing, form)
+      else await createScanProfile(form)
+      resetForm()
+      await fetch()
+    } catch (err) {
+      console.error('Failed to save scan profile:', err)
+      setError('Failed to save scan profile')
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    setError(null)
+    try { await deleteScanProfile(id); await fetch() }
+    catch (err) { console.error('Failed to delete scan profile:', err); setError('Failed to delete profile (it may be in use)') }
+  }
 
   return (
-      <div className="card table-wrapper" style={{ overflow: 'hidden' }}>
+    <div>
+      {error && <div className="card" role="alert" style={{ padding: '12px 16px', marginBottom: '16px', color: '#ff6b6b', borderColor: '#e03131' }}>{error}</div>}
+
+      {isAdmin && (
+        <form onSubmit={handleSubmit} className="card" style={{ padding: '20px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div style={{ minWidth: '140px' }}>
+            <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Name</label>
+            <input className="input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
+          </div>
+          <div style={{ flex: 1, minWidth: '180px' }}>
+            <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Description</label>
+            <input className="input" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+          </div>
+          <div style={{ minWidth: '90px' }}>
+            <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Max Ports</label>
+            <input className="input" type="number" min={1} max={100} value={form.max_port_count} onChange={e => setForm({ ...form, max_port_count: Number(e.target.value) })} />
+          </div>
+          <div style={{ minWidth: '90px' }}>
+            <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Timeout (s)</label>
+            <input className="input" type="number" min={1} max={3600} value={form.timeout_seconds} onChange={e => setForm({ ...form, timeout_seconds: Number(e.target.value) })} />
+          </div>
+          <label style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <input type="checkbox" checked={form.skip_credential_test} onChange={e => setForm({ ...form, skip_credential_test: e.target.checked })} /> Skip creds
+          </label>
+          <label style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <input type="checkbox" checked={form.skip_protocol_probe} onChange={e => setForm({ ...form, skip_protocol_probe: e.target.checked })} /> Skip probes
+          </label>
+          <button type="submit" className="btn btn-primary">{editing ? 'Save' : '+ Add Profile'}</button>
+          {editing && <button type="button" className="btn btn-ghost" onClick={resetForm}>Cancel</button>}
+        </form>
+      )}
+
+      <div className="card table-wrapper">
         <table className="data-table">
-        <thead><tr><th>Name</th><th>Description</th><th>Cred Testing</th><th>Protocol Probe</th><th>Timeout</th><th>Default</th></tr></thead>
-        <tbody>
-          {profiles.length === 0 ? (
-            <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '30px' }}>No scan profiles configured</td></tr>
-          ) : profiles.map(p => (
-            <tr key={p.id} style={{ cursor: 'default' }}>
-              <td style={{ fontWeight: 600, textTransform: 'capitalize' }}>{p.name}</td>
-              <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', maxWidth: '300px' }}>{p.description}</td>
-              <td>{p.skip_credential_test ? <span style={{ color: '#ff6b6b' }}>Skipped</span> : <span style={{ color: '#69db7c' }}>Enabled</span>}</td>
-              <td>{p.skip_protocol_probe ? <span style={{ color: '#ff6b6b' }}>Skipped</span> : <span style={{ color: '#69db7c' }}>Enabled</span>}</td>
-              <td>{p.timeout_seconds}s</td>
-              <td>{p.is_default ? <span className="badge badge-low">Default</span> : '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+          <thead><tr><th>Name</th><th>Description</th><th>Cred Testing</th><th>Protocol Probe</th><th>Max Ports</th><th>Timeout</th><th>Default</th>{isAdmin && <th>Action</th>}</tr></thead>
+          <tbody>
+            {profiles.length === 0 ? (
+              <tr><td colSpan={isAdmin ? 8 : 7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '30px' }}>No scan profiles configured</td></tr>
+            ) : profiles.map(p => (
+              <tr key={p.id} style={{ cursor: 'default' }}>
+                <td style={{ fontWeight: 600, textTransform: 'capitalize' }}>{p.name}</td>
+                <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', maxWidth: '240px' }}>{p.description}</td>
+                <td>{p.skip_credential_test ? <span style={{ color: '#ff6b6b' }}>Skipped</span> : <span style={{ color: '#69db7c' }}>Enabled</span>}</td>
+                <td>{p.skip_protocol_probe ? <span style={{ color: '#ff6b6b' }}>Skipped</span> : <span style={{ color: '#69db7c' }}>Enabled</span>}</td>
+                <td>{p.max_port_count}</td>
+                <td>{p.timeout_seconds}s</td>
+                <td>{p.is_default ? <span className="badge badge-low">Default</span> : '—'}</td>
+                {isAdmin && <td style={{ whiteSpace: 'nowrap' }}>
+                  <button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: '0.75rem' }} onClick={() => {
+                    setEditing(p.id)
+                    setForm({ name: p.name, description: p.description, skip_credential_test: p.skip_credential_test, skip_protocol_probe: p.skip_protocol_probe, max_port_count: p.max_port_count, timeout_seconds: p.timeout_seconds })
+                  }}>Edit</button>
+                  {!p.is_default && <button className="btn btn-danger" style={{ padding: '2px 8px', fontSize: '0.75rem' }} onClick={() => handleDelete(p.id)}>Delete</button>}
+                </td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
@@ -227,7 +325,7 @@ function ScopesTab({ isAdmin }: { isAdmin: boolean }) {
         </form>
       )}
 
-      <div className="card table-wrapper" style={{ overflow: 'hidden' }}>
+      <div className="card table-wrapper">
         <table className="data-table">
           <thead><tr><th>CIDR</th><th>Label</th><th>Status</th>{isAdmin && <th>Action</th>}</tr></thead>
           <tbody>
@@ -295,7 +393,7 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
         </div>
       )}
 
-      <div className="card table-wrapper" style={{ overflow: 'hidden' }}>
+      <div className="card table-wrapper">
         <table className="data-table">
           <thead><tr><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th></tr></thead>
           <tbody>

@@ -117,6 +117,10 @@ func UpdateEPSSScores(db *sql.DB) {
 			cveIDs = append(cveIDs, cveID)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		slog.Error("Failed reading CVE rows for EPSS update", "error", err.Error())
+		return
+	}
 
 	if len(cveIDs) == 0 {
 		slog.Debug("No CVEs to update EPSS scores for")

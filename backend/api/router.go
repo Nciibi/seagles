@@ -6,14 +6,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+
 	"github.com/Nciibi/seagles/auth"
 	"github.com/Nciibi/seagles/config"
 	dbpkg "github.com/Nciibi/seagles/db"
 	"github.com/Nciibi/seagles/kev"
 	"github.com/Nciibi/seagles/middleware"
 	"github.com/Nciibi/seagles/slog"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 func success(c *gin.Context, data interface{}) {
@@ -146,6 +147,8 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 	{
 		v1.POST("/auth/login", auth.LoginHandler(db))
 		v1.POST("/auth/refresh", auth.RefreshTokenHandler(db))
+		v1.GET("/auth/jwks.json", auth.JWKSHandler())
+		v1.GET("/auth/public-key.pem", auth.PublicKeyPEMHandler())
 
 		v1.GET("/metrics", middleware.MetricsHandler())
 		v1.GET("/swagger.json", SwaggerJSONHandler())
@@ -166,6 +169,14 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 
 		protected := v1.Group("")
 		protected.Use(auth.AuthMiddleware())
+		// RLS enforces tenant isolation on the dedicated connection created
+		// here. Must run after AuthMiddleware so the tenant is known.
+		protected.Use(TenantDBMiddleware(db))
+		// Per-user limits require the authenticated identity, so this second
+		// limiter runs after AuthMiddleware sets user_id. The global limiter
+		// above still applies an IP-based cap to every request, including the
+		// unauthenticated login/refresh endpoints (brute-force protection).
+		protected.Use(middleware.RateLimitMiddleware(rl))
 		// Accounts still on their initial password may only reach the
 		// endpoints needed to change it. Must run after AuthMiddleware.
 		protected.Use(auth.RequirePasswordChange())
@@ -196,6 +207,9 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 			protected.POST("/safelists", auth.AdminOnly(), CreateSafelistHandler(db))
 			protected.DELETE("/safelists/:id", auth.AdminOnly(), DeleteSafelistHandler(db))
 			protected.GET("/scan-profiles", ListScanProfilesHandler(db))
+			protected.POST("/scan-profiles", auth.AdminOnly(), CreateScanProfileHandler(db))
+			protected.PATCH("/scan-profiles/:id", auth.AdminOnly(), UpdateScanProfileHandler(db))
+			protected.DELETE("/scan-profiles/:id", auth.AdminOnly(), DeleteScanProfileHandler(db))
 			protected.GET("/scan-scopes", ListScanScopesHandler(db))
 			protected.POST("/scan-scopes", auth.AdminOnly(), CreateScanScopeHandler(db))
 			protected.DELETE("/scan-scopes/:id", auth.AdminOnly(), DeleteScanScopeHandler(db))

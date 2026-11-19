@@ -13,8 +13,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Nciibi/seagles/slog"
 	_ "github.com/lib/pq"
+
+	"github.com/Nciibi/seagles/slog"
 )
 
 type DBMonitor struct {

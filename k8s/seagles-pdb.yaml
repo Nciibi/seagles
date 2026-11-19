@@ -1,0 +1,34 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: seagles-backend
+  namespace: security-tools
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: seagles-backend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: seagles-frontend
+  namespace: security-tools
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: seagles-frontend
+---
+# The analyzer is currently a single replica; a PDB with minAvailable: 1
+# prevents voluntary disruption rather than guaranteeing availability.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: seagles-firmware-analyzer
+  namespace: security-tools
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: seagles-firmware-analyzer

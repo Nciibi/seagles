@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { getFirmware, analyzeFirmware, uploadFirmware, type Firmware } from '../api/client'
+import { waitForFirmwareAnalysis } from '../utils/asyncJobs'
 import { entropyColor, entropyLabel } from '../utils/helpers'
 import { LoadingCard } from '../components/Loading'
 
@@ -9,32 +10,44 @@ export default function FirmwarePage() {
   const [uploading, setUploading] = useState(false)
   const [uploadMsg, setUploadMsg] = useState('')
   const [loading, setLoading] = useState(true)
-  const analyzeTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const [error, setError] = useState<string | null>(null)
+  const analyzeAbortRef = useRef<AbortController | null>(null)
 
   const fetchFirmware = async () => {
     setLoading(true)
+    setError(null)
     try {
       const res = await getFirmware()
       setFirmware(res.data as unknown as Firmware[])
     } catch (e) {
       console.error('Failed to fetch firmware:', e)
+      setError('Failed to load firmware records')
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => { fetchFirmware() }, [])
-
-  useEffect(() => {
-    return () => {
-      if (analyzeTimerRef.current) clearTimeout(analyzeTimerRef.current)
-    }
-  }, [])
+  useEffect(() => () => analyzeAbortRef.current?.abort(), [])
 
   const handleAnalyze = async (id: string) => {
     setAnalyzingId(id)
-    try { await analyzeFirmware(id) } catch (e) { console.error(e) }
-    analyzeTimerRef.current = setTimeout(() => { setAnalyzingId(null); fetchFirmware() }, 5000)
+    setError(null)
+    const controller = new AbortController()
+    analyzeAbortRef.current = controller
+    try {
+      await analyzeFirmware(id)
+      const result = await waitForFirmwareAnalysis(id, { signal: controller.signal })
+      if (result.analysis_status === 'failed') setError('Firmware analysis failed')
+      await fetchFirmware()
+    } catch (e) {
+      if ((e as Error)?.name !== 'AbortError') {
+        console.error('Analysis failed:', e)
+        setError('Analysis did not complete successfully')
+      }
+    } finally {
+      setAnalyzingId(null)
+    }
   }
 
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -51,15 +64,20 @@ export default function FirmwarePage() {
       setUploadMsg(`✓ Uploaded ${data.filename} (${(data.size_bytes / 1024 / 1024).toFixed(1)} MB)`)
       fetchFirmware()
       ;(e.target as HTMLFormElement).reset()
-    } catch (err: any) {
-      setUploadMsg('✗ Upload failed: ' + (err?.message || 'Unknown error'))
+    } catch (err: unknown) {
+      setUploadMsg('✗ Upload failed: ' + (err instanceof Error ? err.message : 'Unknown error'))
     } finally {
       setUploading(false)
     }
   }
 
-  const user = JSON.parse(localStorage.getItem('seagles_user') || '{}')
-  const isAdmin = user.role === 'admin'
+  let isAdmin = false
+  try {
+    const user = JSON.parse(localStorage.getItem('seagles_user') || '{}')
+    isAdmin = user.role === 'admin'
+  } catch {
+    isAdmin = false
+  }
 
   if (loading) {
     return (
@@ -74,13 +92,20 @@ export default function FirmwarePage() {
     <div>
       <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '20px' }}>Firmware Analysis</h1>
 
+      {error && (
+        <div className="card" role="alert" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px', borderColor: '#e03131' }}>
+          <span style={{ color: '#ff6b6b', flex: 1 }}>{error}</span>
+          <button className="btn btn-ghost" onClick={fetchFirmware}>Retry</button>
+        </div>
+      )}
+
       {/* Upload Section */}
       {isAdmin && (
         <div className="card" style={{ padding: '20px', marginBottom: '20px' }}>
           <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '12px' }}>📤 Upload Firmware Binary</h2>
           <form onSubmit={handleUpload} style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: '250px' }}>
-              <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Firmware File (max 256MB)</label>
+              <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Firmware File (max 100MB)</label>
               <input className="input" type="file" name="firmware" accept=".bin,.img,.fw,.hex,.elf,.rom" required />
             </div>
             <div style={{ minWidth: '150px' }}>

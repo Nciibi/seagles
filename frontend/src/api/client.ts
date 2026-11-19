@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios, { type InternalAxiosRequestConfig } from 'axios'
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1'
 
@@ -8,7 +8,27 @@ const api = axios.create({
 })
 
 let isRefreshing = false
-let pendingRequests: Array<(token: string) => void> = []
+
+interface PendingRequest {
+  resolve: (value: unknown) => void
+  reject: (reason?: unknown) => void
+  request: InternalAxiosRequestConfig
+}
+
+let pendingRequests: PendingRequest[] = []
+
+function flushPending(token: string | null, error?: unknown) {
+  const queued = pendingRequests
+  pendingRequests = []
+  queued.forEach(({ resolve, reject, request }) => {
+    if (token) {
+      request.headers.Authorization = `Bearer ${token}`
+      resolve(api(request))
+    } else {
+      reject(error)
+    }
+  })
+}
 
 // --- CSRF token plumbing ---
 // The backend mints a single-use CSRF token (X-CSRF-Token response header)
@@ -93,12 +113,10 @@ api.interceptors.response.use(
       }
 
       if (isRefreshing) {
-        // Queue requests while refresh is in progress
-        return new Promise((resolve) => {
-          pendingRequests.push((newToken: string) => {
-            originalRequest.headers.Authorization = `Bearer ${newToken}`
-            resolve(api(originalRequest))
-          })
+        // Queue requests while refresh is in progress. Every queued promise
+        // is settled on both success and failure so callers never hang.
+        return new Promise((resolve, reject) => {
+          pendingRequests.push({ resolve, reject, request: originalRequest })
         })
       }
 
@@ -117,12 +135,12 @@ api.interceptors.response.use(
         }
 
         // Process queued requests
-        pendingRequests.forEach((cb) => cb(newToken))
-        pendingRequests = []
+        flushPending(newToken)
 
         originalRequest.headers.Authorization = `Bearer ${newToken}`
         return api(originalRequest)
       } catch (refreshError) {
+        flushPending(null, refreshError)
         clearSession()
         return Promise.reject(refreshError)
       } finally {
@@ -362,6 +380,11 @@ export const deleteSafelist = (id: string) => api.delete(`/safelists/${id}`)
 
 // --- Scan Profiles ---
 export const getScanProfiles = () => api.get<ScanProfile[]>('/scan-profiles')
+export const createScanProfile = (profile: Omit<ScanProfile, 'id' | 'is_default'>) =>
+  api.post('/scan-profiles', profile)
+export const updateScanProfile = (id: string, profile: Omit<ScanProfile, 'id' | 'is_default'>) =>
+  api.patch(`/scan-profiles/${id}`, profile)
+export const deleteScanProfile = (id: string) => api.delete(`/scan-profiles/${id}`)
 
 // --- Scan Scopes ---
 export const getScanScopes = () => api.get<ScanScope[]>('/scan-scopes')

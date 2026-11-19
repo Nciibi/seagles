@@ -8,15 +8,15 @@ import (
 
 // Scan represents a security scan performed on a device.
 type Scan struct {
-	ID          string          `json:"id" db:"id"`
-	DeviceID    sql.NullString  `json:"device_id" db:"device_id"`
-	StartedAt   time.Time       `json:"started_at" db:"started_at"`
-	CompletedAt sql.NullTime    `json:"completed_at" db:"completed_at"`
-	Status      string          `json:"status" db:"status"`
-	ScanType    string          `json:"scan_type" db:"scan_type"`
-	OpenPorts   json.RawMessage `json:"open_ports" db:"open_ports"`
-	Services    json.RawMessage `json:"services" db:"services"`
-	ScanOutput  sql.NullString  `json:"scan_output" db:"scan_output"`
+	ID          string         `json:"id" db:"id"`
+	DeviceID    sql.NullString `json:"device_id" db:"device_id"`
+	StartedAt   time.Time      `json:"started_at" db:"started_at"`
+	CompletedAt sql.NullTime   `json:"completed_at" db:"completed_at"`
+	Status      string         `json:"status" db:"status"`
+	ScanType    string         `json:"scan_type" db:"scan_type"`
+	OpenPorts   []byte         `json:"open_ports" db:"open_ports"`
+	Services    []byte         `json:"services" db:"services"`
+	ScanOutput  sql.NullString `json:"scan_output" db:"scan_output"`
 }
 
 // ScanJSON is a JSON-friendly representation of a Scan.

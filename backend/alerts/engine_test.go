@@ -8,6 +8,8 @@ import (
 	"time"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
+
+	"github.com/Nciibi/seagles/events"
 )
 
 func newMockDB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
@@ -189,11 +191,11 @@ func TestCreateAlert_Inserts(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 
 	mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO alerts")).
-		WithArgs("device-2", "critical", AlertTelnetOpen, "Telnet open", "port 23", sqlmock.AnyArg()).
+		WithArgs(DefaultTenantID, "device-2", "critical", AlertTelnetOpen, "Telnet open", "port 23", sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("alert-id-42"))
 
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, name, url, webhook_type, min_severity, secret, headers")).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "url", "webhook_type", "min_severity", "secret", "headers"}))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, COALESCE(tenant_id, $1), name, url, webhook_type, min_severity, secret, headers")).WithArgs(DefaultTenantID).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "tenant_id", "name", "url", "webhook_type", "min_severity", "secret", "headers"}))
 
 	err := CreateAlert(db, AlertRequest{
 		DeviceID:    "device-2",
@@ -213,6 +215,45 @@ func TestCreateAlert_Inserts(t *testing.T) {
 	}
 }
 
+// The WebSocket bridge is only useful if real alert creation publishes an
+// event. This test exercises the production CreateAlert path, not a manual
+// events.Publish call.
+func TestCreateAlert_PublishesWebSocketEvent(t *testing.T) {
+	db, mock := newMockDB(t)
+
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) FROM alerts")).
+		WithArgs("device-9", AlertNewDevice).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+	mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO alerts")).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("alert-pub-1"))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, COALESCE(tenant_id, $1), name, url, webhook_type, min_severity, secret, headers")).WithArgs(DefaultTenantID).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "tenant_id", "name", "url", "webhook_type", "min_severity", "secret", "headers"}))
+
+	var received []events.Event
+	unsub := events.Subscribe(func(e events.Event) { received = append(received, e) })
+	defer unsub()
+
+	if err := CreateAlert(db, AlertRequest{
+		DeviceID: "device-9", AlertType: AlertNewDevice, Severity: "high", Title: "New device",
+	}); err != nil {
+		t.Fatalf("CreateAlert error: %v", err)
+	}
+
+	if len(received) != 1 {
+		t.Fatalf("published %d events, want 1: %+v", len(received), received)
+	}
+	if received[0].Type != events.AlertCreated {
+		t.Fatalf("event type = %q, want %q", received[0].Type, events.AlertCreated)
+	}
+	payload, ok := received[0].Data.(AlertEvent)
+	if !ok {
+		t.Fatalf("event data type = %T, want alerts.AlertEvent", received[0].Data)
+	}
+	if payload.ID != "alert-pub-1" || payload.DeviceID != "device-9" || payload.Severity != "high" {
+		t.Fatalf("unexpected event payload: %+v", payload)
+	}
+}
+
 func TestCreateAlert_InsertFailure(t *testing.T) {
 	db, mock := newMockDB(t)
 
@@ -221,7 +262,7 @@ func TestCreateAlert_InsertFailure(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 
 	mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO alerts")).
-		WithArgs("device-3", "critical", AlertKEVMatch, "KEV hit", "", sqlmock.AnyArg()).
+		WithArgs(DefaultTenantID, "device-3", "critical", AlertKEVMatch, "KEV hit", "", sqlmock.AnyArg()).
 		WillReturnError(sqlmock.ErrCancelled)
 
 	if err := CreateAlert(db, AlertRequest{
@@ -246,10 +287,10 @@ func TestCheckOfflineDevices(t *testing.T) {
 		WithArgs("dev-a", AlertDeviceOffline).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 	mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO alerts")).
-		WithArgs("dev-a", "medium", AlertDeviceOffline, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WithArgs(DefaultTenantID, "dev-a", "medium", AlertDeviceOffline, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("a1"))
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, name, url, webhook_type, min_severity, secret, headers")).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "url", "webhook_type", "min_severity", "secret", "headers"}))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, COALESCE(tenant_id, $1), name, url, webhook_type, min_severity, secret, headers")).WithArgs(DefaultTenantID).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "tenant_id", "name", "url", "webhook_type", "min_severity", "secret", "headers"}))
 
 	checkOfflineDevices(db)
 	time.Sleep(150 * time.Millisecond)
@@ -282,16 +323,34 @@ func TestCheckFirmwareOverdue(t *testing.T) {
 		WithArgs("dev-c", AlertFirmwareReview).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 	mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO alerts")).
-		WithArgs("dev-c", "low", AlertFirmwareReview, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WithArgs(DefaultTenantID, "dev-c", "low", AlertFirmwareReview, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("a2"))
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, name, url, webhook_type, min_severity, secret, headers")).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "url", "webhook_type", "min_severity", "secret", "headers"}))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, COALESCE(tenant_id, $1), name, url, webhook_type, min_severity, secret, headers")).WithArgs(DefaultTenantID).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "tenant_id", "name", "url", "webhook_type", "min_severity", "secret", "headers"}))
 
 	checkFirmwareOverdue(db)
 	time.Sleep(150 * time.Millisecond)
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+// The query itself is the regression: reintroducing "OR analyzed_at IS NULL"
+// makes freshly-uploaded (pending) firmware immediately generate overdue
+// alerts, which then dedup for 24h and bury real review items.
+func TestCheckFirmwareOverdueQueryExcludesPending(t *testing.T) {
+	db, mock := newMockDB(t)
+
+	const expected = `SELECT device_id FROM firmware
+		WHERE analyzed_at IS NOT NULL AND analyzed_at < NOW() - INTERVAL '90 days'`
+	mock.ExpectQuery(regexp.QuoteMeta(expected)).
+		WillReturnRows(sqlmock.NewRows([]string{"device_id"}))
+
+	checkFirmwareOverdue(db)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("query drifted from the reviewed form: %v", err)
 	}
 }
 
@@ -305,10 +364,10 @@ func TestCheckUnresolvedCritical(t *testing.T) {
 		WithArgs("dev-d", AlertCriticalUnresolved).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 	mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO alerts")).
-		WithArgs("dev-d", "high", AlertCriticalUnresolved, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WithArgs(DefaultTenantID, "dev-d", "high", AlertCriticalUnresolved, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("a3"))
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, name, url, webhook_type, min_severity, secret, headers")).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "url", "webhook_type", "min_severity", "secret", "headers"}))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, COALESCE(tenant_id, $1), name, url, webhook_type, min_severity, secret, headers")).WithArgs(DefaultTenantID).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "tenant_id", "name", "url", "webhook_type", "min_severity", "secret", "headers"}))
 
 	checkUnresolvedCritical(db)
 	time.Sleep(150 * time.Millisecond)
@@ -321,10 +380,10 @@ func TestCheckUnresolvedCritical(t *testing.T) {
 func TestDispatchWebhooks_FiltersBySeverity(t *testing.T) {
 	db, mock := newMockDB(t)
 
-	rows := sqlmock.NewRows([]string{"id", "name", "url", "webhook_type", "min_severity", "secret", "headers"}).
-		AddRow("wh-low", "low hook", "http://localhost/low", "generic", "high", nil, []byte(`{}`)).
-		AddRow("wh-any", "any hook", "http://localhost/any", "generic", "low", nil, []byte(`{}`))
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, name, url, webhook_type, min_severity, secret, headers")).
+	rows := sqlmock.NewRows([]string{"id", "tenant_id", "name", "url", "webhook_type", "min_severity", "secret", "headers"}).
+		AddRow("wh-low", DefaultTenantID, "low hook", "http://localhost/low", "generic", "high", nil, []byte(`{}`)).
+		AddRow("wh-any", DefaultTenantID, "any hook", "http://localhost/any", "generic", "low", nil, []byte(`{}`))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, COALESCE(tenant_id, $1), name, url, webhook_type, min_severity, secret, headers")).WithArgs(DefaultTenantID).
 		WillReturnRows(rows)
 
 	DispatchWebhooks(db, "alert-9", "medium", "Medium alert", "desc", "device-x")
@@ -338,10 +397,10 @@ func TestDispatchWebhooks_FiltersBySeverity(t *testing.T) {
 func TestDispatchWebhooks_CustomHeaders(t *testing.T) {
 	db, mock := newMockDB(t)
 
-	rows := sqlmock.NewRows([]string{"id", "name", "url", "webhook_type", "min_severity", "secret", "headers"}).
-		AddRow("wh-h", "header hook", "not a valid url", "generic", "low", nil,
+	rows := sqlmock.NewRows([]string{"id", "tenant_id", "name", "url", "webhook_type", "min_severity", "secret", "headers"}).
+		AddRow("wh-h", DefaultTenantID, "header hook", "not a valid url", "generic", "low", nil,
 			[]byte(`{"X-Custom":"abc"}`))
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, name, url, webhook_type, min_severity, secret, headers")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, COALESCE(tenant_id, $1), name, url, webhook_type, min_severity, secret, headers")).WithArgs(DefaultTenantID).
 		WillReturnRows(rows)
 
 	DispatchWebhooks(db, "alert-10", "critical", "t", "d", "dev")

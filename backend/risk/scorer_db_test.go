@@ -69,7 +69,7 @@ func TestBuildRiskFactors_WithVulnerabilities(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"entropy_score"}).AddRow(7.8))
 	mock.ExpectQuery(`SELECT started_at FROM scans`).
 		WithArgs("device-2").
-		WillReturnRows(sqlmock.NewRows([]string{"started_at"}).AddRow(time.Now().Add(-72*time.Hour)))
+		WillReturnRows(sqlmock.NewRows([]string{"started_at"}).AddRow(time.Now().Add(-72 * time.Hour)))
 
 	factors, err := BuildRiskFactors(db, "device-2")
 	if err != nil {

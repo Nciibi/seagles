@@ -32,7 +32,14 @@ export default function RiskScore({ score, size = 'md' }: RiskScoreProps) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-      <svg width={config.width} height={config.width} style={{ transform: 'rotate(-90deg)' }}>
+      <svg
+        width={config.width}
+        height={config.width}
+        role="img"
+        aria-label={`Risk score ${score.toFixed(1)} out of 10 (${scoreLabel(score)})`}
+        style={{ transform: 'rotate(-90deg)' }}
+      >
+        <title>{`Risk score ${score.toFixed(1)} out of 10 — ${scoreLabel(score)}`}</title>
         {/* Background ring */}
         <circle
           cx={config.width / 2}

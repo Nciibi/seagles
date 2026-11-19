@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -79,7 +78,7 @@ func resolveJWTKey(cfg *config.Config) (string, error) {
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		slog.Fatal("Failed to load config", "error", err.Error())
 	}
 
 	slog.SetLevel(parseLogLevel(cfg.LogLevel))
@@ -96,7 +95,7 @@ func main() {
 		// instance is fine; a second replica or a restart silently invalidates
 		// every issued token.
 		if cfg.RequireSharedJWTKey {
-			log.Fatalf(REQUIRE_SHARED_JWT_KEY_MSG)
+			log.Fatal(REQUIRE_SHARED_JWT_KEY_MSG)
 		}
 		slog.Warn("Starting with an auto-generated JWT signing key. This is " +
 			"acceptable for a single local instance only. Set REQUIRE_SHARED_JWT_KEY=true " +
@@ -219,6 +218,4 @@ func parseLogLevel(s string) slog.Level {
 	case "error":
 		return slog.LevelError
 	default:
-		return slog.LevelInfo
-	}
-}
+		return slog.Le

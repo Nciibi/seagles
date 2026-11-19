@@ -8,12 +8,18 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
+
 	"github.com/Nciibi/seagles/alerts"
 	"github.com/Nciibi/seagles/slog"
 )
 
+// DefaultTenantID is used by the passive monitor, which observes one network
+// interface and has no per-request tenant to derive a scope from.
+const DefaultTenantID = "00000000-0000-0000-0000-000000000001"
+
 type PassiveMonitor struct {
 	db        *sql.DB
+	tenantID  string
 	ifaceName string
 	quit      chan struct{}
 }
@@ -24,6 +30,7 @@ func NewPassiveMonitor(db *sql.DB, interfaceName string) *PassiveMonitor {
 	}
 	return &PassiveMonitor{
 		db:        db,
+		tenantID:  DefaultTenantID,
 		ifaceName: interfaceName,
 		quit:      make(chan struct{}),
 	}
@@ -67,14 +74,14 @@ func (pm *PassiveMonitor) Stop() {
 // isSafelistedMAC reports whether the MAC has an active 'mac' safelist entry.
 // It lives in the scanner package because the api package (which owns the
 // other safelist helpers) imports scanner, and importing it back would cycle.
-func isSafelistedMAC(db *sql.DB, mac string) bool {
+func isSafelistedMAC(db *sql.DB, mac, tenantID string) bool {
 	if mac == "" {
 		return false
 	}
 	var count int
 	db.QueryRow(`SELECT COUNT(*) FROM safelists
-		WHERE is_active = TRUE AND entry_type = 'mac' AND LOWER(value) = $1`,
-		strings.ToLower(mac)).Scan(&count)
+		WHERE tenant_id = $2 AND is_active = TRUE AND entry_type = 'mac' AND LOWER(value) = $1`,
+		strings.ToLower(mac), tenantID).Scan(&count)
 	return count > 0
 }
 
@@ -113,20 +120,21 @@ func (pm *PassiveMonitor) handleDiscoveredDevice(ip, mac, source string) {
 	// schema and UI but was never consulted, so safelisted hardware still got
 	// inventoried and alerted on. We keep last_seen fresh for known devices so
 	// they don't trigger false offline alerts.
-	if isSafelistedMAC(pm.db, mac) {
-		pm.db.Exec(`UPDATE devices SET last_seen = NOW() WHERE ip_address = $1`, ip)
+	if isSafelistedMAC(pm.db, mac, pm.tenantID) {
+		pm.db.Exec(`UPDATE devices SET last_seen = NOW() WHERE tenant_id = $1 AND ip_address = $2`, pm.tenantID, ip)
 		return
 	}
 
 	var deviceID string
 	var existingMAC string
 
-	err := pm.db.QueryRow(`SELECT id, mac_address FROM devices WHERE ip_address = $1`, ip).Scan(&deviceID, &existingMAC)
+	err := pm.db.QueryRow(`SELECT id, mac_address FROM devices WHERE tenant_id = $1 AND ip_address = $2`, pm.tenantID, ip).Scan(&deviceID, &existingMAC)
 
-	if err == sql.ErrNoRows {
-		err = pm.db.QueryRow(`INSERT INTO devices (ip_address, mac_address, tags) VALUES ($1, $2, ARRAY['passive-discovery'])
+	switch err {
+	case sql.ErrNoRows:
+		err = pm.db.QueryRow(`INSERT INTO devices (tenant_id, ip_address, mac_address, tags) VALUES ($1, $2, $3, ARRAY['passive-discovery'])
 			ON CONFLICT (ip_address) DO UPDATE SET last_seen = NOW()
-			RETURNING id`, ip, mac).Scan(&deviceID)
+			RETURNING id`, pm.tenantID, ip, mac).Scan(&deviceID)
 
 		if err == nil {
 			slog.Info("New device discovered passively", "ip", ip, "mac", mac, "source", source)
@@ -138,11 +146,11 @@ func (pm *PassiveMonitor) handleDiscoveredDevice(ip, mac, source string) {
 				Description: fmt.Sprintf("Device detected on network without active scanning. Source: %s, MAC: %s", source, mac),
 			})
 		}
-	} else if err == nil {
+	case nil:
 		if existingMAC == "" || existingMAC != mac {
-			pm.db.Exec(`UPDATE devices SET mac_address = $1, last_seen = NOW() WHERE id = $2`, mac, deviceID)
+			pm.db.Exec(`UPDATE devices SET mac_address = $1, last_seen = NOW() WHERE tenant_id = $2 AND id = $3`, mac, pm.tenantID, deviceID)
 		} else {
-			pm.db.Exec(`UPDATE devices SET last_seen = NOW() WHERE id = $1 AND last_seen < NOW() - INTERVAL '5 minutes'`, deviceID)
+			pm.db.Exec(`UPDATE devices SET last_seen = NOW() WHERE tenant_id = $1 AND id = $2 AND last_seen < NOW() - INTERVAL '5 minutes'`, pm.tenantID, deviceID)
 		}
 	}
 }

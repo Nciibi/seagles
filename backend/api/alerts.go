@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/Nciibi/seagles/models"
 	"github.com/Nciibi/seagles/slog"
-	"github.com/gin-gonic/gin"
 )
 
 func ListAlertsHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		qdb := tenantDB(c, db)
 		requestID, _ := c.Get("request_id")
 
 		query := `SELECT id, device_id, severity, alert_type, title, description,
@@ -34,12 +36,11 @@ func ListAlertsHandler(db *sql.DB) gin.HandlerFunc {
 			b, _ := strconv.ParseBool(v)
 			query += fmt.Sprintf(" AND is_acknowledged = $%d", argIdx)
 			args = append(args, b)
-			argIdx++
 		}
 
 		query += " ORDER BY triggered_at DESC LIMIT 100"
 
-		rows, err := db.Query(query, args...)
+		rows, err := qdb.Query(query, args...)
 		if err != nil {
 			slog.Error("Failed to query alerts", "request_id", requestID, "error", err.Error())
 			failInternal(c, 500, "Failed to query alerts: ", err)
@@ -52,7 +53,8 @@ func ListAlertsHandler(db *sql.DB) gin.HandlerFunc {
 			var a models.Alert
 			if err := rows.Scan(&a.ID, &a.DeviceID, &a.Severity, &a.AlertType, &a.Title,
 				&a.Description, &a.TriggeredAt, &a.AcknowledgedAt, &a.IsAcknowledged, &a.Metadata); err != nil {
-				continue
+				failInternal(c, 500, "Failed to read alert row", err)
+				return
 			}
 			alertList = append(alertList, a.ToJSON())
 		}
@@ -69,13 +71,14 @@ func ListAlertsHandler(db *sql.DB) gin.HandlerFunc {
 
 func AckAlertHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		qdb := tenantDB(c, db)
 		requestID, _ := c.Get("request_id")
 		id, ok := uuidParam(c, "id")
 		if !ok {
 			return
 		}
 
-		result, err := db.Exec(`UPDATE alerts SET is_acknowledged=true, acknowledged_at=NOW() WHERE id=$1`, id)
+		result, err := qdb.Exec(`UPDATE alerts SET is_acknowledged=true, acknowledged_at=NOW() WHERE id=$1`, id)
 		if err != nil {
 			slog.Error("Failed to acknowledge alert", "request_id", requestID, "alert_id", id, "error", err.Error())
 			failInternal(c, 500, "Failed to acknowledge alert: ", err)

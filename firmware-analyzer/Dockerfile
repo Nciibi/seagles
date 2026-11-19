@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y \
     binutils \
     && rm -rf /var/lib/apt/lists/*
 
-RUN addgroup -S seagles && adduser -S -G seagles seagles
+RUN groupadd --system seagles && useradd --system --gid seagles --create-home --home-dir /home/seagles seagles
 
 WORKDIR /app
 COPY requirements.txt .

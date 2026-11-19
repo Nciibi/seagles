@@ -2,12 +2,17 @@ package alerts
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
 	"math"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -16,6 +21,7 @@ import (
 
 type WebhookConfig struct {
 	ID          string          `json:"id"`
+	TenantID    string          `json:"tenant_id"`
 	Name        string          `json:"name"`
 	URL         string          `json:"url"`
 	WebhookType string          `json:"webhook_type"`
@@ -26,8 +32,8 @@ type WebhookConfig struct {
 }
 
 const (
-	maxWebhookRetries    = 3
-	webhookRetryBaseMs   = 1000
+	maxWebhookRetries  = 3
+	webhookRetryBaseMs = 1000
 )
 
 func severityLevel(sev string) int {
@@ -46,8 +52,8 @@ func severityLevel(sev string) int {
 }
 
 func DispatchWebhooks(db *sql.DB, alertID, severity, title, description, deviceID string) {
-	rows, err := db.Query(`SELECT id, name, url, webhook_type, min_severity, secret, headers
-		FROM webhooks WHERE is_active = TRUE`)
+	rows, err := db.Query(`SELECT id, COALESCE(tenant_id, $1), name, url, webhook_type, min_severity, secret, headers
+		FROM webhooks WHERE is_active = TRUE`, DefaultTenantID)
 	if err != nil {
 		slog.Error("Failed to query webhooks", "error", err.Error())
 		return
@@ -58,7 +64,7 @@ func DispatchWebhooks(db *sql.DB, alertID, severity, title, description, deviceI
 
 	for rows.Next() {
 		var wh WebhookConfig
-		if err := rows.Scan(&wh.ID, &wh.Name, &wh.URL, &wh.WebhookType, &wh.MinSeverity, &wh.Secret, &wh.Headers); err != nil {
+		if err := rows.Scan(&wh.ID, &wh.TenantID, &wh.Name, &wh.URL, &wh.WebhookType, &wh.MinSeverity, &wh.Secret, &wh.Headers); err != nil {
 			continue
 		}
 
@@ -117,17 +123,32 @@ func deliverWebhook(db *sql.DB, wh WebhookConfig, alertID, severity, title, desc
 		payload, err = buildSlackPayload(severity, title, description, deviceID)
 	case "teams":
 		payload, err = buildTeamsPayload(severity, title, description, deviceID)
+	case "syslog":
+		payload, err = buildGenericPayload(alertID, severity, title, description, deviceID)
+		if err == nil {
+			if sendErr := deliverSyslog(wh, payload); sendErr != nil {
+				logDelivery(db, wh.TenantID, wh.ID, alertID, 0, "", sendErr.Error())
+				return 0, sendErr
+			}
+			logDelivery(db, wh.TenantID, wh.ID, alertID, 200, "", "")
+			return 200, nil
+		}
 	default:
 		payload, err = buildGenericPayload(alertID, severity, title, description, deviceID)
 	}
 	if err != nil {
-		logDelivery(db, wh.ID, alertID, 0, "", err.Error())
+		logDelivery(db, wh.TenantID, wh.ID, alertID, 0, "", err.Error())
+		return 0, err
+	}
+
+	if err := ValidateWebhookTarget(wh.URL, wh.WebhookType); err != nil {
+		logDelivery(db, wh.TenantID, wh.ID, alertID, 0, "", err.Error())
 		return 0, err
 	}
 
 	req, err := http.NewRequest("POST", wh.URL, bytes.NewReader(payload))
 	if err != nil {
-		logDelivery(db, wh.ID, alertID, 0, "", err.Error())
+		logDelivery(db, wh.TenantID, wh.ID, alertID, 0, "", err.Error())
 		return 0, err
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -142,11 +163,16 @@ func deliverWebhook(db *sql.DB, wh WebhookConfig, alertID, severity, title, desc
 		}
 	}
 
+	// Applied last so caller-supplied headers cannot forge the signature.
+	if wh.Secret.Valid && wh.Secret.String != "" {
+		req.Header.Set("X-Seagles-Signature", signWebhookPayload(payload, wh.Secret.String))
+	}
+
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		if attempt == maxWebhookRetries-1 {
-			logDelivery(db, wh.ID, alertID, 0, "", err.Error())
+			logDelivery(db, wh.TenantID, wh.ID, alertID, 0, "", err.Error())
 		}
 		return 0, err
 	}
@@ -156,7 +182,7 @@ func deliverWebhook(db *sql.DB, wh WebhookConfig, alertID, severity, title, desc
 	n, _ := resp.Body.Read(buf)
 	body := string(buf[:n])
 
-	logDelivery(db, wh.ID, alertID, resp.StatusCode, body, "")
+	logDelivery(db, wh.TenantID, wh.ID, alertID, resp.StatusCode, body, "")
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		db.Exec(`UPDATE alerts SET webhook_sent = TRUE, webhook_sent_at = NOW() WHERE id = $1`, alertID)
@@ -167,10 +193,57 @@ func deliverWebhook(db *sql.DB, wh WebhookConfig, alertID, severity, title, desc
 	return resp.StatusCode, fmt.Errorf("HTTP %d: %s", resp.StatusCode, body)
 }
 
-func logDelivery(db *sql.DB, webhookID, alertID string, statusCode int, responseBody, errMsg string) {
-	db.Exec(`INSERT INTO webhook_deliveries (webhook_id, alert_id, status_code, response_body, error)
-		VALUES ($1, $2, $3, $4, $5)`,
-		webhookID, alertID, statusCode, responseBody, errMsg)
+func signWebhookPayload(payload []byte, secret string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(payload)
+	return "sha256=" + hex.EncodeToString(mac.Sum(nil))
+}
+
+// deliverSyslog sends an RFC 3164-style datagram/stream to a syslog collector.
+// The URL form is udp://host:514 or tcp://host:514 (port defaults to 514).
+func deliverSyslog(wh WebhookConfig, payload []byte) error {
+	if err := ValidateWebhookTarget(wh.URL, "syslog"); err != nil {
+		return err
+	}
+	u, err := url.Parse(wh.URL)
+	if err != nil {
+		return err
+	}
+	port := u.Port()
+	if port == "" {
+		port = "514"
+	}
+	addr := net.JoinHostPort(u.Hostname(), port)
+	network := strings.ToLower(u.Scheme)
+
+	conn, err := net.DialTimeout(network, addr, 3*time.Second)
+	if err != nil {
+		return fmt.Errorf("syslog connect to %s: %w", addr, err)
+	}
+	defer conn.Close()
+	if err := conn.SetDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		return fmt.Errorf("syslog deadline: %w", err)
+	}
+
+	// <134> = local0 facility (16) + info severity (6).
+	message := append([]byte("<134>"), payload...)
+	if network == "tcp" {
+		message = append([]byte(fmt.Sprintf("%d ", len(message))), message...)
+	}
+	message = append(message, '\n')
+	if _, err := conn.Write(message); err != nil {
+		return fmt.Errorf("syslog write to %s: %w", addr, err)
+	}
+	return nil
+}
+
+func logDelivery(db *sql.DB, tenantID, webhookID, alertID string, statusCode int, responseBody, errMsg string) {
+	if tenantID == "" {
+		tenantID = DefaultTenantID
+	}
+	db.Exec(`INSERT INTO webhook_deliveries (tenant_id, webhook_id, alert_id, status_code, response_body, error)
+		VALUES ($1, $2, $3, $4, $5, $6)`,
+		tenantID, webhookID, alertID, statusCode, responseBody, errMsg)
 }
 
 func buildSlackPayload(severity, title, description, deviceID string) ([]byte, error) {

@@ -28,7 +28,6 @@ def register_firmware(monkeypatch, filepath, vendor="", version=""):
 @pytest.fixture()
 def auth_env(monkeypatch):
     monkeypatch.setenv("FIRMWARE_ANALYZER_TOKEN", TOKEN)
-    monkeypatch.setenv("FIRMWARE_ROOT", "/firmware")
     yield
 
 
@@ -40,12 +39,15 @@ def client(monkeypatch):
 
 
 @pytest.fixture()
-def firmware_file():
-    fd, path = tempfile.mkstemp(suffix=".bin")
+def firmware_file(monkeypatch):
+    root = tempfile.mkdtemp(prefix="seagles-fw-")
+    monkeypatch.setenv("FIRMWARE_ROOT", root)
+    fd, path = tempfile.mkstemp(suffix=".bin", dir=root)
     with os.fdopen(fd, "wb") as f:
         f.write(b"\x00" * 4096)
     yield path
     os.unlink(path)
+    os.rmdir(root)
 
 
 class TestHealth:
@@ -55,7 +57,7 @@ class TestHealth:
         body = resp.json()
         assert body["status"] == "ok"
         assert body["service"] == "firmware-analyzer"
-        assert body["version"] == "2.0.0"
+        assert body["version"] == "2.1.0"
 
 
 class TestAuth:
@@ -87,7 +89,9 @@ class TestAnalyze:
         conn.cursor.return_value.__enter__.return_value.fetchone.return_value = (
             "/firmware/no/such/file.bin", "", "",
         )
-        with patch.object(main, "get_db", MagicMock(return_value=conn)):
+        mocked_db = MagicMock()
+        mocked_db.__enter__.return_value = conn
+        with patch.object(main, "get_db", MagicMock(return_value=mocked_db)):
             resp = client.post("/analyze", json={"firmware_id": FIRMWARE_ID}, headers=AUTH)
         assert resp.status_code == 400
         assert "unavailable" in resp.json()["detail"].lower()
@@ -139,6 +143,65 @@ class TestAnalyze:
         assert len(report["cve_matches"]) == 1
         assert report["cve_matches"][0]["cve_id"] == "CVE-2024-7029"
         assert report["cve_matches"][0]["cvss_score"] == 9.8
+        assert report["cve_matches"][0]["severity"] == "critical"
+
+    def test_real_binwalk_output_reaches_report(self, client, monkeypatch, firmware_file, auth_env):
+        """No mocking around the contract: run_binwalk's real keys must populate the report."""
+        import binwalk_runner
+        import subprocess
+
+        register_firmware(monkeypatch, firmware_file)
+        output = (
+            "DECIMAL       HEXADECIMAL     DESCRIPTION\n"
+            "--------------------------------------------------------------------------------\n"
+            "0             0x0             Squashfs filesystem, little endian\n"
+            "1048576       0x100000        uImage header, Linux kernel\n"
+        )
+
+        class Completed:
+            stdout = output
+
+        monkeypatch.setattr(subprocess, "run", lambda *a, **k: Completed())
+
+        resp = client.post("/analyze", json={"firmware_id": FIRMWARE_ID}, headers=AUTH)
+        assert resp.status_code == 200
+        binwalk = resp.json()["report"]["binwalk"]
+        assert binwalk["has_filesystem"] is True
+        assert binwalk["filesystem_type"] == "squashfs"
+        assert binwalk["has_kernel"] is True
+        assert binwalk["raw_output"] == output
+
+    def test_cve_error_entries_are_filtered(self, client, monkeypatch, firmware_file, auth_env):
+        register_firmware(monkeypatch, firmware_file, "vendorX", "1.0")
+        monkeypatch.setattr(
+            main, "lookup_cve",
+            lambda *a, **k: [
+                {"error": "network down"},
+                {"cve_id": "CVE-2024-1000", "cvss_score": 8.0, "severity": "high"},
+            ],
+        )
+
+        resp = client.post("/analyze", json={"firmware_id": FIRMWARE_ID}, headers=AUTH)
+        matches = resp.json()["report"]["cve_matches"]
+        assert len(matches) == 1
+        assert matches[0]["cve_id"] == "CVE-2024-1000"
+
+    def test_entropy_extras_reach_report(self, client, monkeypatch, firmware_file, auth_env):
+        register_firmware(monkeypatch, firmware_file)
+        monkeypatch.setattr(
+            main, "analyze_file_entropy",
+            lambda p: {
+                "entropy_score": 6.9, "suspicious": False,
+                "file_size_bytes": 4096, "verdict": "compressed_or_mixed",
+                "threshold_used": 7.2,
+            },
+        )
+
+        resp = client.post("/analyze", json={"firmware_id": FIRMWARE_ID}, headers=AUTH)
+        entropy = resp.json()["report"]["entropy"]
+        assert entropy["file_size_bytes"] == 4096
+        assert entropy["verdict"] == "compressed_or_mixed"
+        assert entropy["threshold_used"] == 7.2
 
     def test_pipeline_survives_component_failures(self, client, monkeypatch, firmware_file, auth_env):
         register_firmware(monkeypatch, firmware_file)
@@ -183,3 +246,38 @@ class TestAnalyze:
         # TestClient runs background tasks before returning the response.
         assert recorded["id"] == FIRMWARE_ID
         assert recorded["report"].suspicious_string_count >= 0
+
+
+class TestHostingFlags:
+    def test_derives_telnet_and_credentials_from_iocs(self):
+        telnet, creds = main.derive_hosting_flags(
+            ["/usr/sbin/telnetd -l /bin/sh", "password=admin123"]
+        )
+        assert telnet is True
+        assert creds is True
+
+    def test_no_iocs_yields_false(self):
+        assert main.derive_hosting_flags(["harmless library name"]) == (False, False)
+
+    def test_update_database_persists_derived_flags(self, monkeypatch):
+        from contextlib import contextmanager
+
+        conn = MagicMock()
+        cur = conn.cursor.return_value
+
+        @contextmanager
+        def fake_db():
+            yield conn
+
+        monkeypatch.setattr(main, "get_db", fake_db)
+
+        report = main.AnalysisReport(
+            suspicious_strings=["dropbear -p 2222", "secret=hunter2"],
+            suspicious_string_count=2,
+        )
+        main.update_database(FIRMWARE_ID, report)
+
+        args = cur.execute.call_args.args[1]
+        # UPDATE parameter order: entropy, has_default_creds, has_telnet, ...
+        assert args[1] is True   # has_default_creds
+        assert args[2] is True   # has_telnet

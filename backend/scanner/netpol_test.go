@@ -43,40 +43,13 @@ func scannerSourcePorts(t *testing.T) map[int]string {
 		ports[p] = origin
 	}
 
-	// 1. The nmap -p list: `ports := "22,23,80,443,..."`
-	nmapRe := regexp.MustCompile(`ports\s*:?=\s*"([0-9,\-]+)"`)
-	src, err := os.ReadFile("nmap.go")
-	if err != nil {
-		t.Fatalf("failed to read nmap.go: %v", err)
+	// 1. The nmap -p list is now the compiled DefaultScanPorts slice, which
+	//    also serves as the cap source for profile-driven scans.
+	if len(DefaultScanPorts) == 0 {
+		t.Fatal("DefaultScanPorts is empty; the scanner would probe nothing")
 	}
-	m := nmapRe.FindSubmatch(src)
-	if m == nil {
-		t.Fatal(`could not find the nmap port list (ports := "...") in nmap.go; ` +
-			"update this test if the variable was renamed")
-	}
-	for _, field := range strings.Split(string(m[1]), ",") {
-		field = strings.TrimSpace(field)
-		if field == "" {
-			continue
-		}
-		if lo, hi, ok := strings.Cut(field, "-"); ok {
-			l, err1 := strconv.Atoi(lo)
-			h, err2 := strconv.Atoi(hi)
-			if err1 != nil || err2 != nil {
-				t.Errorf("unparseable nmap port range %q", field)
-				continue
-			}
-			for p := l; p <= h; p++ {
-				add(p, "nmap -p "+field)
-			}
-			continue
-		}
-		p, err := strconv.Atoi(field)
-		if err != nil {
-			t.Errorf("unparseable nmap port %q", field)
-			continue
-		}
-		add(p, "nmap -p")
+	for _, p := range DefaultScanPorts {
+		add(p, "DefaultScanPorts (nmap -p)")
 	}
 
 	// 2. DetectProtocols gates on `portSet[N]`.

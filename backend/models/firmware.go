@@ -10,21 +10,21 @@ import (
 
 // Firmware represents a firmware image associated with a device.
 type Firmware struct {
-	ID                     string          `json:"id" db:"id"`
-	DeviceID               sql.NullString  `json:"device_id" db:"device_id"`
-	Version                sql.NullString  `json:"version" db:"version"`
-	Vendor                 sql.NullString  `json:"vendor" db:"vendor"`
-	Checksum               sql.NullString  `json:"checksum" db:"checksum"`
-	FilePath               sql.NullString  `json:"file_path" db:"file_path"`
-	AnalyzedAt             sql.NullTime    `json:"analyzed_at" db:"analyzed_at"`
-	EntropyScore           float64         `json:"entropy_score" db:"entropy_score"`
-	HasDefaultCreds        bool            `json:"has_default_creds" db:"has_default_creds"`
-	HasTelnet              bool            `json:"has_telnet" db:"has_telnet"`
-	HasBackdoorIndicators  bool            `json:"has_backdoor_indicators" db:"has_backdoor_indicators"`
-	StringsOfInterest      pq.StringArray  `json:"strings_of_interest" db:"strings_of_interest"`
-	CVEMatches             pq.StringArray  `json:"cve_matches" db:"cve_matches"`
-	AnalysisStatus         string          `json:"analysis_status" db:"analysis_status"`
-	AnalysisReport         json.RawMessage `json:"analysis_report" db:"analysis_report"`
+	ID                    string         `json:"id" db:"id"`
+	DeviceID              sql.NullString `json:"device_id" db:"device_id"`
+	Version               sql.NullString `json:"version" db:"version"`
+	Vendor                sql.NullString `json:"vendor" db:"vendor"`
+	Checksum              sql.NullString `json:"checksum" db:"checksum"`
+	FilePath              sql.NullString `json:"file_path" db:"file_path"`
+	AnalyzedAt            sql.NullTime   `json:"analyzed_at" db:"analyzed_at"`
+	EntropyScore          float64        `json:"entropy_score" db:"entropy_score"`
+	HasDefaultCreds       bool           `json:"has_default_creds" db:"has_default_creds"`
+	HasTelnet             bool           `json:"has_telnet" db:"has_telnet"`
+	HasBackdoorIndicators bool           `json:"has_backdoor_indicators" db:"has_backdoor_indicators"`
+	StringsOfInterest     pq.StringArray `json:"strings_of_interest" db:"strings_of_interest"`
+	CVEMatches            pq.StringArray `json:"cve_matches" db:"cve_matches"`
+	AnalysisStatus        string         `json:"analysis_status" db:"analysis_status"`
+	AnalysisReport        []byte         `json:"analysis_report" db:"analysis_report"`
 }
 
 // FirmwareJSON is a JSON-friendly representation of Firmware for API responses.

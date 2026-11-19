@@ -10,9 +10,9 @@ type blacklistEntry struct {
 }
 
 type TokenBlacklist struct {
-	mu       sync.RWMutex
-	entries  map[string]blacklistEntry
-	maxTTL   time.Duration
+	mu      sync.RWMutex
+	entries map[string]blacklistEntry
+	maxTTL  time.Duration
 }
 
 func NewTokenBlacklist() *TokenBlacklist {

@@ -12,8 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Nciibi/seagles/slog"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/Nciibi/seagles/slog"
 )
 
 type Credential struct {

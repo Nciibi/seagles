@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from pathlib import Path
 from uuid import UUID
 from typing import Optional
+import re
 import psycopg2
 import os
 import json
@@ -23,13 +24,16 @@ from cve_lookup import lookup_cve
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Seagles Firmware Analyzer", version="2.0.0")
+app = FastAPI(title="Seagles Firmware Analyzer", version="2.1.0")
 
 DB_URL = os.environ.get("DATABASE_URL", "")
 NVD_API_KEY = os.environ.get("NVD_API_KEY", "")
 
 class EntropyReport(BaseModel):
     entropy_score: float = Field(0.0, ge=0.0, le=8.0)
+    file_size_bytes: int = 0
+    verdict: str = ""
+    threshold_used: Optional[float] = None
     suspicious: bool = False
     details: str = ""
 
@@ -107,7 +111,7 @@ def registered_firmware(firmware_id: str):
 class HealthResponse(BaseModel):
     status: str = "ok"
     service: str = "firmware-analyzer"
-    version: str = "2.0.0"
+    version: str = "2.1.0"
 
 @contextmanager
 def get_db():
@@ -122,11 +126,23 @@ def get_db():
     finally:
         conn.close()
 
+TELNET_INDICATORS = re.compile(r'telnetd|dropbear|telnet', re.IGNORECASE)
+CREDENTIAL_INDICATORS = re.compile(r'(password|passwd|secret)\s*=\s*\w+', re.IGNORECASE)
+
+
+def derive_hosting_flags(suspicious_strings: list[str]) -> tuple[bool, bool]:
+    """Derive has_telnet / has_default_creds from extracted IoC strings."""
+    has_telnet = any(TELNET_INDICATORS.search(s) for s in suspicious_strings)
+    has_default_creds = any(CREDENTIAL_INDICATORS.search(s) for s in suspicious_strings)
+    return has_telnet, has_default_creds
+
+
 def update_database(firmware_id: str, report: AnalysisReport):
     try:
         with get_db() as conn:
             cur = conn.cursor()
             cve_ids = [c.cve_id for c in report.cve_matches if c.cve_id]
+            has_telnet, has_default_creds = derive_hosting_flags(report.suspicious_strings)
             cur.execute("""
                 UPDATE firmware SET
                     entropy_score = %s,
@@ -141,8 +157,8 @@ def update_database(firmware_id: str, report: AnalysisReport):
                 WHERE id = %s
             """, (
                 report.entropy.entropy_score,
-                False,
-                False,
+                has_default_creds,
+                has_telnet,
                 report.suspicious_string_count > 0,
                 report.suspicious_strings,
                 cve_ids,
@@ -205,6 +221,7 @@ async def analyze_firmware(req: AnalyzeRequest, background_tasks: BackgroundTask
                     description=c.get("description", "")
                 )
                 for c in raw_cves
+                if c.get("cve_id")
             ]
         except Exception as e:
             logger.error(f"CVE lookup failed: {e}")
@@ -212,6 +229,9 @@ async def analyze_firmware(req: AnalyzeRequest, background_tasks: BackgroundTask
     report = AnalysisReport(
         entropy=EntropyReport(
             entropy_score=entropy_result.get("entropy_score", 0),
+            file_size_bytes=entropy_result.get("file_size_bytes", 0),
+            verdict=entropy_result.get("verdict", ""),
+            threshold_used=entropy_result.get("threshold_used"),
             suspicious=entropy_result.get("suspicious", False),
             details=entropy_result.get("details", "")
         ),

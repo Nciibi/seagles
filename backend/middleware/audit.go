@@ -6,9 +6,14 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Nciibi/seagles/slog"
 	"github.com/gin-gonic/gin"
+
+	"github.com/Nciibi/seagles/slog"
 )
+
+// DefaultTenantID matches auth.DefaultTenantID for requests that have not
+// gone through authentication (health probes, login failures).
+const DefaultTenantID = "00000000-0000-0000-0000-000000000001"
 
 type AuditEntry struct {
 	UserID    string
@@ -74,10 +79,17 @@ func AuditLogger(db *sql.DB, skipPaths ...string) gin.HandlerFunc {
 			LatencyMs: latencyMs,
 		}
 
+		tenantID := DefaultTenantID
+		if value, ok := c.Get("tenant_id"); ok {
+			if fromContext, ok := value.(string); ok && fromContext != "" {
+				tenantID = fromContext
+			}
+		}
+
 		_, err := db.Exec(
-			`INSERT INTO audit_log (user_id, username, action, resource, resource_id, ip_address, user_agent, status_code, latency_ms)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-			entry.UserID, entry.Username, entry.Action, entry.Resource,
+			`INSERT INTO audit_log (tenant_id, user_id, username, action, resource, resource_id, ip_address, user_agent, status_code, latency_ms)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+			tenantID, entry.UserID, entry.Username, entry.Action, entry.Resource,
 			entry.ResourcID, entry.IPAddress, entry.UserAgent,
 			entry.Status, entry.LatencyMs,
 		)

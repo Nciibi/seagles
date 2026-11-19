@@ -131,20 +131,6 @@ func sanitizeValue(v interface{}, cfg XSSConfig) interface{} {
 	}
 }
 
-var allowedFirmwareMIMETypes = map[string]string{
-	"application/octet-stream":     "bin",
-	"application/x-executable":     "elf",
-	"application/x-sharedlib":      "so",
-	"application/gzip":             "gz",
-	"application/x-gzip":           "gz",
-	"application/x-tar":            "tar",
-	"application/x-bzip2":          "bz2",
-	"application/x-xz":             "xz",
-	"application/zip":              "zip",
-	"application/x-rar-compressed": "rar",
-	"application/x-7z-compressed":  "7z",
-}
-
 var firmwareMagicBytes = []struct {
 	magic  []byte
 	offset int

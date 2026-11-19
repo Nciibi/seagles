@@ -1,7 +1,8 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useCallback, useEffect, useState, useMemo } from 'react'
 import { getVulnerabilities, resolveVuln, type Vulnerability } from '../api/client'
 import { timeAgo, epssColor } from '../utils/helpers'
 import { LoadingCard } from '../components/Loading'
+import ErrorBanner from '../components/ErrorBanner'
 
 export default function Vulnerabilities() {
   const [vulns, setVulns] = useState<Vulnerability[]>([])
@@ -11,9 +12,11 @@ export default function Vulnerabilities() {
   const [searchCVE, setSearchCVE] = useState('')
   const [sortByEPSS, setSortByEPSS] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const fetchVulns = async () => {
+  const fetchVulns = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const params: Record<string, string> = {}
       if (severity) params.severity = severity
@@ -23,15 +26,17 @@ export default function Vulnerabilities() {
       setVulns(res.data as unknown as Vulnerability[])
     } catch (e) {
       console.error('Failed to fetch vulns:', e)
+      setError('Failed to load vulnerabilities')
     } finally {
       setLoading(false)
     }
-  }
+  }, [severity, kevOnly, unresolvedOnly])
 
-  useEffect(() => { fetchVulns() }, [severity, kevOnly, unresolvedOnly])
+  useEffect(() => { fetchVulns() }, [fetchVulns])
 
   const handleResolve = async (id: string) => {
-    try { await resolveVuln(id); fetchVulns() } catch (e) { console.error(e) }
+    try { await resolveVuln(id); await fetchVulns() }
+    catch (e) { console.error(e); setError('Failed to resolve vulnerability') }
   }
 
   const filtered = useMemo(() => {
@@ -58,6 +63,8 @@ export default function Vulnerabilities() {
   return (
     <div>
       <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '20px' }}>Vulnerabilities</h1>
+
+      <ErrorBanner message={error} onRetry={fetchVulns} />
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -87,7 +94,7 @@ export default function Vulnerabilities() {
       </div>
 
       {/* Table */}
-      <div className="card table-wrapper" style={{ overflow: 'hidden' }}>
+      <div className="card table-wrapper">
         <table className="data-table">
           <thead>
             <tr>

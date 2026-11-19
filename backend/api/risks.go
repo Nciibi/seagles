@@ -3,19 +3,21 @@ package api
 import (
 	"database/sql"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/Nciibi/seagles/risk"
 	"github.com/Nciibi/seagles/slog"
-	"github.com/gin-gonic/gin"
 )
 
 func StatsHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		qdb := tenantDB(c, db)
 		requestID, _ := c.Get("request_id")
 
 		var totalDevices, onlineDevices int
 		var avgRiskScore sql.NullFloat64
 
-		err := db.QueryRow(`
+		err := qdb.QueryRow(`
 			SELECT
 				COUNT(*) FILTER (WHERE is_active) as total_devices,
 				COUNT(*) FILTER (WHERE is_active AND last_seen > NOW() - INTERVAL '5 minutes') as online_devices,
@@ -30,7 +32,7 @@ func StatsHandler(db *sql.DB) gin.HandlerFunc {
 
 		var criticalVulns, highVulns, mediumVulns, lowVulns, kevVulns, openAlerts, suspiciousFirmware int
 
-		err = db.QueryRow(`
+		err = qdb.QueryRow(`
 			SELECT
 				COALESCE((SELECT COUNT(*) FROM vulnerabilities WHERE severity='critical' AND is_resolved=FALSE), 0),
 				COALESCE((SELECT COUNT(*) FROM vulnerabilities WHERE severity='high' AND is_resolved=FALSE), 0),
@@ -72,13 +74,14 @@ func StatsHandler(db *sql.DB) gin.HandlerFunc {
 // scan_age, so the breakdown disagreed with devices.risk_score.
 func RiskBreakdownHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		qdb := tenantDB(c, db)
 		requestID, _ := c.Get("request_id")
 		deviceID, ok := uuidParam(c, "id")
 		if !ok {
 			return
 		}
 
-		result := risk.GetRiskBreakdown(db, deviceID)
+		result := risk.GetRiskBreakdown(qdb, deviceID)
 		if errMsg, ok := result["error"].(string); ok {
 			slog.Error("Failed to compute risk breakdown", "request_id", requestID, "device_id", deviceID, "error", errMsg)
 			fail(c, 500, "Failed to compute risk breakdown: "+errMsg)

@@ -55,7 +55,7 @@ func FetchKEV(cacheFilePath string) error {
 	var resp *http.Response
 	err = kevBreaker.Execute(func() error {
 		var innerErr error
-		resp, innerErr = client.Do(req)
+		resp, innerErr = client.Do(req) //nolint:bodyclose // closed by the deferred Close below
 		return innerErr
 	})
 	if err != nil {

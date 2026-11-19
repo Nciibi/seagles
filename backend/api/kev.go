@@ -4,8 +4,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/Nciibi/seagles/kev"
 	"github.com/gin-gonic/gin"
+
+	"github.com/Nciibi/seagles/kev"
 )
 
 // KEVStatusHandler returns the KEV catalog status.

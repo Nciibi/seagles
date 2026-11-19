@@ -109,9 +109,23 @@ class TestRunBinwalk:
 
         result = run_binwalk(firmware_file)
         assert result["output"] == output
+        assert result["raw_output"] == output
         assert len(result["signatures_found"]) == 2
         assert any("Squashfs" in s for s in result["signatures_found"])
         assert any("uImage" in s for s in result["signatures_found"])
+        assert result["has_filesystem"] is True
+        assert result["filesystem_type"] == "squashfs"
+        assert result["has_kernel"] is True
+
+    def test_no_signatures_yields_false_flags(self, monkeypatch, firmware_file):
+        def fake_run(*args, **kwargs):
+            return FakeCompleted("DECIMAL       HEXADECIMAL     DESCRIPTION\n")
+        monkeypatch.setattr(subprocess, "run", fake_run)
+
+        result = run_binwalk(firmware_file)
+        assert result["has_filesystem"] is False
+        assert result["filesystem_type"] is None
+        assert result["has_kernel"] is False
 
     def test_binwalk_not_installed(self, monkeypatch, firmware_file):
         def raise_fnf(*args, **kwargs):
@@ -119,7 +133,10 @@ class TestRunBinwalk:
         monkeypatch.setattr(subprocess, "run", raise_fnf)
 
         result = run_binwalk(firmware_file)
-        assert result == {"output": "binwalk not installed", "signatures_found": []}
+        assert result["signatures_found"] == []
+        assert result["has_filesystem"] is False
+        assert result["has_kernel"] is False
+        assert "not installed" in result["raw_output"]
 
     def test_generic_error(self, monkeypatch, firmware_file):
         def raise_err(*args, **kwargs):
@@ -129,3 +146,4 @@ class TestRunBinwalk:
         result = run_binwalk(firmware_file)
         assert result["signatures_found"] == []
         assert "disk exploded" in result["output"]
+        assert result["has_filesystem"] is False

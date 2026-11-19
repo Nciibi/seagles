@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { getDevice, getRiskBreakdown, getVulnerabilities, getScans, resolveVuln, triggerScan, type Device, type Vulnerability, type Scan, type RiskBreakdown } from '../api/client'
+import { waitForScan } from '../utils/asyncJobs'
 import RiskScore from '../components/RiskScore'
 import { timeAgo } from '../utils/helpers'
 
@@ -10,11 +11,12 @@ export default function DeviceDetail() {
   const [breakdown, setBreakdown] = useState<RiskBreakdown | null>(null)
   const [vulns, setVulns] = useState<Vulnerability[]>([])
   const [scans, setScans] = useState<Scan[]>([])
-  const [activeTab, setActiveTab] = useState<'vulns' | 'scans' | 'firmware'>('vulns')
+  const [activeTab, setActiveTab] = useState<'vulns' | 'scans'>('vulns')
   const [openVulns, setOpenVulns] = useState(0)
   const [scanning, setScanning] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
-  const scanTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const scanAbortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     // A closure-local flag makes stale responses impossible to apply: when the
@@ -41,6 +43,7 @@ export default function DeviceDetail() {
         setScans((scanRes.data as unknown as Scan[]).filter((s) => s.device_id === id))
       } catch (e) {
         console.error('Failed to fetch device:', e)
+        if (!cancelled) setError('Failed to load device details')
       }
     }
 
@@ -48,11 +51,7 @@ export default function DeviceDetail() {
     return () => { cancelled = true }
   }, [id, reloadKey])
 
-  useEffect(() => {
-    return () => {
-      if (scanTimerRef.current) clearTimeout(scanTimerRef.current)
-    }
-  }, [])
+  useEffect(() => () => scanAbortRef.current?.abort(), [])
 
   const handleResolve = async (vulnId: string) => {
     try {
@@ -66,8 +65,22 @@ export default function DeviceDetail() {
   const handleScan = async () => {
     if (!id) return
     setScanning(true)
-    try { await triggerScan(id) } catch (e) { console.error(e) }
-    scanTimerRef.current = setTimeout(() => { setScanning(false); setReloadKey((k) => k + 1) }, 3000)
+    setError(null)
+    const controller = new AbortController()
+    scanAbortRef.current = controller
+    try {
+      const started = await triggerScan(id)
+      const scanId = (started.data as { scan_id?: string } | undefined)?.scan_id
+      if (scanId) await waitForScan(scanId, { signal: controller.signal })
+      setReloadKey((k) => k + 1)
+    } catch (e) {
+      if ((e as Error)?.name !== 'AbortError') {
+        console.error('Scan failed:', e)
+        setError('Scan did not complete successfully')
+      }
+    } finally {
+      setScanning(false)
+    }
   }
 
   if (!device) return <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading device...</div>
@@ -111,6 +124,13 @@ export default function DeviceDetail() {
         </div>
       </div>
 
+      {error && (
+        <div className="card" role="alert" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px', borderColor: '#e03131' }}>
+          <span style={{ color: '#ff6b6b', flex: 1 }}>{error}</span>
+          <button className="btn btn-ghost" onClick={() => setReloadKey((k) => k + 1)}>Retry</button>
+        </div>
+      )}
+
       {/* Risk Breakdown */}
       {breakdown && Object.keys(breakdown.score_breakdown).length > 0 && (
         <div className="card" style={{ padding: '20px', marginBottom: '20px' }}>
@@ -133,18 +153,36 @@ export default function DeviceDetail() {
       )}
 
       {/* Tabs */}
-      <div className="tab-bar">
-        <div className={`tab ${activeTab === 'vulns' ? 'active' : ''}`} onClick={() => setActiveTab('vulns')}>
+      <div className="tab-bar" role="tablist" aria-label="Device details">
+        <div
+          role="tab"
+          id="tab-vulns"
+          aria-selected={activeTab === 'vulns'}
+          aria-controls="panel-vulns"
+          tabIndex={activeTab === 'vulns' ? 0 : -1}
+          className={`tab ${activeTab === 'vulns' ? 'active' : ''}`}
+          onClick={() => setActiveTab('vulns')}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveTab('vulns') } }}
+        >
           Vulnerabilities ({openVulns})
         </div>
-        <div className={`tab ${activeTab === 'scans' ? 'active' : ''}`} onClick={() => setActiveTab('scans')}>
+        <div
+          role="tab"
+          id="tab-scans"
+          aria-selected={activeTab === 'scans'}
+          aria-controls="panel-scans"
+          tabIndex={activeTab === 'scans' ? 0 : -1}
+          className={`tab ${activeTab === 'scans' ? 'active' : ''}`}
+          onClick={() => setActiveTab('scans')}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveTab('scans') } }}
+        >
           Scan History ({scans.length})
         </div>
       </div>
 
       {/* Tab content */}
       {activeTab === 'vulns' && (
-        <div className="card table-wrapper" style={{ overflow: 'hidden' }}>
+        <div className="card table-wrapper" role="tabpanel" id="panel-vulns" aria-labelledby="tab-vulns">
           <table className="data-table">
             <thead>
               <tr>
@@ -181,7 +219,7 @@ export default function DeviceDetail() {
       )}
 
       {activeTab === 'scans' && (
-        <div className="card table-wrapper" style={{ overflow: 'hidden' }}>
+        <div className="card table-wrapper" role="tabpanel" id="panel-scans" aria-labelledby="tab-scans">
           <table className="data-table">
             <thead>
               <tr><th>Started</th><th>Status</th><th>Type</th><th>Open Ports</th></tr>

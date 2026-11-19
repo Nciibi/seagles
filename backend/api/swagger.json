@@ -129,6 +129,28 @@
     }
   },
   "paths": {
+    "/auth/jwks.json": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "JSON Web Key Set for access-token verification",
+        "security": [],
+        "responses": {
+          "200": { "description": "Public RSA verification key" },
+          "503": { "description": "Signing key not initialized" }
+        }
+      }
+    },
+    "/auth/public-key.pem": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Public signing key in PEM form",
+        "security": [],
+        "responses": {
+          "200": { "description": "PEM-encoded RSA public key" },
+          "503": { "description": "Signing key not initialized" }
+        }
+      }
+    },
     "/auth/login": {
       "post": {
         "tags": ["Auth"],
@@ -212,6 +234,73 @@
         "security": [],
         "responses": {
           "200": { "description": "Service is healthy" }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Prometheus metrics",
+        "security": [],
+        "responses": {
+          "200": { "description": "Prometheus exposition format", "content": { "text/plain": {} } }
+        }
+      }
+    },
+    "/docs": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Swagger UI",
+        "security": [],
+        "responses": {
+          "200": { "description": "Interactive API documentation" }
+        }
+      }
+    },
+    "/swagger.json": {
+      "get": {
+        "tags": ["System"],
+        "summary": "OpenAPI specification",
+        "security": [],
+        "responses": {
+          "200": { "description": "This OpenAPI document" }
+        }
+      }
+    },
+    "/ws": {
+      "get": {
+        "tags": ["System"],
+        "summary": "WebSocket event stream",
+        "security": [{ "BearerAuth": [] }],
+        "description": "Upgrade to a WebSocket connection to receive real-time alert and scan events. The access token must be supplied in the Authorization header (or via the configured ticket query parameter). Origin is restricted to ALLOWED_ORIGINS.",
+        "responses": {
+          "101": { "description": "Switching Protocols" },
+          "401": { "description": "Unauthorized" },
+          "403": { "description": "Origin not allowed" }
+        }
+      }
+    },
+    "/sessions": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "List active sessions",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Active refresh-token sessions" },
+          "403": { "description": "Admin role required" }
+        }
+      }
+    },
+    "/sessions/{id}": {
+      "delete": {
+        "tags": ["Admin"],
+        "summary": "Revoke a session",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Session revoked" },
+          "400": { "description": "Invalid UUID" },
+          "403": { "description": "Admin role required" }
         }
       }
     },
@@ -473,6 +562,28 @@
         "summary": "List scan profiles",
         "security": [{ "BearerAuth": [] }],
         "responses": { "200": { "description": "Scan profiles" } }
+      },
+      "post": {
+        "tags": ["Scans"],
+        "summary": "Create scan profile (admin)",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Scan profile created" }, "409": { "description": "Name already exists" } }
+      }
+    },
+    "/scan-profiles/{id}": {
+      "patch": {
+        "tags": ["Scans"],
+        "summary": "Update scan profile (admin)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Scan profile updated" }, "404": { "description": "Profile not found" } }
+      },
+      "delete": {
+        "tags": ["Scans"],
+        "summary": "Delete a non-default scan profile (admin)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Scan profile deleted" }, "409": { "description": "Profile is in use" } }
       }
     },
     "/scan-scopes": {

@@ -1,26 +1,32 @@
 {
 	"info": {
 		"name": "Seagles API",
-		"description": "IoT Security Platform — Authentication, Device Management, Firmware Analysis, and Scanning",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "seagles"
+		"description": "IoT Security Platform API (v1). Auth uses RS256 bearer tokens. Login returns data.token (access) and data.refresh_token. The seeded account is admin / changeme and has must_change_password=true: call Auth > Change Password before any other protected endpoint. All :id path parameters are UUIDs. Set base_url to the Compose host (http://localhost:8080/api/v1) or a k8s ingress URL, and create an environment for each.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"auth": {
 		"type": "bearer",
 		"bearer": [
-			{
-				"key": "token",
-				"value": "{{access_token}}",
-				"type": "string"
-			}
+			{ "key": "token", "value": "{{access_token}}", "type": "string" }
 		]
 	},
 	"variable": [
 		{ "key": "base_url", "value": "http://localhost:8080/api/v1", "type": "string" },
-		{ "key": "email", "value": "admin@seagles.dev", "type": "string" },
-		{ "key": "password", "value": "admin123", "type": "string" },
+		{ "key": "username", "value": "admin", "type": "string" },
+		{ "key": "password", "value": "changeme", "type": "string" },
+		{ "key": "new_password", "value": "ChangeMe-2026!", "type": "string" },
 		{ "key": "access_token", "value": "", "type": "string" },
-		{ "key": "refresh_token", "value": "", "type": "string" }
+		{ "key": "refresh_token", "value": "", "type": "string" },
+		{ "key": "device_id", "value": "00000000-0000-0000-0000-000000000001", "type": "string" },
+		{ "key": "scan_id", "value": "00000000-0000-0000-0000-000000000002", "type": "string" },
+		{ "key": "vuln_id", "value": "00000000-0000-0000-0000-000000000003", "type": "string" },
+		{ "key": "firmware_id", "value": "00000000-0000-0000-0000-000000000004", "type": "string" },
+		{ "key": "alert_id", "value": "00000000-0000-0000-0000-000000000005", "type": "string" },
+		{ "key": "safelist_id", "value": "00000000-0000-0000-0000-000000000006", "type": "string" },
+		{ "key": "scope_id", "value": "00000000-0000-0000-0000-000000000007", "type": "string" },
+		{ "key": "webhook_id", "value": "00000000-0000-0000-0000-000000000008", "type": "string" },
+		{ "key": "user_id", "value": "00000000-0000-0000-0000-000000000009", "type": "string" },
+		{ "key": "session_id", "value": "00000000-0000-0000-0000-000000000010", "type": "string" }
 	],
 	"item": [
 		{
@@ -33,48 +39,88 @@
 							"listen": "test",
 							"script": {
 								"exec": [
-									"var jsonData = pm.response.json();",
-									"pm.collectionVariables.set('access_token', jsonData.data.access_token);",
-									"pm.collectionVariables.set('refresh_token', jsonData.data.refresh_token);"
+									"pm.test('status 200', () => pm.response.to.have.status(200));",
+									"var body = pm.response.json();",
+									"pm.test('token returned', () => pm.expect(body.data.token).to.be.a('string').that.is.not.empty);",
+									"pm.collectionVariables.set('access_token', body.data.token);",
+									"if (body.data.refresh_token) pm.collectionVariables.set('refresh_token', body.data.refresh_token);"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"url": "{{base_url}}/auth/login",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}",
+							"options": { "raw": { "language": "json" } }
+						}
+					}
+				},
+				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('status 200', () => pm.response.to.have.status(200));",
+									"var body = pm.response.json();",
+									"pm.collectionVariables.set('access_token', body.data.token);",
+									"if (body.data.refresh_token) pm.collectionVariables.set('refresh_token', body.data.refresh_token);"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"url": "{{base_url}}/auth/refresh",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}",
+							"options": { "raw": { "language": "json" } }
+						}
+					}
+				},
+				{
+					"name": "Change Password (required for seeded admin)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('status 200', () => pm.response.to.have.status(200));",
+									"pm.collectionVariables.set('password', pm.collectionVariables.get('new_password'));"
 								]
 							}
 						}
 					],
 					"request": {
 						"method": "POST",
-						"url": "{{base_url}}/auth/login",
-						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"url": "{{base_url}}/auth/change-password",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
-						}
-					}
-				},
-				{
-					"name": "Refresh Token",
-					"request": {
-						"method": "POST",
-						"url": "{{base_url}}/auth/refresh",
-						"header": [{"key": "Content-Type", "value": "application/json"}],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+							"raw": "{\n  \"current_password\": \"{{password}}\",\n  \"new_password\": \"{{new_password}}\"\n}",
+							"options": { "raw": { "language": "json" } }
 						}
 					}
 				},
 				{
 					"name": "Get Me",
-					"request": {
-						"method": "GET",
-						"url": "{{base_url}}/auth/me"
-					}
+					"request": { "method": "GET", "url": "{{base_url}}/auth/me" }
+				},
+				{
+					"name": "Get Permissions",
+					"request": { "method": "GET", "url": "{{base_url}}/auth/permissions" }
 				},
 				{
 					"name": "Logout",
-					"request": {
-						"method": "POST",
-						"url": "{{base_url}}/auth/logout"
-					},
 					"event": [
 						{
 							"listen": "test",
@@ -85,163 +131,55 @@
 								]
 							}
 						}
-					]
-				},
-				{
-					"name": "Change Password",
-					"request": {
-						"method": "POST",
-						"url": "{{base_url}}/auth/change-password",
-						"header": [{"key": "Content-Type", "value": "application/json"}],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"current_password\": \"{{password}}\",\n  \"new_password\": \"newpass123\"\n}"
-						}
-					}
+					],
+					"request": { "method": "POST", "url": "{{base_url}}/auth/logout" }
 				}
+			]
+		},
+		{
+			"name": "Probes & Docs",
+			"item": [
+				{ "name": "Livez", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{base_url}}/livez" } },
+				{ "name": "Readyz", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{base_url}}/readyz" } },
+				{ "name": "Health", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{base_url}}/health" } },
+				{ "name": "Metrics", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{base_url}}/metrics" } },
+				{ "name": "Swagger JSON", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{base_url}}/swagger.json" } },
+				{ "name": "Swagger UI", "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{base_url}}/docs" } }
+			]
+		},
+		{
+			"name": "Stats & KEV",
+			"item": [
+				{ "name": "Get Stats", "request": { "method": "GET", "url": "{{base_url}}/stats" } },
+				{ "name": "KEV Status", "request": { "method": "GET", "url": "{{base_url}}/kev/status" } }
 			]
 		},
 		{
 			"name": "Devices",
 			"item": [
-				{
-					"name": "List Devices",
-					"request": {
-						"method": "GET",
-						"url": "{{base_url}}/devices"
-					}
-				},
-				{
-					"name": "Get Device",
-					"request": {
-						"method": "GET",
-						"url": "{{base_url}}/devices/1"
-					}
-				},
-				{
-					"name": "Create Device",
-					"request": {
-						"method": "POST",
-						"url": "{{base_url}}/devices",
-						"header": [{"key": "Content-Type", "value": "application/json"}],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"ip\": \"192.168.1.100\",\n  \"mac\": \"aa:bb:cc:dd:ee:ff\",\n  \"hostname\": \"test-device\",\n  \"vendor\": \"TestCorp\"\n}"
-						}
-					}
-				},
-				{
-					"name": "Update Device",
-					"request": {
-						"method": "PUT",
-						"url": "{{base_url}}/devices/1",
-						"header": [{"key": "Content-Type", "value": "application/json"}],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"hostname\": \"updated-device\",\n  \"vendor\": \"UpdatedCorp\"\n}"
-						}
-					}
-				},
-				{
-					"name": "Delete Device",
-					"request": {
-						"method": "DELETE",
-						"url": "{{base_url}}/devices/1"
-					}
-				},
-				{
-					"name": "Get Device Alerts",
-					"request": {
-						"method": "GET",
-						"url": "{{base_url}}/devices/1/alerts"
-					}
-				}
+				{ "name": "List Devices", "request": { "method": "GET", "url": "{{base_url}}/devices" } },
+				{ "name": "Get Device", "request": { "method": "GET", "url": "{{base_url}}/devices/{{device_id}}" } },
+				{ "name": "Get Risk Breakdown", "request": { "method": "GET", "url": "{{base_url}}/devices/{{device_id}}/risk-breakdown" } },
+				{ "name": "Delete Device (admin)", "request": { "method": "DELETE", "url": "{{base_url}}/devices/{{device_id}}" } },
+				{ "name": "Scan Device (admin)", "request": { "method": "POST", "url": "{{base_url}}/devices/{{device_id}}/scan" } }
 			]
 		},
 		{
-			"name": "Firmware",
+			"name": "Scans",
 			"item": [
+				{ "name": "List Scans", "request": { "method": "GET", "url": "{{base_url}}/scans" } },
+				{ "name": "Get Scan", "request": { "method": "GET", "url": "{{base_url}}/scans/{{scan_id}}" } },
 				{
-					"name": "List Firmware",
-					"request": {
-						"method": "GET",
-						"url": "{{base_url}}/firmware"
-					}
-				},
-				{
-					"name": "Get Firmware",
-					"request": {
-						"method": "GET",
-						"url": "{{base_url}}/firmware/1"
-					}
-				},
-				{
-					"name": "Upload Firmware",
+					"name": "Network Scan (admin)",
 					"request": {
 						"method": "POST",
-						"url": "{{base_url}}/firmware/upload",
-						"header": [{"key": "Content-Type", "value": "multipart/form-data"}],
-						"body": {
-							"mode": "formdata",
-							"formdata": [
-								{"key": "file", "type": "file", "src": "/path/to/firmware.bin"}
-							]
-						}
-					}
-				},
-				{
-					"name": "Analyze Firmware",
-					"request": {
-						"method": "POST",
-						"url": "{{base_url}}/firmware/1/analyze"
-					}
-				}
-			]
-		},
-		{
-			"name": "Scanning",
-			"item": [
-				{
-					"name": "Discover Network",
-					"request": {
-						"method": "POST",
-						"url": "{{base_url}}/scan/discover",
-						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"url": "{{base_url}}/scan/network",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"cidr\": \"192.168.1.0/24\"\n}"
+							"raw": "{\n  \"cidr\": \"192.168.1.0/24\",\n  \"scan_type\": \"quick\",\n  \"profile_id\": \"\"\n}",
+							"options": { "raw": { "language": "json" } }
 						}
-					}
-				},
-				{
-					"name": "Deep Scan",
-					"request": {
-						"method": "POST",
-						"url": "{{base_url}}/scan/deep",
-						"header": [{"key": "Content-Type", "value": "application/json"}],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"ip\": \"192.168.1.100\"\n}"
-						}
-					}
-				},
-				{
-					"name": "Batch Scan",
-					"request": {
-						"method": "POST",
-						"url": "{{base_url}}/scan/batch",
-						"header": [{"key": "Content-Type", "value": "application/json"}],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"ips\": [\"192.168.1.100\", \"192.168.1.101\"]\n}"
-						}
-					}
-				},
-				{
-					"name": "Scan Status",
-					"request": {
-						"method": "GET",
-						"url": "{{base_url}}/scan/status/1"
 					}
 				}
 			]
@@ -249,91 +187,122 @@
 		{
 			"name": "Vulnerabilities",
 			"item": [
+				{ "name": "List Vulnerabilities", "request": { "method": "GET", "url": "{{base_url}}/vulnerabilities" } },
+				{ "name": "Resolve Vulnerability (admin)", "request": { "method": "PATCH", "url": "{{base_url}}/vulnerabilities/{{vuln_id}}/resolve" } }
+			]
+		},
+		{
+			"name": "Firmware",
+			"item": [
+				{ "name": "List Firmware", "request": { "method": "GET", "url": "{{base_url}}/firmware" } },
 				{
-					"name": "List Vulnerabilities",
-					"request": {
-						"method": "GET",
-						"url": "{{base_url}}/vulnerabilities"
-					}
-				},
-				{
-					"name": "Get Vulnerability",
-					"request": {
-						"method": "GET",
-						"url": "{{base_url}}/vulnerabilities/CVE-2024-1234"
-					}
-				},
-				{
-					"name": "Get CVSS Score",
-					"request": {
-						"method": "GET",
-						"url": "{{base_url}}/vulnerabilities/CVE-2024-1234/cvss"
-					}
-				},
-				{
-					"name": "Risk Assessment",
+					"name": "Upload Firmware (admin)",
 					"request": {
 						"method": "POST",
-						"url": "{{base_url}}/vulnerabilities/assess",
-						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"url": "{{base_url}}/firmware/upload",
 						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"cve_id\": \"CVE-2024-1234\",\n  \"epss_score\": 0.5,\n  \"has_exploit\": true,\n  \"asset_criticality\": 0.8,\n  \"network_exposure\": 0.6\n}"
+							"mode": "formdata",
+							"formdata": [
+								{ "key": "firmware", "type": "file", "src": "/path/to/firmware.bin" },
+								{ "key": "device_id", "value": "{{device_id}}", "type": "text" },
+								{ "key": "vendor", "value": "AVTECH", "type": "text" },
+								{ "key": "version", "value": "5.4.3", "type": "text" }
+							]
 						}
 					}
-				}
+				},
+				{ "name": "Analyze Firmware (admin)", "request": { "method": "POST", "url": "{{base_url}}/firmware/{{firmware_id}}/analyze" } }
 			]
 		},
 		{
 			"name": "Alerts",
 			"item": [
+				{ "name": "List Alerts", "request": { "method": "GET", "url": "{{base_url}}/alerts" } },
+				{ "name": "Acknowledge Alert", "request": { "method": "POST", "url": "{{base_url}}/alerts/{{alert_id}}/ack" } }
+			]
+		},
+		{
+			"name": "Safelists",
+			"item": [
+				{ "name": "List Safelists", "request": { "method": "GET", "url": "{{base_url}}/safelists" } },
 				{
-					"name": "List Alerts",
-					"request": {
-						"method": "GET",
-						"url": "{{base_url}}/alerts"
-					}
-				},
-				{
-					"name": "Acknowledge Alert",
+					"name": "Create Safelist (admin)",
 					"request": {
 						"method": "POST",
-						"url": "{{base_url}}/alerts/1/acknowledge"
+						"url": "{{base_url}}/safelists",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"entry_type\": \"cidr\",\n  \"value\": \"10.0.0.0/8\",\n  \"reason\": \"Internal lab range\"\n}",
+							"options": { "raw": { "language": "json" } }
+						}
 					}
-				}
+				},
+				{ "name": "Delete Safelist (admin)", "request": { "method": "DELETE", "url": "{{base_url}}/safelists/{{safelist_id}}" } }
+			]
+		},
+		{
+			"name": "Scan Config",
+			"item": [
+				{ "name": "List Scan Profiles", "request": { "method": "GET", "url": "{{base_url}}/scan-profiles" } },
+				{ "name": "List Scan Scopes", "request": { "method": "GET", "url": "{{base_url}}/scan-scopes" } },
+				{
+					"name": "Create Scan Scope (admin)",
+					"request": {
+						"method": "POST",
+						"url": "{{base_url}}/scan-scopes",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"cidr\": \"192.168.1.0/24\",\n  \"label\": \"Home lab\"\n}",
+							"options": { "raw": { "language": "json" } }
+						}
+					}
+				},
+				{ "name": "Delete Scan Scope (admin)", "request": { "method": "DELETE", "url": "{{base_url}}/scan-scopes/{{scope_id}}" } }
+			]
+		},
+		{
+			"name": "Webhooks",
+			"item": [
+				{ "name": "List Webhooks (admin)", "request": { "method": "GET", "url": "{{base_url}}/webhooks" } },
+				{
+					"name": "Create Webhook (admin)",
+					"request": {
+						"method": "POST",
+						"url": "{{base_url}}/webhooks",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"security-ops\",\n  \"url\": \"https://hooks.example.com/seagles\",\n  \"webhook_type\": \"generic\",\n  \"min_severity\": \"high\"\n}",
+							"options": { "raw": { "language": "json" } }
+						}
+					}
+				},
+				{ "name": "Test Webhook (admin)", "request": { "method": "POST", "url": "{{base_url}}/webhooks/{{webhook_id}}/test" } },
+				{ "name": "Delete Webhook (admin)", "request": { "method": "DELETE", "url": "{{base_url}}/webhooks/{{webhook_id}}" } }
 			]
 		},
 		{
 			"name": "Admin",
 			"item": [
+				{ "name": "List Users (admin)", "request": { "method": "GET", "url": "{{base_url}}/users" } },
 				{
-					"name": "Health Check",
+					"name": "Create User (admin)",
 					"request": {
-						"method": "GET",
-						"url": "{{base_url}}/health"
+						"method": "POST",
+						"url": "{{base_url}}/users",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"analyst1\",\n  \"email\": \"analyst1@seagles.local\",\n  \"password\": \"Analyst-Pass-2026!\",\n  \"role\": \"viewer\"\n}",
+							"options": { "raw": { "language": "json" } }
+						}
 					}
 				},
-				{
-					"name": "Audit Log",
-					"request": {
-						"method": "GET",
-						"url": "{{base_url}}/audit-log"
-					}
-				},
-				{
-					"name": "Metrics",
-					"request": {
-						"method": "GET",
-						"url": "{{base_url}}/metrics"
-					}
-				},
-				{
-					"name": "Swagger Docs",
-					"request": {
-						"method": "GET",
-						"url": "{{base_url}}/docs"
-					}
-				}
+				{ "name": "Audit Log (auditor)", "request": { "method": "GET", "url": "{{base_url}}/audit-log" } },
+				{ "name": "List Sessions (admin)", "request": { "method": "GET", "url": "{{base_url}}/sessions" } },
+				{ "name": "Revoke Session (admin)", "request": { "method": "DELETE", "url": "{{base_url}}/sessions/{{session_id}}" } }
 			]
 		}
 	]

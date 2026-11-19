@@ -150,7 +150,10 @@ func TestNewPinnedHTTPClient_ValidPin(t *testing.T) {
 	pins := []CertPin{{Hostname: "example.com", SHA256: fingerprint}}
 	client := NewPinnedHTTPClient(pins)
 
-	_, err = client.Get(fmt.Sprintf("https://%s/", listener.Addr().String()))
+	resp, err := client.Get(fmt.Sprintf("https://%s/", listener.Addr().String()))
+	if resp != nil {
+		resp.Body.Close()
+	}
 	if err == nil {
 		t.Log("connection succeeded with valid pin")
 	}

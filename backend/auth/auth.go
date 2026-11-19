@@ -10,10 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Nciibi/seagles/cache"
-	"github.com/Nciibi/seagles/slog"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/Nciibi/seagles/cache"
+	"github.com/Nciibi/seagles/slog"
 )
 
 type User struct {
@@ -21,6 +22,7 @@ type User struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
 	Role     string `json:"role"`
+	TenantID string `json:"tenant_id,omitempty"`
 
 	// TokenID carries the JTI of the access token this User was built from.
 	// It is internal only (never serialized to clients).
@@ -76,11 +78,14 @@ func CheckPassword(password, hash string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
 }
 
-func storeRefreshToken(db *sql.DB, userID, tokenID string, expiresAt time.Time) error {
+func storeRefreshToken(db *sql.DB, userID, tenantID, tokenID string, expiresAt time.Time) error {
 	tokenHash := sha256.Sum256([]byte(tokenID))
+	if tenantID == "" {
+		tenantID = DefaultTenantID
+	}
 	_, err := db.Exec(
-		`INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
-		userID, hex.EncodeToString(tokenHash[:]), expiresAt,
+		`INSERT INTO refresh_tokens (tenant_id, user_id, token_hash, expires_at) VALUES ($1, $2, $3, $4)`,
+		tenantID, userID, hex.EncodeToString(tokenHash[:]), expiresAt,
 	)
 	return err
 }
@@ -99,12 +104,12 @@ func validateRefreshToken(db *sql.DB, refreshToken string) (*User, error) {
 	var expiresAt time.Time
 	var revoked bool
 	err := db.QueryRow(
-		`SELECT u.id, u.username, u.email, u.role, rt.expires_at, rt.revoked
+		`SELECT u.id, u.username, u.email, u.role, COALESCE(u.tenant_id, $2), rt.expires_at, rt.revoked
 	 FROM refresh_tokens rt JOIN users u ON u.id = rt.user_id
 	 WHERE rt.token_hash = $1 AND rt.revoked = FALSE AND rt.expires_at > NOW()
 	 AND u.is_active = TRUE`,
-		tokenHashHex,
-	).Scan(&user.ID, &user.Username, &user.Email, &user.Role, &expiresAt, &revoked)
+		tokenHashHex, DefaultTenantID,
+	).Scan(&user.ID, &user.Username, &user.Email, &user.Role, &user.TenantID, &expiresAt, &revoked)
 	if err == sql.ErrNoRows {
 		return nil, errors.New("invalid or expired refresh token")
 	}
@@ -144,11 +149,11 @@ func LoginHandler(db *sql.DB) gin.HandlerFunc {
 		var user User
 		var passwordHash string
 		err := db.QueryRow(
-			`SELECT id, username, email, role, password_hash, must_change_password
+			`SELECT id, username, email, role, password_hash, COALESCE(tenant_id, $2), must_change_password
 			 FROM users WHERE username = $1 AND is_active = TRUE`,
-			req.Username,
+			req.Username, DefaultTenantID,
 		).Scan(&user.ID, &user.Username, &user.Email, &user.Role, &passwordHash,
-			&user.MustChangePassword)
+			&user.TenantID, &user.MustChangePassword)
 
 		if err == sql.ErrNoRows {
 			slog.Warn("login_failed", "username", req.Username, "reason", "invalid_credentials")
@@ -178,7 +183,7 @@ func LoginHandler(db *sql.DB) gin.HandlerFunc {
 
 		refreshTokenID := generateTokenID()
 		refreshExpiry := time.Now().Add(RefreshTokenTTL)
-		if err := storeRefreshToken(db, user.ID, refreshTokenID, refreshExpiry); err != nil {
+		if err := storeRefreshToken(db, user.ID, user.TenantID, refreshTokenID, refreshExpiry); err != nil {
 			slog.Error("refresh_token_store_failed", "error", err.Error())
 			c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Failed to generate refresh token"})
 			return
@@ -222,8 +227,9 @@ func RegisterHandler(db *sql.DB) gin.HandlerFunc {
 
 		var userID string
 		err = db.QueryRow(
-			`INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id`,
-			req.Username, req.Email, hash, role,
+			`INSERT INTO users (username, email, password_hash, role, tenant_id)
+			 VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+			req.Username, req.Email, hash, role, TenantFromContext(c),
 		).Scan(&userID)
 
 		if err != nil {
@@ -268,7 +274,7 @@ func RefreshTokenHandler(db *sql.DB) gin.HandlerFunc {
 
 		refreshTokenID := generateTokenID()
 		refreshExpiry := time.Now().Add(RefreshTokenTTL)
-		if err := storeRefreshToken(db, user.ID, refreshTokenID, refreshExpiry); err != nil {
+		if err := storeRefreshToken(db, user.ID, user.TenantID, refreshTokenID, refreshExpiry); err != nil {
 			slog.Error("refresh_token_store_failed", "error", err.Error())
 			c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Failed to generate refresh token"})
 			return
@@ -459,6 +465,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		c.Set("username", user.Username)
 		c.Set("user_role", user.Role)
 		c.Set("token_id", user.TokenID)
+		c.Set("tenant_id", user.TenantID)
 		c.Next()
 	}
 }

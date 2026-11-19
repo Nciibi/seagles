@@ -6,14 +6,16 @@ import (
 	"log"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/Nciibi/seagles/models"
 	"github.com/Nciibi/seagles/risk"
 	"github.com/Nciibi/seagles/slog"
-	"github.com/gin-gonic/gin"
 )
 
 func ListVulnerabilitiesHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		qdb := tenantDB(c, db)
 		requestID, _ := c.Get("request_id")
 
 		query := `SELECT id, device_id, scan_id, cve_id, cvss_score, severity, title,
@@ -42,12 +44,11 @@ func ListVulnerabilitiesHandler(db *sql.DB) gin.HandlerFunc {
 			b, _ := strconv.ParseBool(v)
 			query += fmt.Sprintf(" AND is_resolved = $%d", argIdx)
 			args = append(args, b)
-			argIdx++
 		}
 
 		query += " ORDER BY cvss_score DESC NULLS LAST, discovered_at DESC"
 
-		rows, err := db.Query(query, args...)
+		rows, err := qdb.Query(query, args...)
 		if err != nil {
 			slog.Error("Failed to query vulnerabilities", "request_id", requestID, "error", err.Error())
 			failInternal(c, 500, "Failed to query vulnerabilities: ", err)
@@ -61,7 +62,8 @@ func ListVulnerabilitiesHandler(db *sql.DB) gin.HandlerFunc {
 			if err := rows.Scan(&v.ID, &v.DeviceID, &v.ScanID, &v.CVEID, &v.CVSSScore,
 				&v.Severity, &v.Title, &v.Description, &v.AffectedComponent,
 				&v.Remediation, &v.IsKEV, &v.DiscoveredAt, &v.ResolvedAt, &v.IsResolved); err != nil {
-				continue
+				failInternal(c, 500, "Failed to read vulnerability row", err)
+				return
 			}
 			vulns = append(vulns, v.ToJSON())
 		}
@@ -78,13 +80,14 @@ func ListVulnerabilitiesHandler(db *sql.DB) gin.HandlerFunc {
 
 func ResolveVulnerabilityHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		qdb := tenantDB(c, db)
 		requestID, _ := c.Get("request_id")
 		id, ok := uuidParam(c, "id")
 		if !ok {
 			return
 		}
 
-		result, err := db.Exec(`UPDATE vulnerabilities SET is_resolved=true, resolved_at=NOW() WHERE id=$1`, id)
+		result, err := qdb.Exec(`UPDATE vulnerabilities SET is_resolved=true, resolved_at=NOW() WHERE id=$1`, id)
 		if err != nil {
 			slog.Error("Failed to resolve vulnerability", "request_id", requestID, "vuln_id", id, "error", err.Error())
 			failInternal(c, 500, "Failed to resolve vulnerability: ", err)
@@ -97,7 +100,7 @@ func ResolveVulnerabilityHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		var deviceID sql.NullString
-		db.QueryRow(`SELECT device_id FROM vulnerabilities WHERE id=$1`, id).Scan(&deviceID)
+		qdb.QueryRow(`SELECT device_id FROM vulnerabilities WHERE id=$1`, id).Scan(&deviceID)
 		if deviceID.Valid {
 			go func() {
 				defer func() {

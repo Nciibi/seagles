@@ -79,11 +79,9 @@ func parseSchema(t *testing.T) map[string]map[string]bool {
 		for i, loc := range locs {
 			table := strings.ToLower(sql[loc[2]:loc[3]])
 			start := loc[1] // just after the opening paren
-			end := -1
+			end := len(sql)
 			if i+1 < len(locs) {
 				end = locs[i+1][0]
-			} else {
-				end = len(sql)
 			}
 			body := sql[start:end]
 

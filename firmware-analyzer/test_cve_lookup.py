@@ -1,7 +1,7 @@
 """Tests for cve_lookup.py — NVD API query and result filtering."""
 
 import cve_lookup
-from cve_lookup import lookup_cve
+from cve_lookup import lookup_cve, severity_from_score
 
 
 def nvd_payload(*vulns):
@@ -36,6 +36,14 @@ def patch_no_sleep(monkeypatch):
     monkeypatch.setattr(cve_lookup.time, "sleep", lambda s: None)
 
 
+class TestSeverityFromScore:
+    def test_boundaries(self):
+        assert severity_from_score(9.0) == "critical"
+        assert severity_from_score(7.0) == "high"
+        assert severity_from_score(4.0) == "medium"
+        assert severity_from_score(3.9) == "low"
+
+
 class TestLookupCVE:
     def test_empty_keyword_returns_empty(self, monkeypatch):
         patch_no_sleep(monkeypatch)
@@ -62,6 +70,7 @@ class TestLookupCVE:
         assert results[0]["cve_id"] == "CVE-2024-1111"
         assert results[0]["cvss_score"] == 9.8
         assert results[0]["description"] == "critical bug"
+        assert results[0]["severity"] == "critical"
         assert results[0]["url"].endswith("/CVE-2024-1111")
 
     def test_prefers_v31_over_v2(self, monkeypatch):
@@ -72,6 +81,7 @@ class TestLookupCVE:
         )
         results = lookup_cve("vendor", "1.0")
         assert results[0]["cvss_score"] == 7.5
+        assert results[0]["severity"] == "high"
 
     def test_falls_back_to_v2(self, monkeypatch):
         patch_no_sleep(monkeypatch)
@@ -81,6 +91,7 @@ class TestLookupCVE:
         )
         results = lookup_cve("vendor", "1.0")
         assert results[0]["cvss_score"] == 6.0
+        assert results[0]["severity"] == "medium"
 
     def test_request_params_and_api_key_header(self, monkeypatch):
         patch_no_sleep(monkeypatch)

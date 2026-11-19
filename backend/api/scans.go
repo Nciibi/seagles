@@ -9,14 +9,17 @@ import (
 	"log"
 	"time"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/Nciibi/seagles/alerts"
+	"github.com/Nciibi/seagles/auth"
 	"github.com/Nciibi/seagles/config"
+	"github.com/Nciibi/seagles/events"
 	"github.com/Nciibi/seagles/kev"
 	"github.com/Nciibi/seagles/models"
 	"github.com/Nciibi/seagles/risk"
 	"github.com/Nciibi/seagles/scanner"
 	"github.com/Nciibi/seagles/slog"
-	"github.com/gin-gonic/gin"
 )
 
 type TriggerScanRequest struct {
@@ -24,11 +27,72 @@ type TriggerScanRequest struct {
 	ScanType  string `json:"scan_type" binding:"omitempty,oneof=full quick"`
 }
 
+// scanProfileConfig is the effective, profile-driven behavior of a scan.
+// Missing/invalid profile rows fall back to the historical full-scan defaults
+// so a deleted profile can never turn scans into a no-op.
+type scanProfileConfig struct {
+	SkipCredentialTest bool
+	SkipProtocolProbe  bool
+	MaxPorts           int
+	Timeout            time.Duration
+}
+
+func loadScanProfile(db DBTX, profileID string) scanProfileConfig {
+	cfg := scanProfileConfig{MaxPorts: len(scanner.DefaultScanPorts), Timeout: 90 * time.Second}
+
+	var query string
+	var args []interface{}
+	if profileID != "" {
+		query = `SELECT skip_credential_test, skip_protocol_probe, max_port_count, timeout_seconds
+			FROM scan_profiles WHERE id = $1`
+		args = append(args, profileID)
+	} else {
+		query = `SELECT skip_credential_test, skip_protocol_probe, max_port_count, timeout_seconds
+			FROM scan_profiles WHERE is_default = TRUE ORDER BY name LIMIT 1`
+	}
+
+	var maxPorts, timeoutSeconds int
+	err := db.QueryRow(query, args...).Scan(&cfg.SkipCredentialTest, &cfg.SkipProtocolProbe, &maxPorts, &timeoutSeconds)
+	if err != nil {
+		return cfg
+	}
+	if maxPorts > 0 {
+		cfg.MaxPorts = maxPorts
+	}
+	if timeoutSeconds > 0 {
+		cfg.Timeout = time.Duration(timeoutSeconds) * time.Second
+	}
+	return cfg
+}
+
+// activeScanScopes returns the CIDRs administrators configured for discovery.
+// An empty result means fall back to the NETWORK_CIDR environment setting.
+func activeScanScopes(db DBTX, tenantID string) []string {
+	rows, err := db.Query(`SELECT cidr FROM scan_scopes WHERE tenant_id = $1 AND is_active = TRUE ORDER BY created_at`, tenantID)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	var scopes []string
+	for rows.Next() {
+		var cidr string
+		if err := rows.Scan(&cidr); err == nil {
+			scopes = append(scopes, cidr)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil
+	}
+	return scopes
+}
+
 func ListScansHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		qdb := tenantDB(c, db)
 		requestID, _ := c.Get("request_id")
 
-		rows, err := db.Query(`SELECT id, device_id, started_at, completed_at, status,
+		rows, err := qdb.Query(`SELECT id, device_id, started_at, completed_at, status,
 			scan_type, open_ports, services, scan_output
 			FROM scans ORDER BY started_at DESC LIMIT 100`)
 		if err != nil {
@@ -43,7 +107,8 @@ func ListScansHandler(db *sql.DB) gin.HandlerFunc {
 			var s models.Scan
 			if err := rows.Scan(&s.ID, &s.DeviceID, &s.StartedAt, &s.CompletedAt,
 				&s.Status, &s.ScanType, &s.OpenPorts, &s.Services, &s.ScanOutput); err != nil {
-				continue
+				failInternal(c, 500, "Failed to read scan row", err)
+				return
 			}
 			scans = append(scans, s.ToJSON())
 		}
@@ -60,6 +125,7 @@ func ListScansHandler(db *sql.DB) gin.HandlerFunc {
 
 func GetScanHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		qdb := tenantDB(c, db)
 		requestID, _ := c.Get("request_id")
 		id, ok := uuidParam(c, "id")
 		if !ok {
@@ -67,7 +133,7 @@ func GetScanHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		var s models.Scan
-		err := db.QueryRow(`SELECT id, device_id, started_at, completed_at, status,
+		err := qdb.QueryRow(`SELECT id, device_id, started_at, completed_at, status,
 			scan_type, open_ports, services, scan_output
 			FROM scans WHERE id = $1`, id).Scan(
 			&s.ID, &s.DeviceID, &s.StartedAt, &s.CompletedAt,
@@ -85,7 +151,7 @@ func GetScanHandler(db *sql.DB) gin.HandlerFunc {
 		result := gin.H{"scan": s.ToJSON()}
 		if s.DeviceID.Valid {
 			var d models.Device
-			if err := db.QueryRow(`SELECT id, ip_address, mac_address, hostname, vendor,
+			if err := qdb.QueryRow(`SELECT id, ip_address, mac_address, hostname, vendor,
 				device_type, os_fingerprint, firmware_version, first_seen, last_seen,
 				risk_score, is_active, tags, raw_nmap
 				FROM devices WHERE id = $1`, s.DeviceID.String).Scan(
@@ -102,6 +168,8 @@ func GetScanHandler(db *sql.DB) gin.HandlerFunc {
 
 func TriggerDeviceScanHandler(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		qdb := tenantDB(c, db)
+		tenantID := auth.TenantFromContext(c)
 		requestID, _ := c.Get("request_id")
 		deviceID, ok := uuidParam(c, "id")
 		if !ok {
@@ -109,7 +177,7 @@ func TriggerDeviceScanHandler(db *sql.DB, cfg *config.Config, kevCatalog *kev.KE
 		}
 
 		var ip string
-		err := db.QueryRow(`SELECT ip_address FROM devices WHERE id = $1`, deviceID).Scan(&ip)
+		err := qdb.QueryRow(`SELECT ip_address FROM devices WHERE id = $1`, deviceID).Scan(&ip)
 		if err == sql.ErrNoRows {
 			fail(c, 404, "Device not found")
 			return
@@ -133,23 +201,28 @@ func TriggerDeviceScanHandler(db *sql.DB, cfg *config.Config, kevCatalog *kev.KE
 		}
 
 		var scanID string
-		err = db.QueryRow(`INSERT INTO scans (device_id, status, scan_type, scan_profile_id) VALUES ($1, 'running', $2, $3) RETURNING id`,
-			deviceID, scanType, nullableString(req.ProfileID)).Scan(&scanID)
+		err = qdb.QueryRow(`INSERT INTO scans (tenant_id, device_id, status, scan_type, scan_profile_id)
+			VALUES ($1, $2, 'running', $3, $4) RETURNING id`,
+			tenantID, deviceID, scanType, nullableString(req.ProfileID)).Scan(&scanID)
 		if err != nil {
 			slog.Error("Failed to create scan", "request_id", requestID, "device_id", deviceID, "error", err.Error())
 			failInternal(c, 500, "Failed to create scan: ", err)
 			return
 		}
 
-		slog.Info("Scan triggered", "request_id", requestID, "device_id", deviceID, "ip", ip, "scan_id", scanID)
+		profile := loadScanProfile(qdb, req.ProfileID)
+		slog.Info("Scan triggered", "request_id", requestID, "device_id", deviceID, "ip", ip,
+			"scan_id", scanID, "max_ports", profile.MaxPorts,
+			"skip_protocol_probe", profile.SkipProtocolProbe,
+			"skip_credential_test", profile.SkipCredentialTest)
 
-		go runDeviceScan(db, cfg, kevCatalog, deviceID, scanID, ip)
+		go runDeviceScan(db, cfg, kevCatalog, profile, tenantID, deviceID, scanID, ip)
 
 		success(c, gin.H{"scan_id": scanID, "status": "running"})
 	}
 }
 
-func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, deviceID, scanID, ip string) {
+func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, profile scanProfileConfig, tenantID, deviceID, scanID, ip string) {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("Scan goroutine panicked", "device_id", deviceID, "recover", r)
@@ -169,19 +242,28 @@ func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, d
 		}
 	}
 
-	if IsSafelisted(db, ip) {
+	if IsSafelisted(db, ip, tenantID) {
 		slog.Info("Scan skipped: IP is safelisted", "ip", ip)
 		if _, err := db.Exec(`UPDATE scans SET status='skipped', scan_output='Device is safelisted', completed_at=NOW() WHERE id=$1`, scanID); err != nil {
 			slog.Error("Failed to mark scan skipped", "scan_id", scanID, "error", err.Error())
 		}
+		events.Publish(events.Event{Type: events.ScanSkipped, Data: map[string]interface{}{
+			"scan_id": scanID, "device_id": deviceID, "ip": ip, "reason": "safelisted",
+		}})
 		return
 	}
 
 	startTime := time.Now()
-	result, err := scanner.DeepScan(ip)
+	result, err := scanner.DeepScanWithOptions(ip, scanner.ScanOptions{
+		MaxPorts: profile.MaxPorts,
+		Timeout:  profile.Timeout,
+	})
 	if err != nil {
 		slog.Error("Deep scan failed", "ip", ip, "error", err.Error())
 		updateScanStatus("failed")
+		events.Publish(events.Event{Type: events.ScanFailed, Data: map[string]interface{}{
+			"scan_id": scanID, "device_id": deviceID, "ip": ip, "error": err.Error(),
+		}})
 		return
 	}
 
@@ -213,18 +295,22 @@ func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, d
 		db.Exec(`UPDATE devices SET raw_nmap=$1 WHERE id=$2`, result.Host.RawXML, deviceID)
 	}
 
-	findings := scanner.DetectProtocols(ip, openPortNumbers)
+	var findings []scanner.ProtocolFinding
+	if !profile.SkipProtocolProbe {
+		findings = scanner.DetectProtocols(ip, openPortNumbers)
+	}
 	for _, f := range findings {
 		var vulnID string
-		err := db.QueryRow(`INSERT INTO vulnerabilities (device_id, scan_id, severity, title, description, affected_component)
-			VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-			deviceID, scanID, f.Risk, f.Protocol+" exposure detected", f.Description, fmt.Sprintf("port/%d", f.Port),
+		err := db.QueryRow(`INSERT INTO vulnerabilities (tenant_id, device_id, scan_id, severity, title, description, affected_component)
+			VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+			tenantID, deviceID, scanID, f.Risk, f.Protocol+" exposure detected", f.Description, fmt.Sprintf("port/%d", f.Port),
 		).Scan(&vulnID)
 		if err != nil {
 			slog.Error("Failed to insert vulnerability", "error", err.Error())
 		}
 
 		alerts.CreateAlert(db, alerts.AlertRequest{
+			TenantID:    tenantID,
 			DeviceID:    deviceID,
 			AlertType:   protocolToAlertType(f.Protocol),
 			Severity:    f.Risk,
@@ -237,16 +323,18 @@ func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, d
 		if p == 443 {
 			tlsResult := scanner.CheckTLS(ip, 443)
 			if tlsResult.SupportsTLS10 || tlsResult.SupportsTLS11 || len(tlsResult.WeakCiphers) > 0 {
-				db.QueryRow(`INSERT INTO vulnerabilities (device_id, scan_id, severity, title, description, affected_component)
-					VALUES ($1, $2, 'high', 'Weak TLS configuration', 'Device supports deprecated TLS versions or weak ciphers', 'tls')
-					RETURNING id`, deviceID, scanID).Scan(new(string))
+				db.QueryRow(`INSERT INTO vulnerabilities (tenant_id, device_id, scan_id, severity, title, description, affected_component)
+					VALUES ($1, $2, $3, 'high', 'Weak TLS configuration', 'Device supports deprecated TLS versions or weak ciphers', 'tls')
+					RETURNING id`, tenantID, deviceID, scanID).Scan(new(string))
 				alerts.CreateAlert(db, alerts.AlertRequest{
+					TenantID: tenantID,
 					DeviceID: deviceID, AlertType: alerts.AlertWeakTLS, Severity: "high",
 					Title: fmt.Sprintf("Weak TLS on %s:443", ip),
 				})
 			}
 			if tlsResult.CertExpired {
 				alerts.CreateAlert(db, alerts.AlertRequest{
+					TenantID: tenantID,
 					DeviceID: deviceID, AlertType: alerts.AlertCertExpiring, Severity: "medium",
 					Title: fmt.Sprintf("Expired TLS certificate on %s:443", ip),
 				})
@@ -255,11 +343,15 @@ func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, d
 		}
 	}
 
-	creds, credErr := scanner.LoadCredentials("data/default-credentials.txt")
-	if credErr != nil {
-		slog.Warn("Failed to load credentials", "error", credErr.Error())
+	if profile.SkipCredentialTest {
+		slog.Info("Credential testing skipped by scan profile", "scan_id", scanID, "device_id", deviceID)
 	} else {
-		runCredentialTests(db, deviceID, scanID, ip, openPortNumbers, creds, kevCatalog)
+		creds, credErr := scanner.LoadCredentials("data/default-credentials.txt")
+		if credErr != nil {
+			slog.Warn("Failed to load credentials", "error", credErr.Error())
+		} else {
+			runCredentialTests(db, tenantID, deviceID, scanID, ip, openPortNumbers, creds, kevCatalog)
+		}
 	}
 
 	updateScanStatus("complete")
@@ -269,9 +361,15 @@ func runDeviceScan(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog, d
 		"open_ports", len(openPortNumbers),
 		"findings", len(findings),
 		"duration", time.Since(startTime).String())
+
+	events.Publish(events.Event{Type: events.ScanCompleted, Data: map[string]interface{}{
+		"scan_id": scanID, "device_id": deviceID, "ip": ip,
+		"open_ports": len(openPortNumbers), "findings": len(findings),
+		"duration_ms": time.Since(startTime).Milliseconds(),
+	}})
 }
 
-func runCredentialTests(db *sql.DB, deviceID, scanID, ip string, ports []int, creds []scanner.Credential, kevCatalog *kev.KEVCatalog) {
+func runCredentialTests(db *sql.DB, tenantID, deviceID, scanID, ip string, ports []int, creds []scanner.Credential, kevCatalog *kev.KEVCatalog) {
 	hasPort := func(target int) bool {
 		for _, p := range ports {
 			if p == target {
@@ -301,12 +399,13 @@ func runCredentialTests(db *sql.DB, deviceID, scanID, ip string, ports []int, cr
 
 	for _, r := range results {
 		if r.Found {
-			db.QueryRow(`INSERT INTO vulnerabilities (device_id, scan_id, severity, cvss_score, title, description, affected_component)
-				VALUES ($1, $2, 'critical', 9.5, 'Default credentials active', $3, 'authentication') RETURNING id`,
-				deviceID, scanID, fmt.Sprintf("Device accepted login with username: %s via %s", r.Username, r.Method)).Scan(new(string))
+			db.QueryRow(`INSERT INTO vulnerabilities (tenant_id, device_id, scan_id, severity, cvss_score, title, description, affected_component)
+				VALUES ($1, $2, $3, 'critical', 9.5, 'Default credentials active', $4, 'authentication') RETURNING id`,
+				tenantID, deviceID, scanID, fmt.Sprintf("Device accepted login with username: %s via %s", r.Username, r.Method)).Scan(new(string))
 
 			metadata, _ := json.Marshal(map[string]string{"username": r.Username, "method": r.Method})
 			alerts.CreateAlert(db, alerts.AlertRequest{
+				TenantID:  tenantID,
 				DeviceID:  deviceID,
 				AlertType: alerts.AlertDefaultCreds,
 				Severity:  "critical",
@@ -319,6 +418,7 @@ func runCredentialTests(db *sql.DB, deviceID, scanID, ip string, ports []int, cr
 		if r.LockedOut {
 			slog.Warn("Credential lockout detected", "ip", ip)
 			alerts.CreateAlert(db, alerts.AlertRequest{
+				TenantID:  tenantID,
 				DeviceID:  deviceID,
 				AlertType: alerts.AlertLockedOut,
 				Severity:  "medium",
@@ -347,7 +447,8 @@ func protocolToAlertType(protocol string) string {
 func NetworkScanHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestID, _ := c.Get("request_id")
-		slog.Info("Network scan triggered", "request_id", requestID)
+		tenantID := auth.TenantFromContext(c)
+		slog.Info("Network scan triggered", "request_id", requestID, "tenant_id", tenantID)
 
 		go func() {
 			defer func() {
@@ -355,15 +456,35 @@ func NetworkScanHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 					log.Printf("PANIC in network scan: %v", r)
 				}
 			}()
-			hosts, err := scanner.DiscoverHosts(cfg.NetworkCIDR)
-			if err != nil {
-				slog.Error("Network discovery failed", "error", err.Error())
-				return
+			cidrs := activeScanScopes(db, tenantID)
+			if len(cidrs) == 0 {
+				if cfg.NetworkCIDR == "" {
+					slog.Error("Network discovery has no scope: configure a scan scope or NETWORK_CIDR")
+					return
+				}
+				cidrs = []string{cfg.NetworkCIDR}
+			}
+			slog.Info("Network discovery scopes", "count", len(cidrs))
+
+			var hosts []string
+			seen := make(map[string]bool)
+			for _, cidr := range cidrs {
+				found, err := scanner.DiscoverHosts(cidr)
+				if err != nil {
+					slog.Error("Network discovery failed for scope", "cidr", cidr, "error", err.Error())
+					continue
+				}
+				for _, host := range found {
+					if !seen[host] {
+						seen[host] = true
+						hosts = append(hosts, host)
+					}
+				}
 			}
 
 			discovered := 0
 			for _, ip := range hosts {
-				if IsSafelisted(db, ip) {
+				if IsSafelisted(db, ip, tenantID) {
 					slog.Debug("Skipping safelisted IP", "ip", ip)
 					continue
 				}
@@ -371,18 +492,20 @@ func NetworkScanHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 				var deviceID string
 				var isNew bool
 
-				err := db.QueryRow(`SELECT id FROM devices WHERE ip_address = $1`, ip).Scan(&deviceID)
-				if err == sql.ErrNoRows {
-					err = db.QueryRow(`INSERT INTO devices (ip_address) VALUES ($1)
-						ON CONFLICT (ip_address) DO UPDATE SET last_seen = NOW()
-						RETURNING id`, ip).Scan(&deviceID)
+				err := db.QueryRow(`SELECT id FROM devices WHERE tenant_id = $1 AND ip_address = $2`, tenantID, ip).Scan(&deviceID)
+				switch err {
+				case sql.ErrNoRows:
+					db.QueryRow(`INSERT INTO devices (tenant_id, ip_address) VALUES ($1, $2)
+						ON CONFLICT (tenant_id, ip_address) DO UPDATE SET last_seen = NOW()
+						RETURNING id`, tenantID, ip).Scan(&deviceID)
 					isNew = true
-				} else if err == nil {
+				case nil:
 					db.Exec(`UPDATE devices SET last_seen = NOW() WHERE id = $1`, deviceID)
 				}
 
 				if isNew && deviceID != "" {
 					alerts.CreateAlert(db, alerts.AlertRequest{
+						TenantID:  tenantID,
 						DeviceID:  deviceID,
 						AlertType: alerts.AlertNewDevice,
 						Severity:  "high",

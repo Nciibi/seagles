@@ -9,6 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+
+	"github.com/Nciibi/seagles/events"
 )
 
 func newUpgrader(allowedOrigins []string) websocket.Upgrader {
@@ -50,6 +52,11 @@ func init() {
 	hub = &WSHub{
 		clients: make(map[*WSClient]bool),
 	}
+	// Forward every in-process event to connected WebSocket clients. The hub
+	// marshals the envelope itself, so listeners here only hand over the data.
+	events.Subscribe(func(e events.Event) {
+		hub.Broadcast(e.Type, e.Data)
+	})
 }
 
 func GetWSHub() *WSHub {

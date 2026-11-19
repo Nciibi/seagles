@@ -27,7 +27,7 @@ Steps to reproduce the behavior:
 
 - OS: [e.g., Ubuntu 22.04, Windows 11]
 - Browser (if frontend): [e.g., Chrome 120, Firefox 121]
-- Backend version: [e.g., v2.0.0]
+- Backend version: [e.g., v2.1.0]
 - Database: [e.g., PostgreSQL 16]
 
 ## Logs / Screenshots

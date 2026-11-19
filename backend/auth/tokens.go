@@ -12,6 +12,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 	"sync"
 	"time"
@@ -28,6 +29,14 @@ const (
 
 	AccessTokenTTL  = 15 * time.Minute
 	RefreshTokenTTL = 7 * 24 * time.Hour
+
+	TokenIssuer   = "seagles"
+	TokenAudience = "seagles-api"
+	TokenKid      = "seagles-v1"
+
+	// DefaultTenantID is the tenant every existing row was backfilled to by
+	// migration 015. Single-tenant deployments continue to use it.
+	DefaultTenantID = "00000000-0000-0000-0000-000000000001"
 )
 
 type KeyPair struct {
@@ -40,6 +49,9 @@ type Claims struct {
 	Name      string    `json:"name"`
 	Role      string    `json:"role"`
 	JTI       string    `json:"jti"`
+	TenantID  string    `json:"tenant_id,omitempty"`
+	Iss       string    `json:"iss"`
+	Aud       string    `json:"aud"`
 	TokenType TokenType `json:"type"`
 	IAT       int64     `json:"iat"`
 	Exp       int64     `json:"exp"`
@@ -56,7 +68,6 @@ type SignedToken struct {
 var (
 	globalKeyPair   *KeyPair
 	globalKeyPairMu sync.RWMutex
-	tokenIssuer     = "seagles"
 
 	// keyIsEphemeral records that the active key pair was generated in-process
 	// rather than loaded from configuration. See UsingEphemeralKey.
@@ -158,6 +169,41 @@ func LoadOrGenerateKeys(privateKeyPEM string) error {
 	return nil
 }
 
+// JWK is the public portion of the active signing key in RFC 7517 form.
+type JWK struct {
+	Kty string `json:"kty"`
+	Use string `json:"use"`
+	Alg string `json:"alg"`
+	Kid string `json:"kid"`
+	N   string `json:"n"`
+	E   string `json:"e"`
+}
+
+// GetPublicJWK returns the active RSA public key for external token
+// verification. Only the modulus and exponent are exposed.
+func GetPublicJWK() (JWK, error) {
+	globalKeyPairMu.RLock()
+	pair := globalKeyPair
+	var pub *rsa.PublicKey
+	if pair != nil {
+		pub = pair.PublicKey
+	}
+	globalKeyPairMu.RUnlock()
+
+	if pub == nil {
+		return JWK{}, errors.New("key pair not initialized")
+	}
+
+	return JWK{
+		Kty: "RSA",
+		Use: "sig",
+		Alg: "RS256",
+		Kid: TokenKid,
+		N:   base64.RawURLEncoding.EncodeToString(pub.N.Bytes()),
+		E:   base64.RawURLEncoding.EncodeToString(big.NewInt(int64(pub.E)).Bytes()),
+	}, nil
+}
+
 func GetPublicKeyPEM() (string, error) {
 	globalKeyPairMu.RLock()
 	defer globalKeyPairMu.RUnlock()
@@ -180,14 +226,27 @@ func GetPublicKeyPEM() (string, error) {
 
 func signRS256(claims *Claims) (string, error) {
 	globalKeyPairMu.RLock()
-	priv := globalKeyPair.PrivateKey
+	pair := globalKeyPair
+	var priv *rsa.PrivateKey
+	if pair != nil {
+		priv = pair.PrivateKey
+	}
 	globalKeyPairMu.RUnlock()
 
 	if priv == nil {
 		return "", errors.New("key pair not initialized")
 	}
 
-	header := `{"alg":"RS256","typ":"JWT","kid":"seagles-v1"}`
+	// Stamp issuer and audience at signing time so no caller can mint a token
+	// that claims to come from another issuer.
+	if claims.Iss == "" {
+		claims.Iss = TokenIssuer
+	}
+	if claims.Aud == "" {
+		claims.Aud = TokenAudience
+	}
+
+	header := `{"alg":"RS256","typ":"JWT","kid":"` + TokenKid + `"}`
 	headerB64 := base64.RawURLEncoding.EncodeToString([]byte(header))
 
 	payload, err := json.Marshal(claims)
@@ -210,7 +269,11 @@ func signRS256(claims *Claims) (string, error) {
 
 func verifyRS256(tokenStr string) (*Claims, error) {
 	globalKeyPairMu.RLock()
-	pub := globalKeyPair.PublicKey
+	pair := globalKeyPair
+	var pub *rsa.PublicKey
+	if pair != nil {
+		pub = pair.PublicKey
+	}
 	globalKeyPairMu.RUnlock()
 
 	if pub == nil {
@@ -253,6 +316,12 @@ func verifyRS256(tokenStr string) (*Claims, error) {
 	if claims.TokenType == "" {
 		return nil, errors.New("missing token type claim")
 	}
+	if claims.Iss != TokenIssuer {
+		return nil, errors.New("invalid token issuer")
+	}
+	if claims.Aud != TokenAudience {
+		return nil, errors.New("invalid token audience")
+	}
 
 	if time.Now().After(time.Unix(claims.Exp, 0)) {
 		return nil, errors.New("token expired")
@@ -271,6 +340,9 @@ func GenerateAccessToken(user User) (*SignedToken, error) {
 		Name:               user.Username,
 		Role:               user.Role,
 		JTI:                tokenID,
+		TenantID:           tenantIDForUser(user),
+		Iss:                TokenIssuer,
+		Aud:                TokenAudience,
 		TokenType:          AccessToken,
 		IAT:                now.Unix(),
 		Exp:                exp.Unix(),
@@ -307,8 +379,23 @@ func ValidateAccessToken(tokenStr string) (*User, error) {
 		Username:           claims.Name,
 		Role:               claims.Role,
 		TokenID:            claims.JTI,
+		TenantID:           tenantIDForClaim(claims.TenantID),
 		MustChangePassword: claims.MustChangePassword,
 	}, nil
+}
+
+func tenantIDForUser(user User) string {
+	if user.TenantID != "" {
+		return user.TenantID
+	}
+	return DefaultTenantID
+}
+
+func tenantIDForClaim(tenantID string) string {
+	if tenantID != "" {
+		return tenantID
+	}
+	return DefaultTenantID
 }
 
 func generateTokenID() string {

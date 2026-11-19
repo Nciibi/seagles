@@ -9,6 +9,17 @@ import time
 NVD_API_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 
 
+def severity_from_score(score: float) -> str:
+    """Map a CVSS base score to its qualitative severity rating."""
+    if score >= 9.0:
+        return "critical"
+    if score >= 7.0:
+        return "high"
+    if score >= 4.0:
+        return "medium"
+    return "low"
+
+
 def lookup_cve(vendor: str, version: str, api_key: str = None) -> list[dict]:
     """
     Query NVD for CVEs matching vendor and firmware version.
@@ -65,6 +76,7 @@ def lookup_cve(vendor: str, version: str, api_key: str = None) -> list[dict]:
         results.append({
             "cve_id": cve_id,
             "cvss_score": cvss,
+            "severity": severity_from_score(cvss),
             "description": desc[:500],
             "url": f"https://nvd.nist.gov/vuln/detail/{cve_id}"
         })

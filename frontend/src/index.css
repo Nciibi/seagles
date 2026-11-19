@@ -338,6 +338,10 @@ select.input {
   animation: pulse 1.5s ease-in-out infinite;
 }
 
+.sidebar-margin {
+  margin-left: 240px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   main {

@@ -1,16 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { getAlerts, ackAlert, type Alert } from '../api/client'
 import { timeAgo, getSeverityIcon } from '../utils/helpers'
 import { LoadingCard } from '../components/Loading'
+import ErrorBanner from '../components/ErrorBanner'
 
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [severity, setSeverity] = useState('')
   const [showAcked, setShowAcked] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const fetchAlerts = async () => {
+  const fetchAlerts = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const params: Record<string, string> = {}
       if (severity) params.severity = severity
@@ -19,27 +22,31 @@ export default function AlertsPage() {
       setAlerts(res.data as unknown as Alert[])
     } catch (e) {
       console.error('Failed to fetch alerts:', e)
+      setError('Failed to load alerts')
     } finally {
       setLoading(false)
     }
-  }
-
-  useEffect(() => { fetchAlerts() }, [severity, showAcked])
-  useEffect(() => {
-    const interval = setInterval(fetchAlerts, 15000)
-    return () => clearInterval(interval)
   }, [severity, showAcked])
 
+  useEffect(() => {
+    fetchAlerts()
+    const interval = setInterval(fetchAlerts, 15000)
+    return () => clearInterval(interval)
+  }, [fetchAlerts])
+
   const handleAck = async (id: string) => {
-    try { await ackAlert(id); fetchAlerts() } catch (e) { console.error(e) }
+    try { await ackAlert(id); await fetchAlerts() }
+    catch (e) { console.error(e); setError('Failed to acknowledge alert') }
   }
 
   const handleAckAll = async () => {
     const unacked = alerts.filter(a => !a.is_acknowledged)
+    const failed = []
     for (const a of unacked) {
-      try { await ackAlert(a.id) } catch {}
+      try { await ackAlert(a.id) } catch { failed.push(a.id) }
     }
-    fetchAlerts()
+    await fetchAlerts()
+    if (failed.length) setError(`${failed.length} alert(s) could not be acknowledged`)
   }
 
   const critCount = alerts.filter(a => a.severity === 'critical' && !a.is_acknowledged).length
@@ -68,6 +75,8 @@ export default function AlertsPage() {
           <button className="btn btn-ghost" onClick={handleAckAll}>✓ Acknowledge All</button>
         )}
       </div>
+
+      <ErrorBanner message={error} onRetry={fetchAlerts} />
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}>
@@ -127,6 +136,7 @@ export default function AlertsPage() {
             {!alert.is_acknowledged && (
               <button
                 className="btn btn-ghost"
+                aria-label={`Acknowledge alert: ${alert.title}`}
                 onClick={() => handleAck(alert.id)}
                 style={{ padding: '6px 14px', fontSize: '0.8rem', flexShrink: 0 }}
               >

@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { getStats, getAlerts, triggerNetworkScan, type Stats, type Alert } from '../api/client'
+import { getStats, getAlerts, getScans, triggerNetworkScan, type Stats, type Alert, type Scan } from '../api/client'
+import { waitForNetworkScan } from '../utils/asyncJobs'
 import AlertFeed from '../components/AlertFeed'
 import RiskScore from '../components/RiskScore'
-import { Loading, LoadingCard } from '../components/Loading'
+import { LoadingCard } from '../components/Loading'
 
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null)
@@ -11,7 +12,7 @@ export default function Dashboard() {
   const [scanning, setScanning] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const scanTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
+  const scanAbortRef = useRef<AbortController | null>(null)
 
   const fetchData = useCallback(async () => {
     try {
@@ -38,22 +39,27 @@ export default function Dashboard() {
   }, [fetchData])
 
   useEffect(() => {
-    return () => {
-      if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current)
-    }
+    return () => scanAbortRef.current?.abort()
   }, [])
 
   const handleNetworkScan = async () => {
     setScanning(true)
+    setError(null)
+    const controller = new AbortController()
+    scanAbortRef.current = controller
     try {
+      const existing = (await getScans()).data as unknown as Scan[]
       await triggerNetworkScan()
+      await waitForNetworkScan(existing.map((s) => s.id), { signal: controller.signal })
+      await fetchData()
     } catch (e) {
-      console.error('Network scan failed:', e)
-    }
-    scanTimeoutRef.current = setTimeout(() => {
+      if ((e as Error)?.name !== 'AbortError') {
+        console.error('Network scan failed:', e)
+        setError('Network scan did not complete successfully')
+      }
+    } finally {
       setScanning(false)
-      fetchData()
-    }, 3000)
+    }
   }
 
   if (loading) {
@@ -63,10 +69,10 @@ export default function Dashboard() {
           <LoadingCard height={40} />
           <LoadingCard height={40} />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '28px' }}>
+        <div className="grid-4" style={{ gap: '16px', marginBottom: '28px' }}>
           {[1, 2, 3, 4].map((i) => <LoadingCard key={i} height={100} />)}
         </div>
-      <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        <div className="grid-2" style={{ gap: '20px' }}>
           <LoadingCard height={300} />
           <LoadingCard height={300} />
         </div>

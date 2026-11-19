@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/Nciibi/seagles/models"
 	"github.com/Nciibi/seagles/slog"
-	"github.com/gin-gonic/gin"
 )
 
 func ListDevicesHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		qdb := tenantDB(c, db)
 		requestID, _ := c.Get("request_id")
 
 		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -52,7 +54,7 @@ func ListDevicesHandler(db *sql.DB) gin.HandlerFunc {
 		query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
 		args = append(args, limit, offset)
 
-		rows, err := db.Query(query, args...)
+		rows, err := qdb.Query(query, args...)
 		if err != nil {
 			slog.Error("Failed to query devices", "request_id", requestID, "error", err.Error())
 			failInternal(c, 500, "Failed to query devices: ", err)
@@ -67,7 +69,8 @@ func ListDevicesHandler(db *sql.DB) gin.HandlerFunc {
 				&d.DeviceType, &d.OSFingerprint, &d.FirmwareVersion,
 				&d.FirstSeen, &d.LastSeen, &d.RiskScore, &d.IsActive,
 				&d.Tags, &d.RawNmap); err != nil {
-				continue
+				failInternal(c, 500, "Failed to read device row", err)
+				return
 			}
 			devices = append(devices, d.ToJSON())
 		}
@@ -84,6 +87,7 @@ func ListDevicesHandler(db *sql.DB) gin.HandlerFunc {
 
 func GetDeviceHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		qdb := tenantDB(c, db)
 		requestID, _ := c.Get("request_id")
 		id, ok := uuidParam(c, "id")
 		if !ok {
@@ -91,7 +95,7 @@ func GetDeviceHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		var d models.Device
-		err := db.QueryRow(`SELECT id, ip_address, mac_address, hostname, vendor, device_type,
+		err := qdb.QueryRow(`SELECT id, ip_address, mac_address, hostname, vendor, device_type,
 			os_fingerprint, firmware_version, first_seen, last_seen, risk_score,
 			is_active, tags, raw_nmap FROM devices WHERE id = $1`, id).Scan(
 			&d.ID, &d.IPAddress, &d.MACAddress, &d.Hostname, &d.Vendor,
@@ -109,7 +113,7 @@ func GetDeviceHandler(db *sql.DB) gin.HandlerFunc {
 
 		var latestScan *models.ScanJSON
 		var s models.Scan
-		if err := db.QueryRow(`SELECT id, device_id, started_at, completed_at, status, scan_type,
+		if err := qdb.QueryRow(`SELECT id, device_id, started_at, completed_at, status, scan_type,
 			open_ports, services, scan_output FROM scans WHERE device_id = $1
 			ORDER BY started_at DESC LIMIT 1`, id).Scan(
 			&s.ID, &s.DeviceID, &s.StartedAt, &s.CompletedAt, &s.Status,
@@ -119,7 +123,7 @@ func GetDeviceHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		var openVulns int
-		db.QueryRow(`SELECT COUNT(*) FROM vulnerabilities WHERE device_id=$1 AND is_resolved=FALSE`, id).Scan(&openVulns)
+		qdb.QueryRow(`SELECT COUNT(*) FROM vulnerabilities WHERE device_id=$1 AND is_resolved=FALSE`, id).Scan(&openVulns)
 
 		success(c, gin.H{
 			"device": d.ToJSON(), "latest_scan": latestScan, "open_vulnerabilities": openVulns,
@@ -129,13 +133,14 @@ func GetDeviceHandler(db *sql.DB) gin.HandlerFunc {
 
 func DeleteDeviceHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		qdb := tenantDB(c, db)
 		requestID, _ := c.Get("request_id")
 		id, ok := uuidParam(c, "id")
 		if !ok {
 			return
 		}
 
-		result, err := db.Exec(`UPDATE devices SET is_active = false WHERE id = $1`, id)
+		result, err := qdb.Exec(`UPDATE devices SET is_active = false WHERE id = $1`, id)
 		if err != nil {
 			slog.Error("Failed to delete device", "request_id", requestID, "device_id", id, "error", err.Error())
 			failInternal(c, 500, "Failed to delete device: ", err)

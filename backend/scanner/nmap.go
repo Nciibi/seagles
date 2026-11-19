@@ -49,11 +49,11 @@ type nmapRun struct {
 }
 
 type nmapHost struct {
-	Addresses  []nmapAddr     `xml:"address"`
-	Hostnames  []nmapHostname `xml:"hostnames>hostname"`
-	Ports      []nmapPort     `xml:"ports>port"`
-	OS         nmapOS         `xml:"os"`
-	Status     nmapStatus     `xml:"status"`
+	Addresses []nmapAddr     `xml:"address"`
+	Hostnames []nmapHostname `xml:"hostnames>hostname"`
+	Ports     []nmapPort     `xml:"ports>port"`
+	OS        nmapOS         `xml:"os"`
+	Status    nmapStatus     `xml:"status"`
 }
 
 type nmapAddr struct {
@@ -67,10 +67,10 @@ type nmapHostname struct {
 }
 
 type nmapPort struct {
-	PortID   int          `xml:"portid,attr"`
-	Protocol string       `xml:"protocol,attr"`
-	State    nmapState    `xml:"state"`
-	Service  nmapService  `xml:"service"`
+	PortID   int         `xml:"portid,attr"`
+	Protocol string      `xml:"protocol,attr"`
+	State    nmapState   `xml:"state"`
+	Service  nmapService `xml:"service"`
 }
 
 type nmapState struct {
@@ -96,17 +96,12 @@ type nmapStatus struct {
 	State string `xml:"state,attr"`
 }
 
-type scanJob struct {
-	ip    string
-	ports string
-}
-
 var scanWorkerPool = make(chan struct{}, 20)
 
 var (
-	errInvalidCIDR  = fmt.Errorf("invalid CIDR notation")
-	errInvalidIP    = fmt.Errorf("invalid IP address")
-	errSuspicious   = fmt.Errorf("suspicious input detected")
+	errInvalidCIDR = fmt.Errorf("invalid CIDR notation")
+	errInvalidIP   = fmt.Errorf("invalid IP address")
+	errSuspicious  = fmt.Errorf("suspicious input detected")
 )
 
 var suspiciousPatterns = []string{
@@ -237,7 +232,35 @@ func DiscoverHosts(cidr string) ([]string, error) {
 	return hosts, nil
 }
 
+// DefaultScanPorts is the standard IoT/OT port set used when a scan profile
+// does not specify a smaller cap.
+var DefaultScanPorts = []int{22, 23, 80, 443, 554, 1883, 1884, 5555, 8883, 47808, 502, 8080, 8443}
+
+// ScanOptions carries profile-driven limits into a deep scan. Zero values
+// select the historical defaults.
+type ScanOptions struct {
+	MaxPorts int
+	Timeout  time.Duration
+}
+
+// portsArgument returns the nmap -p value for the requested port cap.
+func portsArgument(maxPorts int) string {
+	selected := DefaultScanPorts
+	if maxPorts > 0 && maxPorts < len(selected) {
+		selected = selected[:maxPorts]
+	}
+	parts := make([]string, 0, len(selected))
+	for _, p := range selected {
+		parts = append(parts, strconv.Itoa(p))
+	}
+	return strings.Join(parts, ",")
+}
+
 func DeepScan(ip string) (*ScanResult, error) {
+	return DeepScanWithOptions(ip, ScanOptions{})
+}
+
+func DeepScanWithOptions(ip string, opts ScanOptions) (*ScanResult, error) {
 	if err := sanitizeIP(ip); err != nil {
 		return nil, fmt.Errorf("invalid target IP: %w", err)
 	}
@@ -247,15 +270,18 @@ func DeepScan(ip string) (*ScanResult, error) {
 
 	start := time.Now()
 
-	ports := "22,23,80,443,554,1883,1884,5555,8883,47808,502,8080,8443"
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	timeout := opts.Timeout
+	if timeout <= 0 {
+		timeout = 90 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "nmap", "-sV", "-sC", "-O",
-		"-p", ports,
+		"-p", portsArgument(opts.MaxPorts),
 		"--script=banner,http-title,ssl-enum-ciphers",
 		"-oX", "-",
-		"--host-timeout", "60s",
+		"--host-timeout", fmt.Sprintf("%ds", int(timeout.Seconds())),
 		"--min-rate", "100",
 		ip)
 
@@ -264,7 +290,7 @@ func DeepScan(ip string) (*ScanResult, error) {
 		if execErr, ok := err.(*exec.Error); ok && execErr.Err == exec.ErrNotFound {
 			return nil, fmt.Errorf("nmap not found: please install nmap")
 		}
-		if output == nil || len(output) == 0 {
+		if len(output) == 0 {
 			return nil, fmt.Errorf("nmap scan failed: %v", err)
 		}
 	}

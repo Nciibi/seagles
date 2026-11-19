@@ -1,6 +1,7 @@
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useState, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getDevices, triggerScan, type Device } from '../api/client'
+import { waitForScan } from '../utils/asyncJobs'
 import { severityBadge, timeAgo } from '../utils/helpers'
 import { LoadingCard } from '../components/Loading'
 
@@ -11,43 +12,48 @@ export default function Devices() {
   const [riskFilter, setRiskFilter] = useState('')
   const [scanningId, setScanningId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const scanTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const [error, setError] = useState<string | null>(null)
+  const scanAbortRef = useRef<AbortController | null>(null)
   const navigate = useNavigate()
 
-  useEffect(() => {
-    fetchDevices()
-  }, [])
+  useEffect(() => () => scanAbortRef.current?.abort(), [])
 
-  useEffect(() => {
-    return () => {
-      if (scanTimerRef.current) clearTimeout(scanTimerRef.current)
-    }
-  }, [])
-
-  const fetchDevices = async () => {
+  const fetchDevices = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const res = await getDevices()
       setDevices(res.data as unknown as Device[])
     } catch (e) {
       console.error('Failed to fetch devices:', e)
+      setError('Failed to load devices')
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  const handleScan = async (e: React.MouseEvent, id: string) => {
+  useEffect(() => { fetchDevices() }, [fetchDevices])
+
+  const handleScan = async (e: React.MouseEvent | React.KeyboardEvent, id: string) => {
     e.stopPropagation()
     setScanningId(id)
+    const controller = new AbortController()
+    scanAbortRef.current = controller
     try {
-      await triggerScan(id)
+      const started = await triggerScan(id)
+      const scanId = (started.data as { scan_id?: string } | undefined)?.scan_id
+      if (scanId) {
+        await waitForScan(scanId, { signal: controller.signal })
+      }
+      await fetchDevices()
     } catch (err) {
-      console.error('Scan failed:', err)
-    }
-    scanTimerRef.current = setTimeout(() => {
+      if ((err as Error)?.name !== 'AbortError') {
+        console.error('Scan failed:', err)
+        setError('Scan did not complete successfully')
+      }
+    } finally {
       setScanningId(null)
-      fetchDevices()
-    }, 3000)
+    }
   }
 
   const filtered = useMemo(() => devices.filter((d) => {
@@ -77,6 +83,13 @@ export default function Devices() {
     <div>
       <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '20px' }}>Device Inventory</h1>
 
+      {error && (
+        <div className="card" role="alert" style={{ padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px', borderColor: '#e03131' }}>
+          <span style={{ color: '#ff6b6b', flex: 1 }}>{error}</span>
+          <button className="btn btn-ghost" onClick={fetchDevices}>Retry</button>
+        </div>
+      )}
+
       {/* Filters */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
         <input
@@ -100,7 +113,7 @@ export default function Devices() {
       </div>
 
       {/* Table */}
-      <div className="card table-wrapper" style={{ overflow: 'hidden' }}>
+      <div className="card table-wrapper">
         <table className="data-table">
           <thead>
             <tr>
@@ -120,7 +133,19 @@ export default function Devices() {
               filtered.map((d) => {
                 const badge = severityBadge(d.risk_score)
                 return (
-                  <tr key={d.id} onClick={() => navigate(`/devices/${d.id}`)}>
+                  <tr
+                    key={d.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Open details for ${d.hostname || d.ip_address}`}
+                    onClick={() => navigate(`/devices/${d.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        navigate(`/devices/${d.id}`)
+                      }
+                    }}
+                  >
                     <td style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 500 }}>{d.ip_address}</td>
                     <td>{d.hostname || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
                     <td>{d.vendor || <span style={{ color: 'var(--text-muted)' }}>Unknown</span>}</td>
@@ -130,6 +155,7 @@ export default function Devices() {
                     <td>
                       <button
                         className="btn btn-ghost"
+                        aria-label={`Scan ${d.ip_address}`}
                         onClick={(e) => handleScan(e, d.id)}
                         disabled={scanningId === d.id}
                         style={{ padding: '4px 12px', fontSize: '0.8rem' }}

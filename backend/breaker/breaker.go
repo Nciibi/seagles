@@ -59,9 +59,9 @@ func New(opts Options) *Breaker {
 		opts.ResetTimeout = 30 * time.Second
 	}
 	b := &Breaker{
-		name:         opts.Name,
-		maxFailures:  opts.MaxFailures,
-		resetTimeout: opts.ResetTimeout,
+		name:          opts.Name,
+		maxFailures:   opts.MaxFailures,
+		resetTimeout:  opts.ResetTimeout,
 		onStateChange: opts.OnStateChange,
 	}
 	b.lastFailure.Store(time.Time{})

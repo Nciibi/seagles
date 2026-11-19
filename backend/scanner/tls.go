@@ -20,13 +20,13 @@ type TLSResult struct {
 }
 
 var weakCipherNames = map[uint16]string{
-	tls.TLS_RSA_WITH_RC4_128_SHA:                "RC4-SHA",
-	tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA:          "3DES-EDE-CBC-SHA",
-	tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA:         "ECDHE-RSA-RC4-SHA",
-	tls.TLS_ECDHE_ECDSA_WITH_RC4_128_SHA:       "ECDHE-ECDSA-RC4-SHA",
-	tls.TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA:    "ECDHE-RSA-3DES-EDE-CBC-SHA",
-	tls.TLS_RSA_WITH_AES_128_CBC_SHA:           "AES128-CBC-SHA",
-	tls.TLS_RSA_WITH_AES_256_CBC_SHA:           "AES256-CBC-SHA",
+	tls.TLS_RSA_WITH_RC4_128_SHA:            "RC4-SHA",
+	tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA:       "3DES-EDE-CBC-SHA",
+	tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA:      "ECDHE-RSA-RC4-SHA",
+	tls.TLS_ECDHE_ECDSA_WITH_RC4_128_SHA:    "ECDHE-ECDSA-RC4-SHA",
+	tls.TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA: "ECDHE-RSA-3DES-EDE-CBC-SHA",
+	tls.TLS_RSA_WITH_AES_128_CBC_SHA:        "AES128-CBC-SHA",
+	tls.TLS_RSA_WITH_AES_256_CBC_SHA:        "AES256-CBC-SHA",
 }
 
 func scanTLSVersion(addr string, version uint16) (bool, *tls.ConnectionState) {

@@ -5,9 +5,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/Nciibi/seagles/config"
 	"github.com/Nciibi/seagles/middleware"
-	"github.com/gin-gonic/gin"
 )
 
 // depProbeTTL bounds how often the health/readiness endpoints open network

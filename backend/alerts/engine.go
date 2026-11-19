@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/Nciibi/seagles/events"
 	"github.com/Nciibi/seagles/slog"
 )
 
@@ -24,15 +25,31 @@ const (
 	AlertLockedOut          = "lockout_detected"
 	AlertCriticalUnresolved = "critical_vuln_unresolved"
 	AlertFirmwareReview     = "firmware_review_due"
+
+	// DefaultTenantID matches auth.DefaultTenantID. Kept local to avoid an
+	// alerts -> auth dependency; alert callers should set TenantID explicitly.
+	DefaultTenantID = "00000000-0000-0000-0000-000000000001"
 )
 
 type AlertRequest struct {
+	TenantID    string          `json:"tenant_id,omitempty"`
 	DeviceID    string          `json:"device_id"`
 	AlertType   string          `json:"alert_type"`
 	Severity    string          `json:"severity"`
 	Title       string          `json:"title"`
 	Description string          `json:"description,omitempty"`
 	Metadata    json.RawMessage `json:"metadata,omitempty"`
+}
+
+// AlertEvent is the real-time payload broadcast when an alert is persisted.
+type AlertEvent struct {
+	ID          string    `json:"id"`
+	DeviceID    string    `json:"device_id"`
+	AlertType   string    `json:"alert_type"`
+	Severity    string    `json:"severity"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	TriggeredAt time.Time `json:"triggered_at"`
 }
 
 func CreateAlert(db *sql.DB, req AlertRequest) error {
@@ -52,15 +69,29 @@ func CreateAlert(db *sql.DB, req AlertRequest) error {
 	}
 
 	var alertID string
-	err = db.QueryRow(`INSERT INTO alerts (device_id, severity, alert_type, title, description, metadata)
-		VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-		req.DeviceID, req.Severity, req.AlertType, req.Title, req.Description, metadata).Scan(&alertID)
+	tenantID := req.TenantID
+	if tenantID == "" {
+		tenantID = DefaultTenantID
+	}
+	err = db.QueryRow(`INSERT INTO alerts (tenant_id, device_id, severity, alert_type, title, description, metadata)
+		VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+		tenantID, req.DeviceID, req.Severity, req.AlertType, req.Title, req.Description, metadata).Scan(&alertID)
 	if err != nil {
 		slog.Error("Failed to create alert", "error", err.Error())
 		return err
 	}
 
 	slog.Info("alert_created", "severity", req.Severity, "type", req.AlertType, "device", req.DeviceID, "title", req.Title)
+
+	events.Publish(events.Event{Type: events.AlertCreated, Data: AlertEvent{
+		ID:          alertID,
+		DeviceID:    req.DeviceID,
+		AlertType:   req.AlertType,
+		Severity:    req.Severity,
+		Title:       req.Title,
+		Description: req.Description,
+		TriggeredAt: time.Now().UTC(),
+	}})
 
 	go DispatchWebhooks(db, alertID, req.Severity, req.Title, req.Description, req.DeviceID)
 
@@ -125,8 +156,10 @@ func checkFirmwareOverdue(db *sql.DB) {
 		}
 	}()
 
+	// A pending (never analyzed) firmware is not "overdue" — it is simply
+	// queued. Only flag images whose analysis happened long ago.
 	rows, err := db.Query(`SELECT device_id FROM firmware
-		WHERE analyzed_at < NOW() - INTERVAL '90 days' OR analyzed_at IS NULL`)
+		WHERE analyzed_at IS NOT NULL AND analyzed_at < NOW() - INTERVAL '90 days'`)
 	if err != nil {
 		slog.Error("Firmware review check failed", "error", err.Error())
 		return

@@ -55,19 +55,19 @@ func TestCalculateRiskScore_Combined(t *testing.T) {
 
 func TestCalculateRiskScore_ClampAt10(t *testing.T) {
 	score := CalculateRiskScore(RiskFactors{
-		HasDefaultCreds: true,
-		HasTelnet:       true,
-		HasADB:          true,
-		HasModbus:       true,
-		HasUnauthRTSP:   true,
-		HasPlaintextMQTT: true,
-		HasHTTPMgmt:     true,
-		HasWeakTLS:      true,
-		KnownCVECount:   100,
-		KEVMatchCount:   50,
-		FirmwareOutdated: true,
+		HasDefaultCreds:     true,
+		HasTelnet:           true,
+		HasADB:              true,
+		HasModbus:           true,
+		HasUnauthRTSP:       true,
+		HasPlaintextMQTT:    true,
+		HasHTTPMgmt:         true,
+		HasWeakTLS:          true,
+		KnownCVECount:       100,
+		KEVMatchCount:       50,
+		FirmwareOutdated:    true,
 		HighEntropyFirmware: true,
-		DaysSinceLastScan: 999,
+		DaysSinceLastScan:   999,
 	})
 	if score != 10.0 {
 		t.Fatalf("expected 10.0 (clamped), got %f", score)
@@ -135,19 +135,19 @@ func TestScoreBreakdown_Empty(t *testing.T) {
 
 func TestScoreBreakdown_All(t *testing.T) {
 	b := ScoreBreakdown(RiskFactors{
-		HasDefaultCreds:      true,
-		HasTelnet:            true,
-		HasADB:               true,
-		HasModbus:            true,
-		HasUnauthRTSP:        true,
-		HasPlaintextMQTT:     true,
-		HasHTTPMgmt:          true,
-		HasWeakTLS:           true,
-		KnownCVECount:        6,
-		KEVMatchCount:        2,
-		FirmwareOutdated:     true,
-		HighEntropyFirmware:  true,
-		DaysSinceLastScan:    30,
+		HasDefaultCreds:     true,
+		HasTelnet:           true,
+		HasADB:              true,
+		HasModbus:           true,
+		HasUnauthRTSP:       true,
+		HasPlaintextMQTT:    true,
+		HasHTTPMgmt:         true,
+		HasWeakTLS:          true,
+		KnownCVECount:       6,
+		KEVMatchCount:       2,
+		FirmwareOutdated:    true,
+		HighEntropyFirmware: true,
+		DaysSinceLastScan:   30,
 	})
 
 	expectedKeys := []string{

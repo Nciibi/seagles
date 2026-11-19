@@ -10,20 +10,20 @@ import (
 
 // Device represents an IoT device discovered on the network.
 type Device struct {
-	ID              string          `json:"id" db:"id"`
-	IPAddress       string          `json:"ip_address" db:"ip_address"`
-	MACAddress      sql.NullString  `json:"mac_address" db:"mac_address"`
-	Hostname        sql.NullString  `json:"hostname" db:"hostname"`
-	Vendor          sql.NullString  `json:"vendor" db:"vendor"`
-	DeviceType      string          `json:"device_type" db:"device_type"`
-	OSFingerprint   sql.NullString  `json:"os_fingerprint" db:"os_fingerprint"`
-	FirmwareVersion sql.NullString  `json:"firmware_version" db:"firmware_version"`
-	FirstSeen       time.Time       `json:"first_seen" db:"first_seen"`
-	LastSeen        time.Time       `json:"last_seen" db:"last_seen"`
-	RiskScore       float64         `json:"risk_score" db:"risk_score"`
-	IsActive        bool            `json:"is_active" db:"is_active"`
-	Tags            pq.StringArray  `json:"tags" db:"tags"`
-	RawNmap         json.RawMessage `json:"raw_nmap" db:"raw_nmap"`
+	ID              string         `json:"id" db:"id"`
+	IPAddress       string         `json:"ip_address" db:"ip_address"`
+	MACAddress      sql.NullString `json:"mac_address" db:"mac_address"`
+	Hostname        sql.NullString `json:"hostname" db:"hostname"`
+	Vendor          sql.NullString `json:"vendor" db:"vendor"`
+	DeviceType      string         `json:"device_type" db:"device_type"`
+	OSFingerprint   sql.NullString `json:"os_fingerprint" db:"os_fingerprint"`
+	FirmwareVersion sql.NullString `json:"firmware_version" db:"firmware_version"`
+	FirstSeen       time.Time      `json:"first_seen" db:"first_seen"`
+	LastSeen        time.Time      `json:"last_seen" db:"last_seen"`
+	RiskScore       float64        `json:"risk_score" db:"risk_score"`
+	IsActive        bool           `json:"is_active" db:"is_active"`
+	Tags            pq.StringArray `json:"tags" db:"tags"`
+	RawNmap         []byte         `json:"raw_nmap" db:"raw_nmap"`
 }
 
 // DeviceJSON is a JSON-friendly representation of a Device for API responses.

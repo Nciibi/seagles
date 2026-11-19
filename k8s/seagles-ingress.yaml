@@ -6,6 +6,9 @@ metadata:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # Must match the backend's 100MB request-body cap (api/router.go) and the
+    # frontend nginx client_max_body_size. A larger edge limit only lets a
+    # request reach the backend and fail there with a confusing 413.
     nginx.ingress.kubernetes.io/proxy-body-size: "100m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
 spec:

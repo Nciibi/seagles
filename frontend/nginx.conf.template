@@ -7,7 +7,9 @@ server {
     # operators are unaffected.
     listen 8080;
     server_name localhost;
-    client_max_body_size 256M;
+    # Must match the backend's 100MB cap (api/router.go) and the ingress
+    # proxy-body-size. A larger value only defers the 413 to the backend.
+    client_max_body_size 100M;
     root /usr/share/nginx/html;
     index index.html;
 
@@ -38,7 +40,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 
-        # Firmware uploads are up to 256M. nginx's default proxy_read_timeout
+        # Firmware uploads are up to 100M. nginx's default proxy_read_timeout
         # is 60s, which cuts off a large upload mid-transfer and returns 504
         # to the browser.
         proxy_read_timeout 300s;

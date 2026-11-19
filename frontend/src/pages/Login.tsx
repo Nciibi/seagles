@@ -23,8 +23,9 @@ export default function Login() {
       }
       localStorage.setItem('seagles_user', JSON.stringify(data.user))
       navigate('/')
-    } catch (err: any) {
-      setError(err?.response?.data?.error || err?.message || 'Login failed')
+    } catch (err: unknown) {
+      const axiosError = err as { response?: { data?: { error?: string } }; message?: string }
+      setError(axiosError.response?.data?.error || axiosError.message || 'Login failed')
     } finally {
       setLoading(false)
     }

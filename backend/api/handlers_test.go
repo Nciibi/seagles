@@ -10,15 +10,20 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/Nciibi/seagles/config"
-	"github.com/Nciibi/seagles/models"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+
+	"github.com/Nciibi/seagles/auth"
+	"github.com/Nciibi/seagles/config"
+	"github.com/Nciibi/seagles/models"
 )
 
 func setupTestRouter(t *testing.T) (*gin.Engine, sqlmock.Sqlmock, *config.Config) {
 	t.Helper()
+	// Tests use httptest servers on loopback; the production SSRF guard must
+	// reject those, so opt in explicitly for the handler suite.
+	t.Setenv("WEBHOOK_ALLOW_PRIVATE_TARGETS", "true")
 	gin.SetMode(gin.TestMode)
 
 	db, mock, err := sqlmock.New()
@@ -501,7 +506,7 @@ func TestSafelistHandlers(t *testing.T) {
 		router, mock, _ := setupTestRouter(t)
 
 		mock.ExpectQuery(`INSERT INTO safelists`).
-			WithArgs("ip", "10.0.0.99", nil, "test-user-id").
+			WithArgs(auth.DefaultTenantID, "ip", "10.0.0.99", nil, "test-user-id").
 			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(uuid.NewString()))
 
 		w := request(router, "POST", "/api/v1/safelists", CreateSafelistRequest{
@@ -564,7 +569,7 @@ func TestScanScopeHandlers(t *testing.T) {
 		router, mock, _ := setupTestRouter(t)
 
 		mock.ExpectQuery(`INSERT INTO scan_scopes`).
-			WithArgs("192.168.1.0/24", nil).
+			WithArgs(auth.DefaultTenantID, "192.168.1.0/24", nil).
 			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(uuid.NewString()))
 
 		w := request(router, "POST", "/api/v1/scan-scopes", CreateScanScopeRequest{
@@ -613,7 +618,7 @@ func TestWebhookHandlers(t *testing.T) {
 		router, mock, _ := setupTestRouter(t)
 
 		mock.ExpectQuery(`INSERT INTO webhooks`).
-			WithArgs("slack-alerts", "https://hooks.slack.com/test", "slack", "high").
+			WithArgs(auth.DefaultTenantID, "slack-alerts", "https://hooks.slack.com/test", "slack", "high").
 			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(uuid.NewString()))
 
 		w := request(router, "POST", "/api/v1/webhooks", CreateWebhookRequest{
@@ -662,10 +667,10 @@ func TestWebhookHandlers(t *testing.T) {
 		}))
 		defer ts.Close()
 
-		mock.ExpectQuery(`SELECT url FROM webhooks`).
+		mock.ExpectQuery(`SELECT url, webhook_type FROM webhooks`).
 			WithArgs(id).
-			WillReturnRows(sqlmock.NewRows([]string{"url"}).
-				AddRow(ts.URL))
+			WillReturnRows(sqlmock.NewRows([]string{"url", "webhook_type"}).
+				AddRow(ts.URL, "generic"))
 
 		w := request(router, "POST", "/api/v1/webhooks/"+id+"/test", nil)
 		if w.Code != http.StatusOK {

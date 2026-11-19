@@ -8,8 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Nciibi/seagles/config"
 	"github.com/gin-gonic/gin"
+
+	"github.com/Nciibi/seagles/config"
 )
 
 // deadTCPAddr is a listener-free address. Dialing it fails fast with a

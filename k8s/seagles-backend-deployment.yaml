@@ -23,7 +23,7 @@ spec:
         runAsNonRoot: true
       containers:
       - name: seagles-backend
-        image: your-registry.com/seagles-backend:v2.0.0
+        image: ghcr.io/nciibi/seagles-backend:v2.1.0
         ports:
         # The API serves both the REST surface and the Prometheus exposition
         # (/api/v1/metrics) from a single listener on PORT (8080). There is no
@@ -48,7 +48,10 @@ spec:
         # reports an empty network. Scan only networks you own or have written
         # permission to test.
         - name: NETWORK_CIDR
-          value: "192.168.1.0/24"
+          valueFrom:
+            configMapKeyRef:
+              name: seagles-config
+              key: NETWORK_CIDR
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
@@ -71,11 +74,20 @@ spec:
               name: seagles-analyzer-secret
               key: token
         - name: FIRMWARE_ANALYZER_URL
-          value: "http://seagles-firmware-analyzer.security-tools.svc.cluster.local:8001"
+          valueFrom:
+            configMapKeyRef:
+              name: seagles-config
+              key: FIRMWARE_ANALYZER_URL
         - name: S3_ENDPOINT
-          value: "minio-service.storage.svc.cluster.local:9000"
+          valueFrom:
+            configMapKeyRef:
+              name: seagles-config
+              key: S3_ENDPOINT
         - name: S3_BUCKET
-          value: "seagles-firmware"
+          valueFrom:
+            configMapKeyRef:
+              name: seagles-config
+              key: S3_BUCKET
         - name: S3_ACCESS_KEY
           valueFrom:
             secretKeyRef:

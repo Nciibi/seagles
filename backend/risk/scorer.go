@@ -129,7 +129,15 @@ func ScoreBreakdown(factors RiskFactors) map[string]float64 {
 }
 
 // BuildRiskFactors queries the database to build risk factors for a device.
-func BuildRiskFactors(db *sql.DB, deviceID string) (RiskFactors, error) {
+// DBTX is implemented by *sql.DB and *sql.Tx. Scoring must run on the
+// request-scoped transaction so RLS restricts it to the caller's tenant.
+type DBTX interface {
+	Query(query string, args ...interface{}) (*sql.Rows, error)
+	QueryRow(query string, args ...interface{}) *sql.Row
+	Exec(query string, args ...interface{}) (sql.Result, error)
+}
+
+func BuildRiskFactors(db DBTX, deviceID string) (RiskFactors, error) {
 	var factors RiskFactors
 
 	// Query vulnerability titles to determine active risk factors
@@ -203,7 +211,7 @@ func BuildRiskFactors(db *sql.DB, deviceID string) (RiskFactors, error) {
 }
 
 // UpdateDeviceRiskScore recalculates and saves the risk score for a device.
-func UpdateDeviceRiskScore(db *sql.DB, deviceID string) error {
+func UpdateDeviceRiskScore(db DBTX, deviceID string) error {
 	factors, err := BuildRiskFactors(db, deviceID)
 	if err != nil {
 		return err
@@ -224,7 +232,7 @@ func UpdateDeviceRiskScore(db *sql.DB, deviceID string) error {
 }
 
 // GetRiskBreakdown returns the full risk breakdown for a device.
-func GetRiskBreakdown(db *sql.DB, deviceID string) map[string]interface{} {
+func GetRiskBreakdown(db DBTX, deviceID string) map[string]interface{} {
 	factors, err := BuildRiskFactors(db, deviceID)
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}

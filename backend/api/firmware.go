@@ -11,27 +11,32 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+
 	"github.com/Nciibi/seagles/alerts"
+	"github.com/Nciibi/seagles/auth"
 	"github.com/Nciibi/seagles/config"
 	"github.com/Nciibi/seagles/middleware"
 	"github.com/Nciibi/seagles/models"
 	"github.com/Nciibi/seagles/slog"
-	"github.com/gin-gonic/gin"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 const maxUploadSize = 256 << 20
 
 func ListFirmwareHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		qdb := tenantDB(c, db)
 		requestID, _ := c.Get("request_id")
 
-		rows, err := db.Query(`SELECT f.id, f.device_id, f.version, f.vendor, f.checksum,
+		rows, err := qdb.Query(`SELECT f.id, f.device_id, f.version, f.vendor, f.checksum,
 			f.file_path, f.analyzed_at, f.entropy_score, f.has_default_creds,
 			f.has_telnet, f.has_backdoor_indicators, f.strings_of_interest,
 			f.cve_matches, f.analysis_status, f.analysis_report,
@@ -61,7 +66,8 @@ func ListFirmwareHandler(db *sql.DB) gin.HandlerFunc {
 				&f.HasTelnet, &f.HasBackdoorIndicators, &f.StringsOfInterest,
 				&f.CVEMatches, &f.AnalysisStatus, &f.AnalysisReport,
 				&deviceIP, &deviceHostname); err != nil {
-				continue
+				failInternal(c, 500, "Failed to read firmware row", err)
+				return
 			}
 			entry := FirmwareWithDevice{FirmwareJSON: f.ToJSON()}
 			if deviceIP.Valid {
@@ -85,6 +91,7 @@ func ListFirmwareHandler(db *sql.DB) gin.HandlerFunc {
 
 func AnalyzeFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		qdb := tenantDB(c, db)
 		if len(cfg.FirmwareAnalyzerToken) < 32 {
 			fail(c, http.StatusServiceUnavailable, "Firmware analyzer authentication is not configured")
 			return
@@ -96,7 +103,7 @@ func AnalyzeFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 		}
 
 		var f models.Firmware
-		err := db.QueryRow(`SELECT id, device_id, version, vendor, file_path
+		err := qdb.QueryRow(`SELECT id, device_id, version, vendor, file_path
 			FROM firmware WHERE id = $1`, id).Scan(
 			&f.ID, &f.DeviceID, &f.Version, &f.Vendor, &f.FilePath)
 		if err == sql.ErrNoRows {
@@ -109,9 +116,12 @@ func AnalyzeFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		db.Exec(`UPDATE firmware SET analysis_status='pending' WHERE id=$1`, id)
+		qdb.Exec(`UPDATE firmware SET analysis_status='pending' WHERE id=$1`, id)
 		slog.Info("Firmware analysis triggered", "request_id", requestID, "firmware_id", id)
 
+		// The goroutine outlives the request transaction; copy the tenant now
+		// instead of reading the (pooled) gin context later.
+		tenantID := auth.TenantFromContext(c)
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -177,6 +187,7 @@ func AnalyzeFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 
 			if result.Report.Entropy.Suspicious && f.DeviceID.Valid {
 				alerts.CreateAlert(db, alerts.AlertRequest{
+					TenantID:  tenantID,
 					DeviceID:  f.DeviceID.String,
 					AlertType: alerts.AlertFirmwareEntropy,
 					Severity:  "high",
@@ -193,6 +204,7 @@ func AnalyzeFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 
 func UploadFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		qdb := tenantDB(c, db)
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadSize)
 
 		file, header, err := c.Request.FormFile("firmware")
@@ -256,7 +268,14 @@ func UploadFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 
 		if cfg.S3Endpoint != "" && cfg.S3AccessKey != "" {
 			useSSL := false
-			minioClient, mErr := minio.New(cfg.S3Endpoint, &minio.Options{
+			endpoint := cfg.S3Endpoint
+			if strings.Contains(endpoint, "://") {
+				if parsed, parseErr := url.Parse(endpoint); parseErr == nil {
+					endpoint = parsed.Host
+					useSSL = strings.EqualFold(parsed.Scheme, "https")
+				}
+			}
+			minioClient, mErr := minio.New(endpoint, &minio.Options{
 				Creds:  credentials.NewStaticV4(cfg.S3AccessKey, cfg.S3SecretKey, ""),
 				Secure: useSSL,
 			})
@@ -268,9 +287,15 @@ func UploadFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 				}
 
 				ctx := context.Background()
-				exists, _ := minioClient.BucketExists(ctx, bucketName)
-				if !exists {
-					_ = minioClient.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
+				exists, bucketErr := minioClient.BucketExists(ctx, bucketName)
+				if bucketErr != nil {
+					slog.Warn("Could not check S3 bucket; attempting upload anyway",
+						"bucket", bucketName, "error", bucketErr.Error())
+				} else if !exists {
+					if mkErr := minioClient.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{}); mkErr != nil {
+						slog.Warn("Could not create S3 bucket; attempting upload anyway",
+							"bucket", bucketName, "error", mkErr.Error())
+					}
 				}
 
 				objectName := fmt.Sprintf("%s/%s", checksum, header.Filename)
@@ -301,10 +326,10 @@ func UploadFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 		}
 
 		var firmwareID string
-		err = db.QueryRow(`INSERT INTO firmware (device_id, vendor, version, checksum, file_path, 
+		err = qdb.QueryRow(`INSERT INTO firmware (tenant_id, device_id, vendor, version, checksum, file_path,
 			file_size_bytes, original_filename, upload_source, analysis_status)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, 'upload', 'pending') RETURNING id`,
-			nullableString(deviceID), nullableString(vendor), nullableString(version),
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'upload', 'pending') RETURNING id`,
+			auth.TenantFromContext(c), nullableString(deviceID), nullableString(vendor), nullableString(version),
 			checksum, finalPath, written, header.Filename,
 		).Scan(&firmwareID)
 

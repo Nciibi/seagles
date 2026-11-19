@@ -155,8 +155,7 @@ export default function App() {
             </div>
           </aside>
 
-          <main id="main-content" style={{
-            marginLeft: '240px',
+          <main id="main-content" className="sidebar-margin" style={{
             flex: 1,
             padding: '24px 32px',
             minWidth: 0,

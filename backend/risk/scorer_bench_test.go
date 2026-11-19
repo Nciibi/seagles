@@ -13,19 +13,19 @@ func BenchmarkCalculateRiskScore_Empty(b *testing.B) {
 
 func BenchmarkCalculateRiskScore_AllFactors(b *testing.B) {
 	factors := RiskFactors{
-		HasDefaultCreds:      true,
-		HasTelnet:            true,
-		HasADB:               true,
-		HasModbus:            true,
-		HasUnauthRTSP:        true,
-		HasPlaintextMQTT:     true,
-		HasHTTPMgmt:          true,
-		HasWeakTLS:           true,
-		KnownCVECount:        10,
-		KEVMatchCount:        5,
-		FirmwareOutdated:     true,
-		HighEntropyFirmware:  true,
-		DaysSinceLastScan:    90,
+		HasDefaultCreds:     true,
+		HasTelnet:           true,
+		HasADB:              true,
+		HasModbus:           true,
+		HasUnauthRTSP:       true,
+		HasPlaintextMQTT:    true,
+		HasHTTPMgmt:         true,
+		HasWeakTLS:          true,
+		KnownCVECount:       10,
+		KEVMatchCount:       5,
+		FirmwareOutdated:    true,
+		HighEntropyFirmware: true,
+		DaysSinceLastScan:   90,
 	}
 	for i := 0; i < b.N; i++ {
 		CalculateRiskScore(factors)
@@ -41,19 +41,19 @@ func BenchmarkSeverityFromScore(b *testing.B) {
 
 func BenchmarkScoreBreakdown(b *testing.B) {
 	factors := RiskFactors{
-		HasDefaultCreds:      true,
-		HasTelnet:            true,
-		HasADB:               true,
-		HasModbus:            true,
-		HasUnauthRTSP:        true,
-		HasPlaintextMQTT:     true,
-		HasHTTPMgmt:          true,
-		HasWeakTLS:           true,
-		KnownCVECount:        6,
-		KEVMatchCount:        2,
-		FirmwareOutdated:     true,
-		HighEntropyFirmware:  true,
-		DaysSinceLastScan:    30,
+		HasDefaultCreds:     true,
+		HasTelnet:           true,
+		HasADB:              true,
+		HasModbus:           true,
+		HasUnauthRTSP:       true,
+		HasPlaintextMQTT:    true,
+		HasHTTPMgmt:         true,
+		HasWeakTLS:          true,
+		KnownCVECount:       6,
+		KEVMatchCount:       2,
+		FirmwareOutdated:    true,
+		HighEntropyFirmware: true,
+		DaysSinceLastScan:   30,
 	}
 	for i := 0; i < b.N; i++ {
 		ScoreBreakdown(factors)

@@ -147,9 +147,18 @@ func main() {
 
 	router := api.NewRouter(database, cfg, kevCatalog)
 
+	// Timeouts bound how long a slow or idle client can hold a connection.
+	// ReadHeaderTimeout is the primary Slowloris defence; IdleTimeout bounds
+	// keep-alive sockets after a completed response. net/http clears both
+	// deadlines when a connection is hijacked, so WebSocket upgrades and long
+	// scan streams are unaffected.
 	srv := &http.Server{
-		Addr:    ":" + cfg.Port,
-		Handler: router,
+		Addr:              ":" + cfg.Port,
+		Handler:           router,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      120 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	useTLS := cfg.TLSEnabled && cfg.TLSCertFile != "" && cfg.TLSKeyFile != ""

@@ -59,3 +59,46 @@ func TestMetricsPrometheusOutput(t *testing.T) {
 		t.Fatal("expected non-nil handler")
 	}
 }
+
+func TestMetricsHandlerEmitsQuantilesAndRuntime(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	globalMetrics.mu.Lock()
+	originalSamples := globalMetrics.latencySamples
+	originalCount := globalMetrics.latencyCount
+	originalSum := globalMetrics.latencySum
+	globalMetrics.latencySamples = map[string][]float64{"GET /test": {0.1, 0.2, 0.3, 0.4}}
+	globalMetrics.latencyCount = map[string]int64{"GET /test": 4}
+	globalMetrics.latencySum = map[string]float64{"GET /test": 1.0}
+	globalMetrics.mu.Unlock()
+	t.Cleanup(func() {
+		globalMetrics.mu.Lock()
+		globalMetrics.latencySamples = originalSamples
+		globalMetrics.latencyCount = originalCount
+		globalMetrics.latencySum = originalSum
+		globalMetrics.mu.Unlock()
+	})
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	MetricsHandler()(c)
+
+	body := w.Body.String()
+	for _, want := range []string{
+		`# TYPE seagles_request_latency_seconds summary`,
+		`seagles_request_latency_seconds{endpoint="GET_/test",quantile="0.5"} 0.200000`,
+		`seagles_request_latency_seconds{endpoint="GET_/test",quantile="0.95"} 0.400000`,
+		`seagles_request_latency_seconds_count{endpoint="GET_/test"} 4`,
+		`seagles_go_goroutines`,
+		`seagles_memory_heap_bytes`,
+		`seagles_gc_collections_total`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("metrics output missing %q", want)
+		}
+	}
+	if strings.Contains(body, "seagles_request_latency_seconds{endpoint=\"GET_/test\"} ") {
+		t.Error("latency still exposed as an unlabelled mean")
+	}
+}

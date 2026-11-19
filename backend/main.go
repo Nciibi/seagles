@@ -15,6 +15,7 @@ import (
 	"github.com/Nciibi/seagles/alerts"
 	"github.com/Nciibi/seagles/api"
 	"github.com/Nciibi/seagles/auth"
+	"github.com/Nciibi/seagles/cache"
 	"github.com/Nciibi/seagles/config"
 	"github.com/Nciibi/seagles/db"
 	"github.com/Nciibi/seagles/kev"

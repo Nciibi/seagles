@@ -124,7 +124,7 @@ func AnalyzeFirmwareHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf("PANIC in firmware analysis: %v", r)
+					slog.Error("PANIC in firmware analysis", "recover", r)
 				}
 			}()
 			analyzerURL := cfg.FirmwareAnalyzerURL

@@ -55,7 +55,10 @@ func TestKeyRotationOverlap(t *testing.T) {
 	globalKeyPairMu.Lock()
 	globalKeyPair = &KeyPair{Kid: PreviousTokenKid, PrivateKey: oldPair, PublicKey: &oldPair.PublicKey}
 	globalKeyPairMu.Unlock()
-	oldToken, err := signRS256(&Claims{Sub: "user-1", JTI: "jti-old", TokenType: AccessToken})
+	oldToken, err := signRS256(&Claims{
+		Sub: "user-1", JTI: "jti-old", TokenType: AccessToken,
+		Exp: time.Now().Add(time.Hour).Unix(),
+	})
 	if err != nil {
 		t.Fatalf("sign with old key: %v", err)
 	}

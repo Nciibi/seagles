@@ -39,9 +39,10 @@ spec:
           capabilities:
             drop:
             - ALL
+            # NET_RAW is required for passive packet capture. NET_ADMIN is not
+            # needed and violates restricted Pod Security Admission.
             add:
             - NET_RAW
-            - NET_ADMIN
 
         env:
         # Network the scanner is authorised to probe. This must match the

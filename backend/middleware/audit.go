@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"database/sql"
-	"log"
 	"strconv"
 	"time"
 

@@ -167,8 +167,7 @@ func deliverWebhook(db *sql.DB, wh WebhookConfig, alertID, severity, title, desc
 		req.Header.Set("X-Seagles-Signature", signWebhookPayload(payload, wh.Secret.String))
 	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := webhookHTTPClient.Do(req)
 	if err != nil {
 		if attempt == maxWebhookRetries-1 {
 			logDelivery(db, wh.TenantID, wh.ID, alertID, 0, "", err.Error())

@@ -232,9 +232,12 @@ func RegisterHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		var userID string
+		// Operator-provisioned accounts start with a password chosen by someone
+		// else. Force a rotation at first login, as the seeded admin already is,
+		// so no deployment keeps a credential the operator never chose.
 		err = db.QueryRow(
-			`INSERT INTO users (username, email, password_hash, role, tenant_id)
-			 VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+			`INSERT INTO users (username, email, password_hash, role, tenant_id, must_change_password)
+			 VALUES ($1, $2, $3, $4, $5, TRUE) RETURNING id`,
 			req.Username, req.Email, hash, role, TenantFromContext(c),
 		).Scan(&userID)
 

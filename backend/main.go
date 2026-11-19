@@ -158,6 +158,29 @@ func main() {
 
 	router := api.NewRouter(database, cfg, kevCatalog)
 
+	// Profiling lives on its own loopback listener so it can never be reached
+	// through the public API port or an ingress. It is disabled by default.
+	var pprofSrv *http.Server
+	if cfg.PPROFEnabled {
+		pprofMux := http.NewServeMux()
+		pprofMux.HandleFunc("/debug/pprof/", pprof.Index)
+		pprofMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		pprofMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		pprofMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		pprofMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		pprofSrv = &http.Server{
+			Addr:              cfg.PPROFListen,
+			Handler:           pprofMux,
+			ReadHeaderTimeout: 10 * time.Second,
+		}
+		go func() {
+			slog.Info("pprof listener enabled", "listen", cfg.PPROFListen)
+			if err := pprofSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				slog.Error("pprof listener failed", "error", err.Error())
+			}
+		}()
+	}
+
 	// Timeouts bound how long a slow or idle client can hold a connection.
 	// ReadHeaderTimeout is the primary Slowloris defence; IdleTimeout bounds
 	// keep-alive sockets after a completed response. net/http clears both

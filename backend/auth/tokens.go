@@ -34,6 +34,10 @@ const (
 	TokenAudience = "seagles-api"
 	TokenKid      = "seagles-v1"
 
+	// PreviousTokenKid identifies the retired signing key during a rotation
+	// window. Tokens signed with it remain verifiable until the overlap ends.
+	PreviousTokenKid = "seagles-previous"
+
 	// DefaultTenantID is the tenant every existing row was backfilled to by
 	// migration 015. Single-tenant deployments continue to use it.
 	DefaultTenantID = "00000000-0000-0000-0000-000000000001"

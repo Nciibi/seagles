@@ -64,6 +64,11 @@ type Config struct {
 	TLSEnabled  bool
 	TLSCertFile string
 	TLSKeyFile  string
+
+	// Pprof exposes runtime profiles on a separate loopback-only listener.
+	// Off by default; never bind it to a public interface.
+	PPROFEnabled bool
+	PPROFListen  string
 }
 
 func Load() (*Config, error) {

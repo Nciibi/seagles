@@ -452,7 +452,7 @@ func NetworkScanHandler(db *sql.DB, cfg *config.Config) gin.HandlerFunc {
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Printf("PANIC in network scan: %v", r)
+					slog.Error("PANIC in network scan", "recover", r)
 				}
 			}()
 			cidrs := activeScanScopes(db, tenantID)

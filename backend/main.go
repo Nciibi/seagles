@@ -203,7 +203,7 @@ func main() {
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		// Requests outlived the drain budget. Log rather than log.Fatalf:
+		// Requests outlived the drain budget. Log rather than exit here:
 		// the background workers still need to be reaped, and exiting here
 		// would skip wg.Wait() and turn a slow drain into a hard kill.
 		slog.Error("HTTP drain exceeded budget, forcing close",

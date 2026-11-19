@@ -222,3 +222,18 @@ func prometheusLabelKey(s string) string {
 	r := strings.NewReplacer(" ", "_", "\"", "", "/", "_")
 	return r.Replace(s)
 }
+
+// quantile returns the nearest-rank quantile of an already sorted slice.
+func quantile(sorted []float64, q float64) float64 {
+	if len(sorted) == 0 {
+		return 0
+	}
+	rank := int(math.Ceil(q * float64(len(sorted))))
+	if rank < 1 {
+		rank = 1
+	}
+	if rank > len(sorted) {
+		rank = len(sorted)
+	}
+	return sorted[rank-1]
+}

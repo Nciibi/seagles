@@ -2,6 +2,7 @@ package cache
 
 import (
 	"testing"
+	"time"
 )
 
 func TestNewTokenBlacklist(t *testing.T) {

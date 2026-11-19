@@ -213,6 +213,14 @@ func LoginHandler(db *sql.DB) gin.HandlerFunc {
 		// The raw pool has no app.tenant_id GUC, so RLS would otherwise match
 		// the same username in every tenant. Scope the lookup explicitly.
 		tenantID := LoginTenant(c)
+		if isAccountLocked(db, tenantID, req.Username) {
+			slog.Warn("login_locked", "username", req.Username, "reason", "account_locked")
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"data": nil, "error": "Account temporarily locked. Try again later.",
+			})
+			return
+		}
+
 		err := db.QueryRow(
 			`SELECT id, username, email, role, password_hash, COALESCE(tenant_id, $2), must_change_password
 			 FROM users WHERE username = $1 AND COALESCE(tenant_id, $2) = $2 AND is_active = TRUE`,

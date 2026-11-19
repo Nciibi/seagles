@@ -125,6 +125,9 @@ func Load() (*Config, error) {
 		TLSCertFile: getEnv("TLS_CERT_FILE", ""),
 		TLSKeyFile:  getEnv("TLS_KEY_FILE", ""),
 
+		RequireHTTPS:        getEnv("REQUIRE_HTTPS", "") == "true",
+		TrustForwardedProto: getEnv("TRUST_FORWARDED_PROTO", "") == "true",
+
 		PPROFEnabled: getEnv("PPROF_ENABLED", "") == "true",
 		PPROFListen:  getEnv("PPROF_LISTEN", "127.0.0.1:6060"),
 	}

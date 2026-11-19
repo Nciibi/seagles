@@ -78,6 +78,8 @@ func Load() (*Config, error) {
 		FirmwareAnalyzerToken: getEnv("FIRMWARE_ANALYZER_TOKEN", ""),
 		JWTSecret:             getEnv("JWT_SECRET", ""),
 		JWTPrivateKeyFile:     getEnv("JWT_PRIVATE_KEY_FILE", ""),
+		JWTPreviousSecret:     getEnv("JWT_PREVIOUS_SECRET", ""),
+		JWTPreviousKeyFile:    getEnv("JWT_PREVIOUS_KEY_FILE", ""),
 		RequireSharedJWTKey:   getEnv("REQUIRE_SHARED_JWT_KEY", "") == "true",
 		SlackWebhookURL:       getEnv("SLACK_WEBHOOK_URL", ""),
 		TeamsWebhookURL:       getEnv("TEAMS_WEBHOOK_URL", ""),

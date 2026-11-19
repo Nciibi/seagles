@@ -170,9 +170,11 @@ func LoadOrGenerateKeys(privateKeyPEM string) error {
 		return fmt.Errorf("failed to generate RSA key: %w", err)
 	}
 	globalKeyPair = &KeyPair{
+		Kid:        TokenKid,
 		PrivateKey: priv,
 		PublicKey:  &priv.PublicKey,
 	}
+	globalPreviousKeyPair = nil
 	keyIsEphemeral = true
 	slog.Warn("Generated an ephemeral RSA key pair: it is NOT shared with any " +
 		"other instance and is lost on restart. This is only safe for a single " +

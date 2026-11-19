@@ -92,6 +92,14 @@ func main() {
 	}
 	auth.SetJWTSecret(jwtKey)
 
+	previousJWTKey, err := resolveKeyFrom(cfg.JWTPreviousSecret, cfg.JWTPreviousKeyFile)
+	if err != nil {
+		slog.Fatal("Previous JWT signing key configuration error", "error", err.Error())
+	}
+	if err := auth.LoadPreviousKey(previousJWTKey); err != nil {
+		slog.Fatal("Previous JWT signing key is invalid", "error", err.Error())
+	}
+
 	if auth.UsingEphemeralKey() {
 		// An auto-generated key is unique to this process. A single local
 		// instance is fine; a second replica or a restart silently invalidates

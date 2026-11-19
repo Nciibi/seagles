@@ -1,8 +1,11 @@
 package auth
 
 import (
+	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 func TestLoadOrGenerateKeys_AutoGenerate(t *testing.T) {

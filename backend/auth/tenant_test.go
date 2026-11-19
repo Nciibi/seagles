@@ -26,6 +26,27 @@ func TestTenantFromContext(t *testing.T) {
 	}
 }
 
+func TestLoginTenantUsesValidHeaderOnly(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	const tenant = "33333333-3333-3333-3333-333333333333"
+
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", nil)
+	if got := LoginTenant(c); got != DefaultTenantID {
+		t.Fatalf("no header tenant = %q, want default", got)
+	}
+
+	c.Request.Header.Set("X-Tenant-ID", tenant)
+	if got := LoginTenant(c); got != tenant {
+		t.Fatalf("valid header tenant = %q, want %q", got, tenant)
+	}
+
+	c.Request.Header.Set("X-Tenant-ID", "not-a-uuid")
+	if got := LoginTenant(c); got != DefaultTenantID {
+		t.Fatalf("invalid header tenant = %q, want default", got)
+	}
+}
+
 func TestAccessTokenKeepsExplicitTenant(t *testing.T) {
 	withTestKeys(t)
 	const tenant = "22222222-2222-2222-2222-222222222222"

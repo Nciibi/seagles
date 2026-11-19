@@ -63,6 +63,12 @@ type ChangePasswordRequest struct {
 	NewPassword     string `json:"new_password" binding:"required,min=8,max=128"`
 }
 
+// passwordHashCost matches the cost used by the seeded accounts in migration
+// 006. bcrypt.DefaultCost (10) is below the documented policy, so new hashes
+// must be generated at cost 12; existing cost-10 hashes still verify and are
+// upgraded the next time the owner changes their password.
+const passwordHashCost = 12
+
 func SetJWTSecret(secret string) {
 	if err := LoadOrGenerateKeys(secret); err != nil {
 		slog.Fatal("Failed to initialize RSA key pair", "error", err.Error())
@@ -70,7 +76,7 @@ func SetJWTSecret(secret string) {
 }
 
 func HashPassword(password string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), passwordHashCost)
 	return string(hash), err
 }
 

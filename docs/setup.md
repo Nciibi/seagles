@@ -258,6 +258,29 @@ kubectl apply -f k8s/
 
 **Note:** Update image tags and registry URLs in the manifests before deploying.
 
+### Verify published images before deploying
+
+Every image pushed by CI is signed with Cosign keyless (OIDC) and carries an
+SPDX SBOM attestation, both attached to the immutable digest. Verify before
+referencing a new digest in the manifests:
+
+```bash
+cosign verify \
+  --certificate-identity-regexp 'https://github.com/Nciibi/seagles/.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  ghcr.io/nciibi/seagles-backend@sha256:<digest>
+
+cosign verify-attestation \
+  --type spdxjson \
+  --certificate-identity-regexp 'https://github.com/Nciibi/seagles/.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  ghcr.io/nciibi/seagles-backend@sha256:<digest>
+```
+
+Deploy by digest (`image: ghcr.io/nciibi/seagles-backend@sha256:...`) rather
+than by a mutable tag. To roll back, redeploy the previously verified digest;
+the deployment is otherwise unchanged.
+
 ### Required configuration before first apply
 
 Four values must match the manifests or the platform will not work. Each has a

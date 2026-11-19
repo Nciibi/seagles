@@ -258,6 +258,7 @@ Built-in safety measures:
 - 500ms delay between credential attempts
 - Maximum 50 credential pairs per device per scan
 - Lockout detection via HTTP 429 and response body analysis
+- Per-account lockout: 5 failed logins in 15 minutes blocks that account for 15 minutes
 - Full audit logging of every credential test
 - Safelist support to exclude known-safe devices
 

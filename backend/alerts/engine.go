@@ -3,7 +3,6 @@ package alerts
 import (
 	"database/sql"
 	"encoding/json"
-	"log"
 	"time"
 
 	"github.com/Nciibi/seagles/events"

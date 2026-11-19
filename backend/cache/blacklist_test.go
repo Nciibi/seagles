@@ -69,6 +69,28 @@ func TestGlobalBlacklist(t *testing.T) {
 	}
 }
 
+func TestRedisBlacklistFallsBackWhenUnavailable(t *testing.T) {
+	CloseRedisBlacklist()
+	t.Cleanup(CloseRedisBlacklist)
+
+	// Invalid URL and unreachable server must both leave the process-local
+	// blacklist fully functional rather than failing startup or token checks.
+	InitRedisBlacklist("://not-a-url", time.Minute)
+	if currentRedisClient() != nil {
+		t.Fatal("invalid REDIS_URL must not install a Redis client")
+	}
+
+	InitRedisBlacklist("redis://127.0.0.1:1", time.Minute)
+	if currentRedisClient() != nil {
+		t.Fatal("unreachable Redis must not install a client")
+	}
+
+	BlacklistToken("fallback-jti")
+	if !IsTokenBlacklisted("fallback-jti") {
+		t.Fatal("local revocation must still work without Redis")
+	}
+}
+
 func TestConcurrentAccess(t *testing.T) {
 	b := NewTokenBlacklist()
 	done := make(chan bool, 10)

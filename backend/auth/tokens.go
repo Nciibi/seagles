@@ -154,9 +154,12 @@ func LoadOrGenerateKeys(privateKeyPEM string) error {
 			return err
 		}
 		globalKeyPair = &KeyPair{
+			Kid:        TokenKid,
 			PrivateKey: priv,
 			PublicKey:  &priv.PublicKey,
 		}
+		// A fresh active key invalidates any rotation window that was open.
+		globalPreviousKeyPair = nil
 		keyIsEphemeral = false
 		slog.Info("Loaded existing RSA key pair")
 		return nil

@@ -240,11 +240,19 @@ func LoginHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		if !CheckPassword(req.Password, passwordHash) {
-			slog.Warn("login_failed", "username", req.Username, "reason", "wrong_password")
+			locked := recordFailedLogin(db, tenantID, req.Username)
+			slog.Warn("login_failed", "username", req.Username, "reason", "wrong_password", "locked", locked)
+			if locked {
+				c.JSON(http.StatusTooManyRequests, gin.H{
+					"data": nil, "error": "Account temporarily locked. Try again later.",
+				})
+				return
+			}
 			c.JSON(http.StatusUnauthorized, gin.H{"data": nil, "error": "Invalid credentials"})
 			return
 		}
 
+		clearFailedLogins(db, tenantID, req.Username)
 		db.Exec(`UPDATE users SET last_login = NOW() WHERE id = $1`, user.ID)
 
 		accessToken, err := GenerateAccessToken(user)

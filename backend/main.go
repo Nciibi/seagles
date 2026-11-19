@@ -175,7 +175,7 @@ func main() {
 			serveErr = srv.ListenAndServe()
 		}
 		if serveErr != nil && serveErr != http.ErrServerClosed {
-			log.Fatalf("Server failed: %v", serveErr)
+			slog.Fatal("Server failed", "error", serveErr.Error())
 		}
 	}()
 

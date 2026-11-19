@@ -87,9 +87,9 @@ func TestMetricsHandlerEmitsQuantilesAndRuntime(t *testing.T) {
 	body := w.Body.String()
 	for _, want := range []string{
 		`# TYPE seagles_request_latency_seconds summary`,
-		`seagles_request_latency_seconds{endpoint="GET_/test",quantile="0.5"} 0.200000`,
-		`seagles_request_latency_seconds{endpoint="GET_/test",quantile="0.95"} 0.400000`,
-		`seagles_request_latency_seconds_count{endpoint="GET_/test"} 4`,
+		`seagles_request_latency_seconds{endpoint="GET__test",quantile="0.5"} 0.200000`,
+		`seagles_request_latency_seconds{endpoint="GET__test",quantile="0.95"} 0.400000`,
+		`seagles_request_latency_seconds_count{endpoint="GET__test"} 4`,
 		`seagles_go_goroutines`,
 		`seagles_memory_heap_bytes`,
 		`seagles_gc_collections_total`,
@@ -98,7 +98,7 @@ func TestMetricsHandlerEmitsQuantilesAndRuntime(t *testing.T) {
 			t.Errorf("metrics output missing %q", want)
 		}
 	}
-	if strings.Contains(body, "seagles_request_latency_seconds{endpoint=\"GET_/test\"} ") {
+	if strings.Contains(body, "seagles_request_latency_seconds{endpoint=\"GET__test\"} ") {
 		t.Error("latency still exposed as an unlabelled mean")
 	}
 }

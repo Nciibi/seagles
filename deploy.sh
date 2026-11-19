@@ -47,7 +47,8 @@ if [ "$SKIP_BUILD" = false ]; then
 
 	echo "=== Building frontend ==="
 	cd frontend
-	npm ci --omit=dev
+	# tsc and vite are devDependencies — --omit=dev breaks the build.
+	npm ci
 	npm run build
 	cd ..
 

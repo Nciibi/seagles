@@ -615,7 +615,14 @@ func HasPermission(role, permission string) bool {
 
 func ListUsersHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		rows, err := db.Query(`SELECT id, username, email, role, is_active, last_login, created_at FROM users ORDER BY created_at DESC`)
+		// The raw pool has no app.tenant_id GUC, so RLS alone would expose every
+		// tenant's users. Filter explicitly on the caller's tenant.
+		tenantID := TenantFromContext(c)
+		rows, err := db.Query(
+			`SELECT id, username, email, role, is_active, last_login, created_at
+			 FROM users WHERE COALESCE(tenant_id, $1) = $1 ORDER BY created_at DESC`,
+			tenantID,
+		)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Failed to query users"})
 			return

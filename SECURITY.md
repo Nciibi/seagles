@@ -41,4 +41,13 @@ The following are in scope:
 - Infrastructure configuration (`/k8s`, `docker-compose.yml`)
 - CI/CD pipelines (`.github/workflows/`)
 
-Out of scope: dependencies with known CVEs that have available patches.
+Dependency vulnerabilities are in scope too, including advisories with an
+available patch. Patched dependencies are upgraded in CI: the Go backend runs
+`govulncheck` on every pull request and fails on reachable advisories; npm
+advisories are monitored with `npm audit`.
+
+As of this revision `npm audit` still reports advisories in the frontend's
+**development-only** toolchain (vitest 2 / vite 5 / tinypool), which require
+major-version upgrades to clear. They are tracked and do not ship in the
+production bundle; `axios` (the runtime HTTP client) is kept on a patched
+release. The Go dependency graph has no reachable advisories.

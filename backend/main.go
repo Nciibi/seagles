@@ -88,6 +88,11 @@ func main() {
 	slog.SetLevel(parseLogLevel(cfg.LogLevel))
 	slog.SetFormat(cfg.LogFormat)
 
+	// Share token revocation across replicas when Redis is configured. Without
+	// it, logout on one pod leaves the access token usable on the others.
+	cache.InitRedisBlacklist(cfg.RedisURL, auth.AccessTokenTTL)
+	defer cache.CloseRedisBlacklist()
+
 	jwtKey, err := resolveJWTKey(cfg)
 	if err != nil {
 		slog.Fatal("JWT signing key configuration error", "error", err.Error())

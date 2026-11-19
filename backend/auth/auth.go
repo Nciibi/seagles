@@ -154,10 +154,13 @@ func LoginHandler(db *sql.DB) gin.HandlerFunc {
 
 		var user User
 		var passwordHash string
+		// The raw pool has no app.tenant_id GUC, so RLS would otherwise match
+		// the same username in every tenant. Scope the lookup explicitly.
+		tenantID := LoginTenant(c)
 		err := db.QueryRow(
 			`SELECT id, username, email, role, password_hash, COALESCE(tenant_id, $2), must_change_password
-			 FROM users WHERE username = $1 AND is_active = TRUE`,
-			req.Username, DefaultTenantID,
+			 FROM users WHERE username = $1 AND COALESCE(tenant_id, $2) = $2 AND is_active = TRUE`,
+			req.Username, tenantID,
 		).Scan(&user.ID, &user.Username, &user.Email, &user.Role, &passwordHash,
 			&user.TenantID, &user.MustChangePassword)
 

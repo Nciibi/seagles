@@ -231,14 +231,45 @@ func GetPublicJWK() (JWK, error) {
 		return JWK{}, errors.New("key pair not initialized")
 	}
 
+	kid := TokenKid
+	if pair != nil && pair.Kid != "" {
+		kid = pair.Kid
+	}
 	return JWK{
 		Kty: "RSA",
 		Use: "sig",
 		Alg: "RS256",
-		Kid: TokenKid,
+		Kid: kid,
 		N:   base64.RawURLEncoding.EncodeToString(pub.N.Bytes()),
 		E:   base64.RawURLEncoding.EncodeToString(big.NewInt(int64(pub.E)).Bytes()),
 	}, nil
+}
+
+// GetPublicJWKs publishes every key currently accepted for verification.
+// During a rotation both the new and the retired key are present; consumers
+// select by "kid" and can switch keys without a verification outage.
+func GetPublicJWKs() ([]JWK, error) {
+	active, err := GetPublicJWK()
+	if err != nil {
+		return nil, err
+	}
+	keys := []JWK{active}
+
+	globalKeyPairMu.RLock()
+	previous := globalPreviousKeyPair
+	globalKeyPairMu.RUnlock()
+	if previous == nil || previous.PublicKey == nil {
+		return keys, nil
+	}
+	keys = append(keys, JWK{
+		Kty: "RSA",
+		Use: "sig",
+		Alg: "RS256",
+		Kid: PreviousTokenKid,
+		N:   base64.RawURLEncoding.EncodeToString(previous.PublicKey.N.Bytes()),
+		E:   base64.RawURLEncoding.EncodeToString(big.NewInt(int64(previous.PublicKey.E)).Bytes()),
+	})
+	return keys, nil
 }
 
 func GetPublicKeyPEM() (string, error) {

@@ -39,7 +39,10 @@ func TestKeyRotationOverlap(t *testing.T) {
 	if err := LoadOrGenerateKeys(newKey); err != nil {
 		t.Fatalf("load active key: %v", err)
 	}
-	newToken, err := signRS256(&Claims{Sub: "user-1", JTI: "jti-new", TokenType: AccessToken})
+	newToken, err := signRS256(&Claims{
+		Sub: "user-1", JTI: "jti-new", TokenType: AccessToken,
+		Exp: time.Now().Add(time.Hour).Unix(),
+	})
 	if err != nil {
 		t.Fatalf("sign with active key: %v", err)
 	}

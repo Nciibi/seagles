@@ -183,6 +183,29 @@ func LoadOrGenerateKeys(privateKeyPEM string) error {
 	return nil
 }
 
+// LoadPreviousKey registers the retired signing key for the overlap window.
+// It must be called after LoadOrGenerateKeys so a rotation publishes the new
+// key as active while still verifying tokens issued by the old one.
+func LoadPreviousKey(privateKeyPEM string) error {
+	if strings.TrimSpace(privateKeyPEM) == "" {
+		return nil
+	}
+	priv, err := parseRSAPrivateKeyPEM(privateKeyPEM)
+	if err != nil {
+		return fmt.Errorf("previous JWT signing key: %w", err)
+	}
+
+	globalKeyPairMu.Lock()
+	defer globalKeyPairMu.Unlock()
+	globalPreviousKeyPair = &KeyPair{
+		Kid:        PreviousTokenKid,
+		PrivateKey: priv,
+		PublicKey:  &priv.PublicKey,
+	}
+	slog.Info("Previous JWT signing key loaded for rotation overlap", "kid", PreviousTokenKid)
+	return nil
+}
+
 // JWK is the public portion of the active signing key in RFC 7517 form.
 type JWK struct {
 	Kty string `json:"kty"`

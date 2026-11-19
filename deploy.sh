@@ -29,6 +29,16 @@ if [ ! -f ".env" ]; then
 	fi
 fi
 
+# Export the deployment environment so psql and the binary actually see the
+# configured values. An environment-specific overlay wins over the base file.
+set -a
+. ./.env
+if [ -f ".env.$ENV" ]; then
+	echo "Loading environment overlay: .env.$ENV"
+	. "./.env.$ENV"
+fi
+set +a
+
 if [ "$SKIP_BUILD" = false ]; then
 	echo "=== Building backend ==="
 	cd backend

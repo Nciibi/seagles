@@ -84,6 +84,62 @@ func CheckPassword(password, hash string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
 }
 
+// isAccountLocked reports whether the (tenant, username) pair is currently in
+// the lockout window. A missing table (migration not yet applied) is not a
+// reason to refuse login; the IP rate limiter still applies.
+func isAccountLocked(db *sql.DB, tenantID, username string) bool {
+	var lockedUntil sql.NullTime
+	err := db.QueryRow(
+		`SELECT locked_until FROM login_attempts WHERE tenant_id = $1 AND username = $2`,
+		tenantID, username,
+	).Scan(&lockedUntil)
+	if err != nil {
+		return false
+	}
+	return lockedUntil.Valid && lockedUntil.Time.After(time.Now())
+}
+
+// recordFailedLogin atomically advances the per-account failure counter and
+// returns true when this failure tripped the lockout. The 15-minute window and
+// 5-failure threshold are defined in migration 018; keeping them in SQL makes
+// the update a single atomic statement under concurrent login attempts.
+func recordFailedLogin(db *sql.DB, tenantID, username string) bool {
+	var lockedUntil sql.NullTime
+	err := db.QueryRow(`
+		INSERT INTO login_attempts (tenant_id, username, failed_count, first_failed_at, locked_until)
+		VALUES ($1, $2, 1, NOW(), NULL)
+		ON CONFLICT (tenant_id, username) DO UPDATE SET
+		  failed_count = CASE
+		    WHEN login_attempts.first_failed_at < NOW() - INTERVAL '15 minutes' THEN 1
+		    ELSE login_attempts.failed_count + 1 END,
+		  first_failed_at = CASE
+		    WHEN login_attempts.first_failed_at < NOW() - INTERVAL '15 minutes' THEN NOW()
+		    ELSE login_attempts.first_failed_at END,
+		  locked_until = CASE
+		    WHEN (CASE WHEN login_attempts.first_failed_at < NOW() - INTERVAL '15 minutes'
+		               THEN 1 ELSE login_attempts.failed_count + 1 END) >= 5
+		      AND (login_attempts.locked_until IS NULL OR login_attempts.locked_until <= NOW())
+		      THEN NOW() + INTERVAL '15 minutes'
+		    ELSE login_attempts.locked_until END
+		RETURNING locked_until`,
+		tenantID, username,
+	).Scan(&lockedUntil)
+	if err != nil {
+		slog.Warn("failed to record login failure", "error", err.Error())
+		return false
+	}
+	return lockedUntil.Valid && lockedUntil.Time.After(time.Now())
+}
+
+func clearFailedLogins(db *sql.DB, tenantID, username string) {
+	if _, err := db.Exec(
+		`DELETE FROM login_attempts WHERE tenant_id = $1 AND username = $2`,
+		tenantID, username,
+	); err != nil {
+		slog.Warn("failed to clear login failures", "error", err.Error())
+	}
+}
+
 func storeRefreshToken(db *sql.DB, userID, tenantID, tokenID string, expiresAt time.Time) error {
 	tokenHash := sha256.Sum256([]byte(tokenID))
 	if tenantID == "" {

@@ -21,6 +21,8 @@ spec:
         runAsGroup: 1000
         fsGroup: 1000
         runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: seagles-backend
         image: ghcr.io/nciibi/seagles-backend:v2.1.0

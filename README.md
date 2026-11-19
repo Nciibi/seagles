@@ -166,7 +166,8 @@ See [docs/architecture.md](docs/architecture.md) for detailed diagrams.
 | `PORT` | Backend API port | `8080` |
 | `FIRMWARE_ANALYZER_URL` | Firmware analyzer service URL | `http://firmware-analyzer:8001` |
 | `ALLOWED_ORIGINS` | CORS/WebSocket origin whitelist (comma-separated) | `http://localhost:3000` |
-| `REDIS_URL` | Redis connection string (optional, falls back to in-memory) | *(empty)* |
+| `REDIS_URL` | Redis connection string; when reachable, token revocation is shared across replicas (falls back to in-memory) | *(empty)* |
+| `REQUIRE_HTTPS` / `TRUST_FORWARDED_PROTO` | Reject plaintext requests / trust proxy-supplied `X-Forwarded-Proto` | `false` / `false` |
 | `RATE_LIMIT_PER_MIN` | Default rate limit per IP | `60` |
 | `LOG_LEVEL` | Logging verbosity | `info` |
 | `S3_ENDPOINT` | S3-compatible storage endpoint | `minio:9000` |

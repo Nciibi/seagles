@@ -245,6 +245,12 @@ func main() {
 		_ = srv.Close()
 	}
 
+	if pprofSrv != nil {
+		if err := pprofSrv.Close(); err != nil {
+			slog.Warn("pprof listener close failed", "error", err.Error())
+		}
+	}
+
 	slog.Info("Waiting for background goroutines to finish...")
 	wg.Wait()
 

@@ -1,0 +1,111 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment (configure required reviewers in GitHub Environments)
+        required: true
+        type: choice
+        options:
+        - staging
+        - production
+      backend_digest:
+        description: Backend image digest, e.g. sha256:abcdef...
+        required: true
+        type: string
+      firmware_digest:
+        description: Firmware analyzer image digest
+        required: true
+        type: string
+      frontend_digest:
+        description: Frontend image digest
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+env:
+  IMAGE_OWNER: nciibi
+  NAMESPACE: security-tools
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    timeout-minutes: 20
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+    - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+
+    # Fail closed: an image without a valid OIDC signature or SBOM attestation
+    # is never rolled out. Keyless identity binds the artifact to this repo.
+    - name: Verify signatures and SBOM attestations
+      env:
+        BACKEND: ghcr.io/nciibi/seagles-backend@${{ inputs.backend_digest }}
+        FIRMWARE: ghcr.io/nciibi/seagles-firmware-analyzer@${{ inputs.firmware_digest }}
+        FRONTEND: ghcr.io/nciibi/seagles-frontend@${{ inputs.frontend_digest }}
+      run: |
+        for ref in "$BACKEND" "$FIRMWARE" "$FRONTEND"; do
+          cosign verify "$ref" \
+            --certificate-identity-regexp 'https://github.com/Nciibi/seagles/.*' \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com
+          cosign verify-attestation --type spdxjson "$ref" \
+            --certificate-identity-regexp 'https://github.com/Nciibi/seagles/.*' \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com
+        done
+
+    - name: Configure kubectl
+      env:
+        KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+      run: |
+        if [ -z "$KUBE_CONFIG" ]; then
+          echo "KUBE_CONFIG secret is not configured for this environment" >&2
+          exit 1
+        fi
+        mkdir -p "$HOME/.kube"
+        printf '%s' "$KUBE_CONFIG" | base64 -d > "$HOME/.kube/config"
+        chmod 600 "$HOME/.kube/config"
+
+    - name: Roll out verified digests (auto-rollback on failure)
+      env:
+        BACKEND: ghcr.io/nciibi/seagles-backend@${{ inputs.backend_digest }}
+        FIRMWARE: ghcr.io/nciibi/seagles-firmware-analyzer@${{ inputs.firmware_digest }}
+        FRONTEND: ghcr.io/nciibi/seagles-frontend@${{ inputs.frontend_digest }}
+      run: |
+        set -euo pipefail
+        ns="$NAMESPACE"
+
+        for deployment in seagles-backend seagles-firmware-analyzer seagles-frontend; do
+          kubectl -n "$ns" rollout status "deployment/$deployment" --timeout=2m >/dev/null 2>&1 || true
+        done
+
+        kubectl -n "$ns" set image deployment/seagles-backend seagles-backend="$BACKEND"
+        kubectl -n "$ns" set image deployment/seagles-firmware-analyzer seagles-firmware-analyzer="$FIRMWARE"
+        kubectl -n "$ns" set image deployment/seagles-frontend seagles-frontend="$FRONTEND"
+
+        failed=0
+        for deployment in seagles-backend seagles-firmware-analyzer seagles-frontend; do
+          if ! kubectl -n "$ns" rollout status "deployment/$deployment" --timeout=5m; then
+            failed=1
+          fi
+        done
+
+        if [ "$failed" -ne 0 ]; then
+          echo "Rollout failed — reverting all deployments to their previous ReplicaSets"
+          for deployment in seagles-backend seagles-firmware-analyzer seagles-frontend; do
+            kubectl -n "$ns" rollout undo "deployment/$deployment"
+            kubectl -n "$ns" rollout status "deployment/$deployment" --timeout=5m || true
+          done
+          exit 1
+        fi
+
+        kubectl -n "$ns" get deployments -o wide

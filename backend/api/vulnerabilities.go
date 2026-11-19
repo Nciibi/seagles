@@ -104,7 +104,7 @@ func ResolveVulnerabilityHandler(db *sql.DB) gin.HandlerFunc {
 			go func() {
 				defer func() {
 					if r := recover(); r != nil {
-						log.Printf("PANIC in risk score update: %v", r)
+						slog.Error("PANIC in risk score update", "recover", r)
 					}
 				}()
 				if err := risk.UpdateDeviceRiskScore(db, deviceID.String); err != nil {

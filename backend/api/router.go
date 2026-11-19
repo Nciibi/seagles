@@ -158,6 +158,7 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 	})
 
 	r.Use(middleware.RateLimitMiddleware(rl))
+	middleware.SetMetricsDB(db)
 	r.Use(middleware.MetricsMiddleware())
 	r.Use(middleware.SanitizeInput(middleware.DefaultXSSConfig))
 	r.Use(middleware.AuditLogger(db, "/api/v1/auth/login", "/api/v1/auth/refresh",

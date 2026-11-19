@@ -18,15 +18,29 @@ type Metrics struct {
 	requestsTotal  map[string]int64
 	requestsActive int64
 	errorsTotal    map[string]int64
-	latencyBuckets map[string][]float64
+	latencySamples map[string][]float64
+	latencyCount   map[string]int64
+	latencySum     map[string]float64
 	uptimeStart    time.Time
+	db             *sql.DB
 }
 
 var globalMetrics = &Metrics{
 	requestsTotal:  make(map[string]int64),
 	errorsTotal:    make(map[string]int64),
-	latencyBuckets: make(map[string][]float64),
+	latencySamples: make(map[string][]float64),
+	latencyCount:   make(map[string]int64),
+	latencySum:     make(map[string]float64),
 	uptimeStart:    time.Now(),
+}
+
+// SetMetricsDB registers the pool whose statistics are exported with the
+// application metrics. It is called once at router construction; passing nil
+// simply omits the database series.
+func SetMetricsDB(db *sql.DB) {
+	globalMetrics.mu.Lock()
+	globalMetrics.db = db
+	globalMetrics.mu.Unlock()
 }
 
 // maxLatencySamples caps the samples kept per endpoint for the latency

@@ -32,6 +32,14 @@ var currentLevel Level = LevelInfo
 var format string = "kv"
 var mu sync.Mutex
 
+// The stdlib logger prefixes every line with LstdFlags ("YYYY/MM/DD HH:MM:SS ")
+// by default. In JSON mode that makes each line invalid JSON and breaks log
+// shippers that parse one object per line. Timestamps are already emitted as
+// the "timestamp" field in buildJSON / buildKV, so the prefix is redundant.
+func init() {
+	log.SetFlags(0)
+}
+
 func SetLevel(l Level) {
 	mu.Lock()
 	defer mu.Unlock()

@@ -3,7 +3,6 @@ package api
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"strconv"
 
 	"github.com/gin-gonic/gin"

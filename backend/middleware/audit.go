@@ -116,11 +116,21 @@ func ListAuditLogsHandler(db *sql.DB) gin.HandlerFunc {
 			}
 		}
 
+		// This handler runs on the raw pool, where RLS is permissive because
+		// app.tenant_id is unset. Filter explicitly so an auditor cannot read
+		// another tenant's audit trail.
+		tenantID := DefaultTenantID
+		if value, ok := c.Get("tenant_id"); ok {
+			if fromContext, ok := value.(string); ok && fromContext != "" {
+				tenantID = fromContext
+			}
+		}
 		rows, err := db.Query(
 			`SELECT id, user_id, username, action, resource, resource_id, detail,
 			        ip_address, user_agent, status_code, latency_ms, created_at
-			 FROM audit_log ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
-			limit, offset,
+			 FROM audit_log WHERE COALESCE(tenant_id, $3) = $3
+			 ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+			limit, offset, tenantID,
 		)
 		if err != nil {
 			c.JSON(500, gin.H{"data": nil, "error": "Failed to query audit log"})

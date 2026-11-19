@@ -296,8 +296,12 @@ func signRS256(claims *Claims) (string, error) {
 	globalKeyPairMu.RLock()
 	pair := globalKeyPair
 	var priv *rsa.PrivateKey
+	kid := TokenKid
 	if pair != nil {
 		priv = pair.PrivateKey
+		if pair.Kid != "" {
+			kid = pair.Kid
+		}
 	}
 	globalKeyPairMu.RUnlock()
 

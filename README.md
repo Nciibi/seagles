@@ -235,6 +235,7 @@ Every device gets a 0–10 risk score. The scoring is additive:
 |---|---|---|
 | Docker Compose | [docs/setup.md](docs/setup.md) | Local dev, small deployments |
 | Kubernetes | `k8s/` manifests | Production, HA, auto-scaling |
+| Gated deploy | `.github/workflows/deploy.yml` | Cosign-verified digest rollout with automatic rollback |
 | Manual (no Docker) | [docs/setup.md](docs/setup.md) | Custom environments |
 
 ### Kubernetes

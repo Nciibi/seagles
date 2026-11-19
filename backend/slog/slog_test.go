@@ -2,6 +2,7 @@ package slog
 
 import (
 	"bytes"
+	"encoding/json"
 	"log"
 	"strings"
 	"testing"

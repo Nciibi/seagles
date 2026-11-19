@@ -43,9 +43,9 @@ func SetMetricsDB(db *sql.DB) {
 	globalMetrics.mu.Unlock()
 }
 
-// maxLatencySamples caps the samples kept per endpoint for the latency
-// summary. The previous hard-coded 100 made long-running averages freeze
-// after the first hundred requests.
+// maxLatencySamples caps the samples retained per endpoint for quantile
+// estimation. Count and sum are tracked separately so they stay exact even
+// after the sample buffer is full.
 const maxLatencySamples = 1000
 
 func MetricsMiddleware() gin.HandlerFunc {

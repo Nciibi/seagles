@@ -61,7 +61,10 @@ if [ "$SKIP_MIGRATE" = false ]; then
 	echo "=== Running database migrations ==="
 	for f in backend/db/migrations/*.sql; do
 		echo "  Applying: $(basename "$f")"
-		PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST:-localhost}" \
+		# ON_ERROR_STOP + --single-transaction make each migration atomic: a
+		# failing statement cannot leave a half-applied schema behind.
+		PGPASSWORD="${DB_PASSWORD:-}" psql -v ON_ERROR_STOP=1 --single-transaction \
+			-h "${DB_HOST:-localhost}" \
 			-U "${DB_USER:-seagles}" \
 			-d "${DB_NAME:-seagles}" \
 			-f "$f"

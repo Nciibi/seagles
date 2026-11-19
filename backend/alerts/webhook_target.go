@@ -1,11 +1,15 @@
 package alerts
 
 import (
+	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 // ValidateWebhookTarget rejects webhook destinations that point at private,

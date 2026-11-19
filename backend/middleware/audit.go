@@ -93,7 +93,10 @@ func AuditLogger(db *sql.DB, skipPaths ...string) gin.HandlerFunc {
 			entry.Status, entry.LatencyMs,
 		)
 		if err != nil {
-			slog.Debug("audit_log_failed", "error", err.Error())
+			// A write operation without an audit record is a compliance gap,
+			// not debug-level noise. Make it visible to operators and shippers.
+			slog.Error("audit_log_failed", "error", err.Error(),
+				"path", c.Request.URL.Path, "user_id", userIDStr)
 		}
 	}
 }

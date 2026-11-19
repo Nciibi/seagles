@@ -318,7 +318,7 @@ func signRS256(claims *Claims) (string, error) {
 		claims.Aud = TokenAudience
 	}
 
-	header := `{"alg":"RS256","typ":"JWT","kid":"` + TokenKid + `"}`
+	header := `{"alg":"RS256","typ":"JWT","kid":"` + kid + `"}`
 	headerB64 := base64.RawURLEncoding.EncodeToString([]byte(header))
 
 	payload, err := json.Marshal(claims)

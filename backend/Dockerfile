@@ -1,4 +1,4 @@
-FROM golang:1.25-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 # Build-time toolchain only. nmap is NOT needed here — it is a runtime
 # dependency and is installed in the runtime stage, which keeps this layer

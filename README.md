@@ -7,7 +7,7 @@
 **Open-source IoT security platform. Find vulnerable devices before attackers do.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Go](https://img.shields.io/badge/Go-1.25-00ADD8.svg)](https://go.dev)
+[![Go](https://img.shields.io/badge/Go-1.26-00ADD8.svg)](https://go.dev)
 [![Node](https://img.shields.io/badge/Node-20+-339933.svg)](https://nodejs.org)
 [![Docker](https://img.shields.io/badge/Docker-required-2496ED.svg)](https://docker.com)
 [![Kubernetes](https://img.shields.io/badge/K8s-ready-326CE5.svg)](https://kubernetes.io)

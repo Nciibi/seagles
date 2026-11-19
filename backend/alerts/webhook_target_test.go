@@ -97,6 +97,28 @@ func TestDeliverSyslogRejectsPrivateTargetByDefault(t *testing.T) {
 	}
 }
 
+func TestWebhookDialContextRejectsPrivateTarget(t *testing.T) {
+	t.Setenv("WEBHOOK_ALLOW_PRIVATE_TARGETS", "")
+	conn, err := webhookDialContext(context.Background(), "tcp", "127.0.0.1:80")
+	if err == nil {
+		conn.Close()
+		t.Fatal("loopback target was dialled despite private-target protection")
+	}
+	if !strings.Contains(err.Error(), "private or local") {
+		t.Fatalf("unexpected rejection reason: %v", err)
+	}
+}
+
+func TestWebhookHTTPClientDoesNotFollowRedirects(t *testing.T) {
+	req, err := http.NewRequest("GET", "https://public.example/hook", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := webhookHTTPClient.CheckRedirect(req, []*http.Request{req}); err != http.ErrUseLastResponse {
+		t.Fatalf("redirect policy = %v, want http.ErrUseLastResponse", err)
+	}
+}
+
 func TestSignWebhookPayload(t *testing.T) {
 	payload := []byte(`{"event":"test"}`)
 	secret := "top-secret"

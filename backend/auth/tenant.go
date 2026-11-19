@@ -26,3 +26,22 @@ func TenantFromContext(c *gin.Context) string {
 	}
 	return DefaultTenantID
 }
+
+// LoginTenant resolves the tenant dimension supplied at login. Usernames are
+// unique per tenant, so a bare username cannot identify an account on a
+// multi-tenant deployment. X-Tenant-ID is only a routing hint: the password is
+// still verified, so a forged header cannot authenticate as another tenant's
+// user. Invalid hints fall back to the default tenant instead of being trusted.
+func LoginTenant(c *gin.Context) string {
+	if c == nil {
+		return DefaultTenantID
+	}
+	hint := strings.TrimSpace(c.GetHeader("X-Tenant-ID"))
+	if hint == "" {
+		return DefaultTenantID
+	}
+	if _, err := uuid.Parse(hint); err != nil {
+		return DefaultTenantID
+	}
+	return hint
+}

@@ -100,9 +100,23 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 		c.Header("X-Frame-Options", "DENY")
 		c.Header("X-XSS-Protection", "1; mode=block")
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
-		c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		// HSTS is ignored (and can break plaintext probes) on HTTP responses.
+		// Honour X-Forwarded-Proto so an TLS-terminating ingress still gets it.
+		if c.Request.TLS != nil || strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https") {
+			c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
 		c.Header("Content-Security-Policy", "default-src 'self'")
 		c.Header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		c.Next()
+	})
+
+	// Token-bearing responses must never be cached by a browser or an
+	// intermediary. JWKS and the public PEM override this with their own
+	// explicit, deliberately cacheable Cache-Control values.
+	r.Use(func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/api/v1/auth/") {
+			c.Header("Cache-Control", "no-store")
+		}
 		c.Next()
 	})
 

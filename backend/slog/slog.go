@@ -101,7 +101,19 @@ func buildJSON(level Level, msg string, keysAndValues ...interface{}) string {
 			entry[key] = keysAndValues[i+1]
 		}
 	}
-	b, _ := json.Marshal(entry)
+	b, err := json.Marshal(entry)
+	if err != nil {
+		// An unsupported attribute value (channel, func, NaN, ...) must not
+		// turn the log line into an empty string. Keep the record and explain
+		// why the original fields could not be encoded.
+		fallback := map[string]interface{}{
+			"timestamp":        entry["timestamp"],
+			"level":            entry["level"],
+			"message":          msg,
+			"log_encode_error": err.Error(),
+		}
+		b, _ = json.Marshal(fallback)
+	}
 	return string(b)
 }
 

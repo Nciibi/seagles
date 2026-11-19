@@ -29,21 +29,36 @@ var DefaultTLSConfig = TLSConfig{
 }
 
 func TLSEnforcementMiddleware() gin.HandlerFunc {
+	return EnforceHTTPSMiddleware(false, false)
+}
+
+// EnforceHTTPSMiddleware rejects plaintext requests when requireHTTPS is set.
+// X-Forwarded-Proto is only trusted when trustForwardedProto is explicitly
+// enabled — otherwise a client could spoof the header and bypass the check.
+// Regardless of configuration, a direct TLS connection below 1.2 is rejected.
+func EnforceHTTPSMiddleware(requireHTTPS, trustForwardedProto bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if c.Request.TLS == nil {
-			slog.Warn("non_tls_request", "path", c.Request.URL.Path, "ip", c.ClientIP())
-			c.Next()
+		directTLS := c.Request.TLS != nil
+		proxiedTLS := trustForwardedProto &&
+			strings.EqualFold(strings.TrimSpace(c.GetHeader("X-Forwarded-Proto")), "https")
+
+		if requireHTTPS && !directTLS && !proxiedTLS {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"data": nil, "error": "HTTPS required",
+			})
 			return
 		}
 
-		version := c.Request.TLS.Version
-		if version < tls.VersionTLS12 {
+		if directTLS && c.Request.TLS.Version < tls.VersionTLS12 {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"data": nil, "error": "TLS 1.2 or higher required",
 			})
 			return
 		}
 
+		if !requireHTTPS && !directTLS && !proxiedTLS {
+			slog.Warn("non_tls_request", "path", c.Request.URL.Path, "ip", c.ClientIP())
+		}
 		c.Next()
 	}
 }

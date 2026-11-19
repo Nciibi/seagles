@@ -214,6 +214,16 @@ func deliverSyslog(wh WebhookConfig, payload []byte) error {
 	addr := net.JoinHostPort(u.Hostname(), port)
 	network := strings.ToLower(u.Scheme)
 
+	// Pin the validated address so the hostname cannot re-resolve to a
+	// private endpoint between ValidateWebhookTarget and DialTimeout.
+	if !strings.EqualFold(os.Getenv("WEBHOOK_ALLOW_PRIVATE_TARGETS"), "true") {
+		ips, err := resolvePublicIPs(u.Hostname())
+		if err != nil {
+			return err
+		}
+		addr = net.JoinHostPort(ips[0].String(), port)
+	}
+
 	conn, err := net.DialTimeout(network, addr, 3*time.Second)
 	if err != nil {
 		return fmt.Errorf("syslog connect to %s: %w", addr, err)

@@ -108,19 +108,75 @@ func MetricsHandler() gin.HandlerFunc {
 			sb.WriteString(fmt.Sprintf("seagles_errors_total{error=\"%s\"} %d\n", labelKey, count))
 		}
 
+		// Emit real quantiles instead of labelling a plain mean as a summary.
+		// Nearest-rank estimation over the bounded sample buffer is a valid
+		// Prometheus summary and makes p95/p99 alerting possible.
 		sb.WriteString("\n# HELP seagles_request_latency_seconds Request latency\n")
 		sb.WriteString("# TYPE seagles_request_latency_seconds summary\n")
-		for key, buckets := range globalMetrics.latencyBuckets {
-			if len(buckets) == 0 {
+		for key, samples := range globalMetrics.latencySamples {
+			if len(samples) == 0 {
 				continue
 			}
-			var sum float64
-			for _, v := range buckets {
-				sum += v
-			}
-			avg := sum / float64(len(buckets))
+			sorted := append([]float64(nil), samples...)
+			sort.Float64s(sorted)
 			labelKey := prometheusLabelKey(key)
-			sb.WriteString(fmt.Sprintf("seagles_request_latency_seconds{endpoint=\"%s\"} %f\n", labelKey, avg))
+			for _, q := range []struct {
+				name  string
+				value float64
+			}{
+				{"0.5", quantile(sorted, 0.50)},
+				{"0.95", quantile(sorted, 0.95)},
+				{"0.99", quantile(sorted, 0.99)},
+			} {
+				sb.WriteString(fmt.Sprintf("seagles_request_latency_seconds{endpoint=\"%s\",quantile=\"%s\"} %f\n",
+					labelKey, q.name, q.value))
+			}
+			sb.WriteString(fmt.Sprintf("seagles_request_latency_seconds_sum{endpoint=\"%s\"} %f\n",
+				labelKey, globalMetrics.latencySum[key]))
+			sb.WriteString(fmt.Sprintf("seagles_request_latency_seconds_count{endpoint=\"%s\"} %d\n",
+				labelKey, globalMetrics.latencyCount[key]))
+		}
+
+		// USE / saturation signals the request counters alone cannot provide.
+		var mem runtime.MemStats
+		runtime.ReadMemStats(&mem)
+		var gcPause uint64
+		if len(mem.PauseNs) > 0 {
+			gcPause = mem.PauseNs[(mem.NumGC+255)%256]
+		}
+		sb.WriteString("\n# HELP seagles_go_goroutines Number of goroutines\n")
+		sb.WriteString("# TYPE seagles_go_goroutines gauge\n")
+		sb.WriteString(fmt.Sprintf("seagles_go_goroutines %d\n", runtime.NumGoroutine()))
+		sb.WriteString("\n# HELP seagles_memory_heap_bytes Heap memory currently allocated\n")
+		sb.WriteString("# TYPE seagles_memory_heap_bytes gauge\n")
+		sb.WriteString(fmt.Sprintf("seagles_memory_heap_bytes %d\n", mem.HeapAlloc))
+		sb.WriteString("\n# HELP seagles_memory_sys_bytes Total memory obtained from the OS\n")
+		sb.WriteString("# TYPE seagles_memory_sys_bytes gauge\n")
+		sb.WriteString(fmt.Sprintf("seagles_memory_sys_bytes %d\n", mem.Sys))
+		sb.WriteString("\n# HELP seagles_gc_collections_total Number of completed GC cycles\n")
+		sb.WriteString("# TYPE seagles_gc_collections_total counter\n")
+		sb.WriteString(fmt.Sprintf("seagles_gc_collections_total %d\n", mem.NumGC))
+		sb.WriteString("\n# HELP seagles_gc_last_pause_seconds Duration of the most recent GC pause\n")
+		sb.WriteString("# TYPE seagles_gc_last_pause_seconds gauge\n")
+		sb.WriteString(fmt.Sprintf("seagles_gc_last_pause_seconds %f\n", float64(gcPause)/1e9))
+
+		if db := globalMetrics.db; db != nil {
+			stats := db.Stats()
+			sb.WriteString("\n# HELP seagles_db_connections_open Open database connections\n")
+			sb.WriteString("# TYPE seagles_db_connections_open gauge\n")
+			sb.WriteString(fmt.Sprintf("seagles_db_connections_open %d\n", stats.OpenConnections))
+			sb.WriteString("\n# HELP seagles_db_connections_in_use Connections currently checked out\n")
+			sb.WriteString("# TYPE seagles_db_connections_in_use gauge\n")
+			sb.WriteString(fmt.Sprintf("seagles_db_connections_in_use %d\n", stats.InUse))
+			sb.WriteString("\n# HELP seagles_db_connections_idle Idle connections\n")
+			sb.WriteString("# TYPE seagles_db_connections_idle gauge\n")
+			sb.WriteString(fmt.Sprintf("seagles_db_connections_idle %d\n", stats.Idle))
+			sb.WriteString("\n# HELP seagles_db_wait_count_total Queries that waited for a connection\n")
+			sb.WriteString("# TYPE seagles_db_wait_count_total counter\n")
+			sb.WriteString(fmt.Sprintf("seagles_db_wait_count_total %d\n", stats.WaitCount))
+			sb.WriteString("\n# HELP seagles_db_wait_duration_seconds Time spent waiting for a connection\n")
+			sb.WriteString("# TYPE seagles_db_wait_duration_seconds counter\n")
+			sb.WriteString(fmt.Sprintf("seagles_db_wait_duration_seconds %f\n", stats.WaitDuration.Seconds()))
 		}
 
 		c.String(200, sb.String())

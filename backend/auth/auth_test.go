@@ -170,6 +170,16 @@ func TestHashPassword(t *testing.T) {
 	if hash == "mysecurepassword" {
 		t.Fatal("hash should not equal plaintext")
 	}
+	cost, err := bcrypt.Cost([]byte(hash))
+	if err != nil {
+		t.Fatalf("could not read bcrypt cost: %v", err)
+	}
+	if cost < 12 {
+		t.Fatalf("bcrypt cost %d is below the policy minimum of 12", cost)
+	}
+	if !strings.HasPrefix(hash, "$2a$") && !strings.HasPrefix(hash, "$2b$") {
+		t.Fatalf("unexpected bcrypt hash prefix: %s", hash[:4])
+	}
 }
 
 func TestCheckPassword(t *testing.T) {

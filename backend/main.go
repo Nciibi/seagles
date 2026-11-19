@@ -107,7 +107,7 @@ func main() {
 	defer database.Close()
 
 	if err := db.RunMigrations(database); err != nil {
-		log.Fatalf("Database migration failed: %v", err)
+		slog.Fatal("Database migration failed", "error", err.Error())
 	}
 
 	var wg sync.WaitGroup

@@ -72,6 +72,42 @@ func TestTLSEnforcementMiddleware_AllowsNoTLS(t *testing.T) {
 	}
 }
 
+func TestEnforceHTTPSMiddleware(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	tests := []struct {
+		name       string
+		require    bool
+		trustProxy bool
+		proto      string
+		want       int
+	}{
+		{"plaintext allowed when not required", false, false, "", http.StatusOK},
+		{"plaintext blocked when required", true, false, "", http.StatusForbidden},
+		{"spoofed header ignored", true, false, "https", http.StatusForbidden},
+		{"trusted proxy header accepted", true, true, "https", http.StatusOK},
+		{"trusted proxy http still blocked", true, true, "http", http.StatusForbidden},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := gin.New()
+			r.Use(EnforceHTTPSMiddleware(tt.require, tt.trustProxy))
+			r.GET("/test", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"ok": true}) })
+
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			if tt.proto != "" {
+				req.Header.Set("X-Forwarded-Proto", tt.proto)
+			}
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			if w.Code != tt.want {
+				t.Fatalf("got %d, want %d", w.Code, tt.want)
+			}
+		})
+	}
+}
+
 func TestLoadPinnedKeys(t *testing.T) {
 	dir := t.TempDir()
 	pinsFile := filepath.Join(dir, "pins.txt")

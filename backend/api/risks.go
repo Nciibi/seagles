@@ -84,7 +84,7 @@ func RiskBreakdownHandler(db *sql.DB) gin.HandlerFunc {
 		result := risk.GetRiskBreakdown(qdb, deviceID)
 		if errMsg, ok := result["error"].(string); ok {
 			slog.Error("Failed to compute risk breakdown", "request_id", requestID, "device_id", deviceID, "error", errMsg)
-			fail(c, 500, "Failed to compute risk breakdown: "+errMsg)
+			fail(c, 500, "Failed to compute risk breakdown")
 			return
 		}
 

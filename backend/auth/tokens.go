@@ -44,6 +44,7 @@ const (
 )
 
 type KeyPair struct {
+	Kid        string
 	PrivateKey *rsa.PrivateKey
 	PublicKey  *rsa.PublicKey
 }

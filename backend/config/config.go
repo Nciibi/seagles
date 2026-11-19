@@ -119,6 +119,9 @@ func Load() (*Config, error) {
 		TLSEnabled:  getEnv("TLS_ENABLED", "") == "true",
 		TLSCertFile: getEnv("TLS_CERT_FILE", ""),
 		TLSKeyFile:  getEnv("TLS_KEY_FILE", ""),
+
+		PPROFEnabled: getEnv("PPROF_ENABLED", "") == "true",
+		PPROFListen:  getEnv("PPROF_LISTEN", "127.0.0.1:6060"),
 	}
 
 	return cfg, nil

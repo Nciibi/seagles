@@ -63,9 +63,13 @@ jobs:
       run: go build ./...
       working-directory: backend
 
-    - name: Go test
-      run: go test -v -count=1 ./...
+    - name: Go test (race + coverage gate)
       working-directory: backend
+      run: |
+        go test -race -count=1 -covermode=atomic -coverprofile=coverage.out ./...
+        total=$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%","",$3); print $3}')
+        echo "Total statement coverage: ${total}%"
+        awk -v c="$total" 'BEGIN { if (c+0 < 50) { print "coverage below 50% floor"; exit 1 } }'
 
   backend-integration-test:
     name: Backend Integration Test

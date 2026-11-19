@@ -1,0 +1,55 @@
+groups:
+  - name: seagles-slo
+    rules:
+      - alert: SeaglesAPIDown
+        expr: up{job="seagles-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Seagles API is unreachable"
+          description: "Prometheus has not been able to scrape the Seagles API for 2 minutes."
+
+      - alert: SeaglesHighErrorRate
+        expr: |
+          sum(rate(seagles_errors_total[5m]))
+            /
+          sum(rate(seagles_requests_total[5m]))
+            > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Seagles API error rate above 5%"
+          description: "More than 5% of requests returned 4xx/5xx over the last 5 minutes."
+
+      - alert: SeaglesHighLatencyP95
+        expr: max(seagles_request_latency_seconds{quantile="0.95"}) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Seagles API p95 latency above 1s"
+          description: "The slowest endpoint's p95 latency has exceeded one second for 10 minutes."
+
+      - alert: SeaglesDBPoolSaturation
+        expr: |
+          seagles_db_connections_in_use
+            /
+          clamp_min(seagles_db_connections_open, 1)
+            > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Database connection pool is saturated"
+          description: "Over 90% of the database pool is checked out; requests will start queueing."
+
+      - alert: SeaglesGoroutineLeak
+        expr: seagles_go_goroutines > 2000
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusual goroutine growth"
+          description: "Goroutine count has stayed above 2000 for 15 minutes, which may indicate a leak."

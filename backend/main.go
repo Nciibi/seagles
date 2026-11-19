@@ -55,22 +55,24 @@ REQUIRE_SHARED_JWT_KEY.`
 // through to generating a per-process key — turning a missing mount or bad
 // permissions into an authentication outage rather than a startup failure.
 func resolveJWTKey(cfg *config.Config) (string, error) {
-	if key := strings.TrimSpace(cfg.JWTSecret); key != "" {
+	return resolveKeyFrom(cfg.JWTSecret, cfg.JWTPrivateKeyFile)
+}
+
+func resolveKeyFrom(secret, keyFile string) (string, error) {
+	if key := strings.TrimSpace(secret); key != "" {
 		return key, nil
 	}
 
-	if cfg.JWTPrivateKeyFile == "" {
+	if keyFile == "" {
 		return "", nil
 	}
 
-	keyData, err := os.ReadFile(cfg.JWTPrivateKeyFile)
+	keyData, err := os.ReadFile(keyFile)
 	if err != nil {
-		return "", fmt.Errorf("JWT_PRIVATE_KEY_FILE is set to %q but could not be read: %w",
-			cfg.JWTPrivateKeyFile, err)
+		return "", fmt.Errorf("JWT private key file %q could not be read: %w", keyFile, err)
 	}
 	if len(strings.TrimSpace(string(keyData))) == 0 {
-		return "", fmt.Errorf("JWT_PRIVATE_KEY_FILE %q is empty; expected an RSA private key in PEM form",
-			cfg.JWTPrivateKeyFile)
+		return "", fmt.Errorf("JWT private key file %q is empty; expected an RSA private key in PEM form", keyFile)
 	}
 	return string(keyData), nil
 }

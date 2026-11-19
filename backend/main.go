@@ -86,7 +86,7 @@ func main() {
 
 	jwtKey, err := resolveJWTKey(cfg)
 	if err != nil {
-		log.Fatalf("%v", err)
+		slog.Fatal("JWT signing key configuration error", "error", err.Error())
 	}
 	auth.SetJWTSecret(jwtKey)
 
@@ -95,7 +95,8 @@ func main() {
 		// instance is fine; a second replica or a restart silently invalidates
 		// every issued token.
 		if cfg.RequireSharedJWTKey {
-			log.Fatal(REQUIRE_SHARED_JWT_KEY_MSG)
+			slog.Fatal("Refusing to start without a shared JWT signing key",
+				"remediation", REQUIRE_SHARED_JWT_KEY_MSG)
 		}
 		slog.Warn("Starting with an auto-generated JWT signing key. This is " +
 			"acceptable for a single local instance only. Set REQUIRE_SHARED_JWT_KEY=true " +
@@ -218,4 +219,6 @@ func parseLogLevel(s string) slog.Level {
 	case "error":
 		return slog.LevelError
 	default:
-		return slog.Le
+		return slog.LevelInfo
+	}
+}

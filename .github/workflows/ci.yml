@@ -326,3 +326,64 @@ jobs:
         tags: ghcr.io/${{ env.IMAGE_OWNER }}/seagles-frontend:${{ github.sha }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
+
+    # Supply chain: generate an SPDX SBOM for every published image and attach
+    # it plus a keyless signature to the immutable digest. Deployment should
+    # verify both before rolling out (see docs/setup.md).
+    - name: Install Cosign
+      if: github.event_name == 'push'
+      uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+
+    - name: Backend SBOM
+      if: github.event_name == 'push'
+      uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+      with:
+        image: ghcr.io/${{ env.IMAGE_OWNER }}/seagles-backend@${{ steps.backend-image.outputs.digest }}
+        format: spdx-json
+        output-file: sbom-backend.spdx.json
+        upload-artifact: false
+        upload-release-assets: false
+
+    - name: Firmware analyzer SBOM
+      if: github.event_name == 'push'
+      uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+      with:
+        image: ghcr.io/${{ env.IMAGE_OWNER }}/seagles-firmware-analyzer@${{ steps.firmware-image.outputs.digest }}
+        format: spdx-json
+        output-file: sbom-firmware.spdx.json
+        upload-artifact: false
+        upload-release-assets: false
+
+    - name: Frontend SBOM
+      if: github.event_name == 'push'
+      uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+      with:
+        image: ghcr.io/${{ env.IMAGE_OWNER }}/seagles-frontend@${{ steps.frontend-image.outputs.digest }}
+        format: spdx-json
+        output-file: sbom-frontend.spdx.json
+        upload-artifact: false
+        upload-release-assets: false
+
+    - name: Sign and attest images
+      if: github.event_name == 'push'
+      env:
+        COSIGN_EXPERIMENTAL: "true"
+      run: |
+        echo "${{ secrets.GITHUB_TOKEN }}" | cosign login ghcr.io \
+          -u "${{ github.actor }}" --password-stdin
+
+        for name in backend firmware-analyzer frontend; do
+          case "$name" in
+            backend)          ref="ghcr.io/${IMAGE_OWNER}/seagles-backend@${{ steps.backend-image.outputs.digest }}" ;;
+            firmware-analyzer) ref="ghcr.io/${IMAGE_OWNER}/seagles-firmware-analyzer@${{ steps.firmware-image.outputs.digest }}" ;;
+            frontend)         ref="ghcr.io/${IMAGE_OWNER}/seagles-frontend@${{ steps.frontend-image.outputs.digest }}" ;;
+          esac
+          case "$name" in
+            backend)          sbom="sbom-backend.spdx.json" ;;
+            firmware-analyzer) sbom="sbom-firmware.spdx.json" ;;
+            frontend)         sbom="sbom-frontend.spdx.json" ;;
+          esac
+
+          cosign sign --yes "$ref"
+          cosign attest --yes --predicate "$sbom" --type spdxjson "$ref"
+        done

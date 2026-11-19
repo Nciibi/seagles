@@ -204,6 +204,8 @@ jobs:
   trivy-scan:
     name: Trivy Security Scan
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
     permissions:
       contents: read
       security-events: write

@@ -5,11 +5,9 @@ metadata:
   labels:
     app.kubernetes.io/name: seagles
     app.kubernetes.io/part-of: seagles
-    # Baseline is enforced because passive scanning needs NET_RAW, which the
-    # Restricted profile forbids. Restricted violations are still surfaced as
-    # warnings so drift is visible without breaking the scanner.
-    pod-security.kubernetes.io/enforce: baseline
-    pod-security.kubernetes.io/enforce-version: latest
+    # Passive scanning needs NET_RAW, which even the Baseline profile forbids.
+    # Report Restricted drift as warnings instead of enforcing and blocking the
+    # scanner pods; enforce can be enabled once NET_RAW is no longer required.
     pod-security.kubernetes.io/warn: restricted
     pod-security.kubernetes.io/warn-version: latest
 ---

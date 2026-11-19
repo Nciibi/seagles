@@ -74,6 +74,7 @@ jobs:
   backend-integration-test:
     name: Backend Integration Test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     # Requires a real PostgreSQL. The tenant-scoping guarantees and migration
     # re-runnability are enforced by the database, so sqlmock cannot assert
     # them: without a live database, a schema that leaks data between tenants

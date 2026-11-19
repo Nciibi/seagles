@@ -8,6 +8,7 @@ import (
 	"encoding/pem"
 	"strings"
 	"testing"
+	"time"
 )
 
 func testRSAPEM(t *testing.T) string {

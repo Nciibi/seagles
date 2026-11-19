@@ -160,6 +160,9 @@ See [docs/architecture.md](docs/architecture.md) for detailed diagrams.
 | `NVD_API_KEY` | NIST NVD API key for faster CVE lookups | *(empty — uses public rate limit)* |
 | `JWT_SECRET` | RSA private key PEM (auto-generated if empty) | *(auto-generated)* |
 | `JWT_PRIVATE_KEY_FILE` | Path to PEM key file on disk | *(empty)* |
+| `JWT_PREVIOUS_SECRET` / `JWT_PREVIOUS_KEY_FILE` | Retired signing key, kept during a rotation overlap | *(empty)* |
+| `PPROF_ENABLED` / `PPROF_LISTEN` | Loopback-only runtime profiling listener | `false` / `127.0.0.1:6060` |
+| `LOG_FORMAT` | `kv` or one-JSON-object-per-line `json` | `kv` |
 | `PORT` | Backend API port | `8080` |
 | `FIRMWARE_ANALYZER_URL` | Firmware analyzer service URL | `http://firmware-analyzer:8001` |
 | `ALLOWED_ORIGINS` | CORS/WebSocket origin whitelist (comma-separated) | `http://localhost:3000` |

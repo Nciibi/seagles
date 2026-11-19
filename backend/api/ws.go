@@ -153,7 +153,7 @@ func WSHandler(allowedOrigins []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
-			log.Printf("WebSocket upgrade failed: %v", err)
+			slog.Error("WebSocket upgrade failed", "error", err.Error())
 			return
 		}
 

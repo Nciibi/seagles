@@ -6,19 +6,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// JWKSHandler publishes the active verification key so third parties can
-// validate access tokens without sharing the private key. The response is
-// public by design; Rotate-key deployments should publish both old and new
-// keys during the overlap window.
+// JWKSHandler publishes every currently accepted verification key so third
+// parties can validate access tokens without sharing a private key. The
+// response is public by design; during rotation both the new and the retired
+// key are published so consumers can switch by "kid" without an outage.
 func JWKSHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		jwk, err := GetPublicJWK()
+		keys, err := GetPublicJWKs()
 		if err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"data": nil, "error": "signing key unavailable"})
 			return
 		}
 		c.Header("Cache-Control", "public, max-age=300")
-		c.JSON(http.StatusOK, gin.H{"keys": []JWK{jwk}})
+		c.JSON(http.StatusOK, gin.H{"keys": keys})
 	}
 }
 

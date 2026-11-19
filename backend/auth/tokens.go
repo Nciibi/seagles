@@ -74,6 +74,10 @@ var (
 	globalKeyPair   *KeyPair
 	globalKeyPairMu sync.RWMutex
 
+	// globalPreviousKeyPair holds the retired key during a rotation window so
+	// tokens minted before the switch keep working until they expire.
+	globalPreviousKeyPair *KeyPair
+
 	// keyIsEphemeral records that the active key pair was generated in-process
 	// rather than loaded from configuration. See UsingEphemeralKey.
 	keyIsEphemeral bool

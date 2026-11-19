@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/Nciibi/seagles/events"
+	"github.com/Nciibi/seagles/slog"
 )
 
 func newUpgrader(allowedOrigins []string) websocket.Upgrader {

@@ -340,21 +340,38 @@ func signRS256(claims *Claims) (string, error) {
 }
 
 func verifyRS256(tokenStr string) (*Claims, error) {
-	globalKeyPairMu.RLock()
-	pair := globalKeyPair
-	var pub *rsa.PublicKey
-	if pair != nil {
-		pub = pair.PublicKey
-	}
-	globalKeyPairMu.RUnlock()
-
-	if pub == nil {
-		return nil, errors.New("key pair not initialized")
-	}
-
 	parts := strings.SplitN(tokenStr, ".", 3)
 	if len(parts) != 3 {
 		return nil, errors.New("invalid token format")
+	}
+
+	globalKeyPairMu.RLock()
+	active := globalKeyPair
+	previous := globalPreviousKeyPair
+	globalKeyPairMu.RUnlock()
+
+	if active == nil || active.PublicKey == nil {
+		return nil, errors.New("key pair not initialized")
+	}
+
+	pub := active.PublicKey
+
+	// Select the verification key by "kid". Tokens minted before kid selection
+	// was introduced carry the active kid, so an absent or malformed header
+	// falls back to the active key. An unknown, non-empty kid is rejected
+	// rather than silently tried against every key.
+	var header struct {
+		Kid string `json:"kid"`
+	}
+	if decoded, err := base64.RawURLEncoding.DecodeString(parts[0]); err == nil {
+		_ = json.Unmarshal(decoded, &header)
+	}
+	if header.Kid != "" && header.Kid != active.Kid {
+		if header.Kid == PreviousTokenKid && previous != nil && previous.PublicKey != nil {
+			pub = previous.PublicKey
+		} else {
+			return nil, errors.New("unknown token key id")
+		}
 	}
 
 	signingInput := parts[0] + "." + parts[1]

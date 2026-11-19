@@ -66,6 +66,11 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 	r.Use(gin.Recovery())
 
 	rl := middleware.NewRateLimiter(cfg.RateLimitPerMin, 1*time.Minute)
+	// Login is the one unauthenticated endpoint an attacker can hammer. The
+	// generic per-IP cap (default 60/min) is far too generous for password
+	// guessing, so give it a dedicated, much stricter budget. The key is the
+	// client IP until AuthMiddleware runs, which is exactly what we want here.
+	rl.AddRule("POST", "/api/v1/auth/login", 10, 15*time.Minute)
 
 	r.Use(func(c *gin.Context) {
 		start := time.Now()

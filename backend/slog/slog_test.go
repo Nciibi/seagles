@@ -125,6 +125,51 @@ func TestLoggerPrefix(t *testing.T) {
 	}
 }
 
+func TestJSONOutputIsValidJSON(t *testing.T) {
+	SetLevel(LevelDebug)
+	SetFormat("json")
+	defer SetFormat("kv")
+
+	out := captureOutput(func() {
+		Info("json message", "status", 200, "ok", true)
+	})
+
+	var entry map[string]interface{}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &entry); err != nil {
+		t.Fatalf("log line is not valid JSON: %v (line: %q)", err, out)
+	}
+	if entry["message"] != "json message" {
+		t.Fatalf("unexpected message: %v", entry["message"])
+	}
+	if entry["level"] != "INFO" {
+		t.Fatalf("unexpected level: %v", entry["level"])
+	}
+	if entry["status"] != float64(200) {
+		t.Fatalf("unexpected status: %v", entry["status"])
+	}
+	if entry["timestamp"] == nil {
+		t.Fatal("missing timestamp field")
+	}
+}
+
+func TestJSONOutputWithUnencodableAttribute(t *testing.T) {
+	SetLevel(LevelDebug)
+	SetFormat("json")
+	defer SetFormat("kv")
+
+	out := captureOutput(func() {
+		Info("bad field", "fn", func() {})
+	})
+
+	var entry map[string]interface{}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &entry); err != nil {
+		t.Fatalf("fallback log line is not valid JSON: %v (line: %q)", err, out)
+	}
+	if entry["log_encode_error"] == nil {
+		t.Fatal("expected log_encode_error in fallback entry")
+	}
+}
+
 func TestFatalOutput(t *testing.T) {
 	SetLevel(LevelDebug)
 	out := captureOutput(func() {

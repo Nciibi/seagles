@@ -255,6 +255,7 @@ jobs:
   build-images:
     name: Build & Publish Images
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs:
       - backend-lint
       - backend-test
@@ -263,6 +264,7 @@ jobs:
       - firmware-analyzer-test
       - frontend-lint
       - frontend-test
+      - secret-scan
     permissions:
       contents: read
       packages: write

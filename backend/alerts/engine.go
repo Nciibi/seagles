@@ -143,7 +143,7 @@ func checkOfflineDevices(db *sql.DB) {
 		})
 	}
 	if err := rows.Err(); err != nil {
-		log.Printf("Error iterating alerts for engine: %v", err)
+		slog.Error("Error iterating alerts for engine", "error", err.Error())
 		return
 	}
 }
@@ -179,7 +179,7 @@ func checkFirmwareOverdue(db *sql.DB) {
 		})
 	}
 	if err := rows.Err(); err != nil {
-		log.Printf("Error iterating alerts for engine: %v", err)
+		slog.Error("Error iterating alerts for engine", "error", err.Error())
 		return
 	}
 }
@@ -214,7 +214,7 @@ func checkUnresolvedCritical(db *sql.DB) {
 		})
 	}
 	if err := rows.Err(); err != nil {
-		log.Printf("Error iterating alerts for engine: %v", err)
+		slog.Error("Error iterating alerts for engine", "error", err.Error())
 		return
 	}
 }

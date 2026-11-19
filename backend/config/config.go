@@ -64,6 +64,11 @@ type Config struct {
 	TLSEnabled  bool
 	TLSCertFile string
 	TLSKeyFile  string
+	// RequireHTTPS rejects plaintext API requests. TrustForwardedProto lets a
+	// TLS-terminating proxy satisfy that check; leave false unless the app is
+	// only reachable through a proxy that overwrites the header.
+	RequireHTTPS       bool
+	TrustForwardedProto bool
 
 	// Pprof exposes runtime profiles on a separate loopback-only listener.
 	// Off by default; never bind it to a public interface.

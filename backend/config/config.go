@@ -64,6 +64,9 @@ type Config struct {
 	TLSEnabled  bool
 	TLSCertFile string
 	TLSKeyFile  string
+	// TLSMinVersion is "1.2" (default) or "1.3". "1.3" rejects older clients
+	// both at the TLS handshake and at the request-middleware boundary.
+	TLSMinVersion string
 	// RequireHTTPS rejects plaintext API requests. TrustForwardedProto lets a
 	// TLS-terminating proxy satisfy that check; leave false unless the app is
 	// only reachable through a proxy that overwrites the header.

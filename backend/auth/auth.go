@@ -245,11 +245,12 @@ func LoginHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		err := db.QueryRow(
-			`SELECT id, username, email, role, password_hash, COALESCE(tenant_id, $2), must_change_password
+			`SELECT id, username, email, role, password_hash, COALESCE(tenant_id, $2),
+			        must_change_password, COALESCE(totp_enabled, FALSE)
 			 FROM users WHERE username = $1 AND COALESCE(tenant_id, $2) = $2 AND is_active = TRUE`,
 			req.Username, tenantID,
 		).Scan(&user.ID, &user.Username, &user.Email, &user.Role, &passwordHash,
-			&user.TenantID, &user.MustChangePassword)
+			&user.TenantID, &user.MustChangePassword, &user.TOTPEnabled)
 
 		if err == sql.ErrNoRows {
 			slog.Warn("login_failed", "username", req.Username, "reason", "invalid_credentials")

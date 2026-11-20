@@ -33,6 +33,9 @@ type User struct {
 	// endpoint except the password-change endpoints is refused, so a
 	// deployment can never sit indefinitely on a publicly known credential.
 	MustChangePassword bool `json:"must_change_password"`
+
+	// TOTPEnabled is true once MFA enrolment has been confirmed with a code.
+	TOTPEnabled bool `json:"totp_enabled"`
 }
 
 type LoginRequest struct {

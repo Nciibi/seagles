@@ -48,6 +48,11 @@ type LoginResponse struct {
 	ExpiresIn    int64  `json:"expires_in"`
 	RefreshToken string `json:"refresh_token,omitempty"`
 	User         User   `json:"user"`
+
+	// MFARequired is set instead of Token/RefreshToken when the password factor
+	// succeeded but a TOTP code is still needed. MFAToken is single-purpose.
+	MFARequired bool   `json:"mfa_required,omitempty"`
+	MFAToken    string `json:"mfa_token,omitempty"`
 }
 
 type RefreshRequest struct {

@@ -20,12 +20,16 @@ export default function Settings() {
     isAdmin = false
   }
 
+  const tabs: Tab[] = ['safelists', 'webhooks', 'profiles', 'scopes']
+  if (isAdmin) tabs.push('sessions')
+  tabs.push('users')
+
   return (
     <div>
       <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '20px' }}>Settings</h1>
 
       <div className="tab-bar" role="tablist" aria-label="Settings sections">
-        {(['safelists', 'webhooks', 'profiles', 'scopes', 'users'] as Tab[]).map((t) => (
+        {tabs.map((t) => (
           <div
             key={t}
             role="tab"

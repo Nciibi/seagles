@@ -10,7 +10,7 @@ import {
   type SafelistEntry, type Webhook, type ScanProfile, type ScanScope, type User,
 } from '../api/client'
 
-type Tab = 'safelists' | 'webhooks' | 'profiles' | 'scopes' | 'sessions' | 'users'
+type Tab = 'safelists' | 'webhooks' | 'profiles' | 'scopes' | 'sessions' | 'mfa' | 'users'
 
 export default function Settings() {
   const [tab, setTab] = useState<Tab>('safelists')

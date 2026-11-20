@@ -86,7 +86,7 @@
 - [x] Add browser-based logout with API call
 - [x] Add refresh token storage for persistent sessions
 - [x] Add `logout`, `refreshToken`, `changePassword`, `getPermissions`, `getAuditLog` API calls
-- [ ] Add 2FA/TOTP support for admin accounts (TBD)
+- [x] Add 2FA/TOTP support (all accounts; RFC 6238, encrypted secrets, single-use challenges)
 
 **Files:** `frontend/src/api/client.ts`, `frontend/src/App.tsx`, `frontend/src/pages/Login.tsx`
 

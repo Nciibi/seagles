@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import SessionsTab from '../components/SessionsTab'
 import {
   getSafelists, createSafelist, deleteSafelist,
   getWebhooks, createWebhook, deleteWebhook,

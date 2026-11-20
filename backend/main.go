@@ -205,7 +205,10 @@ func main() {
 
 	useTLS := cfg.TLSEnabled && cfg.TLSCertFile != "" && cfg.TLSKeyFile != ""
 	if useTLS {
-		slog.Info("TLS enabled", "cert", cfg.TLSCertFile)
+		// Enforce the floor at the handshake too, not just in the middleware:
+		// a client negotiating TLS 1.2 is rejected before any request is parsed.
+		srv.TLSConfig = &tls.Config{MinVersion: middleware.MinTLSVersion(cfg.TLSMinVersion)}
+		slog.Info("TLS enabled", "cert", cfg.TLSCertFile, "min_version", cfg.TLSMinVersion)
 	}
 
 	go func() {

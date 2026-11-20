@@ -27,9 +27,13 @@ type TokenType string
 const (
 	AccessToken  TokenType = "access"
 	RefreshToken TokenType = "refresh"
+	// MFAToken is a short-lived, single-purpose token issued after the password
+	// factor succeeds for an MFA-enabled account. It grants no API access.
+	MFAToken TokenType = "mfa"
 
 	AccessTokenTTL  = 15 * time.Minute
 	RefreshTokenTTL = 7 * 24 * time.Hour
+	MFATTLS         = 5 * time.Minute
 
 	TokenIssuer   = "seagles"
 	TokenAudience = "seagles-api"

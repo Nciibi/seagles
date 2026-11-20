@@ -4,9 +4,11 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import Login from './Login'
 
 const login = vi.fn()
+const verifyMfa = vi.fn()
 
 vi.mock('../api/client', () => ({
   login: (...args: unknown[]) => login(...args),
+  verifyMfa: (...args: unknown[]) => verifyMfa(...args),
 }))
 
 function renderLogin() {

@@ -279,6 +279,28 @@ func LoginHandler(db *sql.DB) gin.HandlerFunc {
 		clearFailedLogins(db, tenantID, req.Username)
 		db.Exec(`UPDATE users SET last_login = NOW() WHERE id = $1`, user.ID)
 
+		// The password factor is satisfied, but an MFA-enabled account gets
+		// only a single-purpose challenge token until the code is verified.
+		if user.TOTPEnabled {
+			mfaToken, err := GenerateMFAToken(user)
+			if err != nil {
+				slog.Error("mfa_token_generation_failed", "error", err.Error())
+				c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Failed to generate MFA challenge"})
+				return
+			}
+			slog.Info("login_mfa_required", "username", user.Username)
+			c.JSON(http.StatusOK, gin.H{
+				"data": LoginResponse{
+					User:        user,
+					ExpiresIn:   int64(MFATTLS.Seconds()),
+					MFARequired: true,
+					MFAToken:    mfaToken.Token,
+				},
+				"error": nil,
+			})
+			return
+		}
+
 		accessToken, err := GenerateAccessToken(user)
 		if err != nil {
 			slog.Error("token_generation_failed", "error", err.Error())

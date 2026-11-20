@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"testing"
 	"time"
+
+	"github.com/Nciibi/seagles/cache"
 )
 
 func TestSetTOTPEncryptionKey(t *testing.T) {

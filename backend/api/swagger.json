@@ -45,6 +45,8 @@
           "token": { "type": "string" },
           "expires_in": { "type": "integer" },
           "refresh_token": { "type": "string" },
+          "mfa_required": { "type": "boolean", "description": "True when a TOTP code is still required" },
+          "mfa_token": { "type": "string", "description": "Short-lived challenge token, only when mfa_required" },
           "user": {
             "type": "object",
             "properties": {

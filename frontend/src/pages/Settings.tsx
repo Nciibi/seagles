@@ -321,6 +321,7 @@ function ScopesTab({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <div>
+      {error && <div className="card" role="alert" style={{ padding: '12px 16px', marginBottom: '16px', color: '#ff6b6b', borderColor: '#e03131' }}>{error}</div>}
       {isAdmin && (
         <form onSubmit={handleAdd} className="card" style={{ padding: '20px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: '200px' }}>

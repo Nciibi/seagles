@@ -1,3 +1,13 @@
+/** Risk bands and palette: the single source of truth for risk presentation. */
+export const RISK_THRESHOLDS = { critical: 8, high: 6, medium: 3 } as const
+
+export const RISK_COLORS = {
+  critical: '#e03131',
+  high: '#f08c00',
+  medium: '#1c7ed6',
+  low: '#2f9e44',
+} as const
+
 export function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)

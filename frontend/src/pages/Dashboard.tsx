@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { getStats, getAlerts, getScans, triggerNetworkScan, type Stats, type Alert, type Scan } from '../api/client'
 import { waitForNetworkScan } from '../utils/asyncJobs'
+import { RISK_COLORS, percentOf } from '../utils/helpers'
 import AlertFeed from '../components/AlertFeed'
 import RiskScore from '../components/RiskScore'
 import { LoadingCard } from '../components/Loading'

@@ -10,12 +10,13 @@ import (
 	"github.com/google/gopacket/pcap"
 
 	"github.com/Nciibi/seagles/alerts"
+	"github.com/Nciibi/seagles/meta"
 	"github.com/Nciibi/seagles/slog"
 )
 
 // DefaultTenantID is used by the passive monitor, which observes one network
 // interface and has no per-request tenant to derive a scope from.
-const DefaultTenantID = "00000000-0000-0000-0000-000000000001"
+const DefaultTenantID = meta.DefaultTenantID
 
 type PassiveMonitor struct {
 	db        *sql.DB

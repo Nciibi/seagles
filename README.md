@@ -33,6 +33,8 @@ Seagles discovers every IoT device on your network, scans them for real CVEs, te
 - **Risk Scoring** — 0-10 additive score with per-factor breakdown
 - **Real-time Alerts** — WebSocket push, Slack/Teams/Syslog webhooks, email-ready
 - **RBAC** — 4 roles (viewer, auditor, operator, admin) with 50+ granular permissions
+- **MFA** — Optional TOTP (RFC 6238) with AES-256-GCM encrypted secrets at rest and single-use login challenges
+- **Session Management** — List and revoke active sessions from Settings
 - **Audit Logging** — All write operations logged for compliance (90-day retention)
 - **PWA** — Installable, offline-capable, service worker with push notifications
 - **Monitoring** — Built-in Prometheus metrics + Grafana dashboards (4 pre-built)

@@ -32,6 +32,7 @@ function submitCredentials() {
 beforeEach(() => {
   localStorage.clear()
   login.mockReset()
+  verifyMfa.mockReset()
 })
 
 describe('Login routing', () => {

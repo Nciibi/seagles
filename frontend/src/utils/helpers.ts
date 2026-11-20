@@ -23,37 +23,38 @@ export function formatDate(dateStr: string): string {
 }
 
 export function riskColor(score: number): string {
-  if (score >= 8) return '#e03131'
-  if (score >= 6) return '#f08c00'
-  if (score >= 3) return '#1c7ed6'
-  return '#2f9e44'
+  if (score >= RISK_THRESHOLDS.critical) return RISK_COLORS.critical
+  if (score >= RISK_THRESHOLDS.high) return RISK_COLORS.high
+  if (score >= RISK_THRESHOLDS.medium) return RISK_COLORS.medium
+  return RISK_COLORS.low
 }
 
 export function riskLabel(score: number): string {
-  if (score >= 8) return 'Critical'
-  if (score >= 6) return 'High'
-  if (score >= 3) return 'Medium'
+  if (score >= RISK_THRESHOLDS.critical) return 'Critical'
+  if (score >= RISK_THRESHOLDS.high) return 'High'
+  if (score >= RISK_THRESHOLDS.medium) return 'Medium'
   return 'Low'
 }
 
 export function severityBadge(score: number): { cls: string; text: string } {
-  if (score >= 8) return { cls: 'badge badge-critical', text: `Critical ${score.toFixed(1)}` }
-  if (score >= 6) return { cls: 'badge badge-high', text: `High ${score.toFixed(1)}` }
-  if (score >= 3) return { cls: 'badge badge-medium', text: `Medium ${score.toFixed(1)}` }
-  return { cls: 'badge badge-low', text: `Low ${score.toFixed(1)}` }
+  const label = riskLabel(score)
+  return { cls: `badge badge-${label.toLowerCase()}`, text: `${label} ${score.toFixed(1)}` }
+}
+
+/** Maps a textual alert severity (as returned by the API) to its band colour. */
+export function severityColorFor(severity: string): string {
+  switch (severity) {
+    case 'critical': return RISK_COLORS.critical
+    case 'high': return RISK_COLORS.high
+    case 'medium': return RISK_COLORS.medium
+    default: return '#6b7280'
+  }
 }
 
 export function epssColor(score: number | null): string {
   if (score == null) return 'var(--text-muted)'
   if (score >= 0.5) return '#e03131'
   if (score >= 0.1) return '#f08c00'
-  return '#2f9e44'
-}
-
-export function severityColor(score: number): string {
-  if (score >= 8) return '#e03131'
-  if (score >= 6) return '#f08c00'
-  if (score >= 3) return '#1c7ed6'
   return '#2f9e44'
 }
 
@@ -67,6 +68,13 @@ export function entropyLabel(score: number): string {
   if (score > 7.2) return 'Suspicious'
   if (score > 6.5) return 'Elevated'
   return 'Normal'
+}
+
+/** Percentage of a whole, clamped to 0-100. `parts` must include every part. */
+export function percentOf(value: number, parts: number[]): number {
+  const total = parts.reduce((sum, part) => sum + part, 0)
+  if (total <= 0) return 0
+  return Math.min(Math.max((value / total) * 100, 0), 100)
 }
 
 export function getSeverityIcon(severity: string): string {

@@ -21,7 +21,7 @@ export default function Settings() {
     isAdmin = false
   }
 
-  const tabs: Tab[] = ['safelists', 'webhooks', 'profiles', 'scopes']
+  const tabs: Tab[] = ['safelists', 'webhooks', 'profiles', 'scopes', 'mfa']
   if (isAdmin) tabs.push('sessions')
   tabs.push('users')
 

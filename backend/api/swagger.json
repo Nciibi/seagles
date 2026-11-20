@@ -71,6 +71,29 @@
           "new_password": { "type": "string", "minLength": 8 }
         }
       },
+      "MFACodeRequest": {
+        "type": "object",
+        "required": ["code"],
+        "properties": {
+          "code": { "type": "string", "pattern": "^[0-9]{6}$", "minLength": 6, "maxLength": 6 }
+        }
+      },
+      "MFAVerifyRequest": {
+        "type": "object",
+        "required": ["mfa_token", "code"],
+        "properties": {
+          "mfa_token": { "type": "string" },
+          "code": { "type": "string", "pattern": "^[0-9]{6}$", "minLength": 6, "maxLength": 6 }
+        }
+      },
+      "MFASetupResponse": {
+        "type": "object",
+        "properties": {
+          "secret": { "type": "string", "description": "Base32-encoded TOTP secret for manual entry" },
+          "otpauth_uri": { "type": "string", "description": "otpauth:// URI for authenticator apps" },
+          "enabled": { "type": "boolean" }
+        }
+      },
       "Device": {
         "type": "object",
         "properties": {

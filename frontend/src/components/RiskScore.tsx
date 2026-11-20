@@ -1,3 +1,5 @@
+import { riskColor, riskLabel } from '../utils/helpers'
+
 interface RiskScoreProps {
   score: number
   size?: 'sm' | 'md' | 'lg'

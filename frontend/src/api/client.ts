@@ -355,6 +355,8 @@ export const changePassword = (currentPassword: string, newPassword: string) =>
   api.post('/auth/change-password', { current_password: currentPassword, new_password: newPassword })
 export const getMe = () => api.get<AuthUser>('/auth/me')
 export const getPermissions = () => api.get('/auth/permissions')
+export const getSessions = () => api.get<SessionInfo[]>('/sessions')
+export const revokeSession = (id: string) => api.delete(`/sessions/${id}`)
 
 // --- Stats ---
 export const getStats = () => api.get<Stats>('/stats')

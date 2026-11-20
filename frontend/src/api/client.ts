@@ -361,6 +361,12 @@ export interface ScanDetailResponse {
 
 export const login = (username: string, password: string) =>
   api.post<LoginResponse>('/auth/login', { username, password })
+export const verifyMfa = (mfaToken: string, code: string) =>
+  api.post<LoginResponse>('/auth/mfa/verify', { mfa_token: mfaToken, code })
+export const getMfaStatus = () => api.get<MFAStatusResponse>('/auth/mfa/status')
+export const setupMfa = () => api.post<MFASetupResponse>('/auth/mfa/setup')
+export const enableMfa = (code: string) => api.post('/auth/mfa/enable', { code })
+export const disableMfa = (code: string) => api.post('/auth/mfa/disable', { code })
 export const refreshToken = (refreshToken: string) =>
   api.post('/auth/refresh', { refresh_token: refreshToken })
 export const logout = () => api.post('/auth/logout')

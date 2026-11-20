@@ -76,9 +76,9 @@ var globalBlacklist = NewTokenBlacklist()
 const revokedKeyPrefix = "seagles:revoked:"
 
 var (
-	redisMu       sync.RWMutex
-	redisClient   *redis.Client
-	revokedTTL    = 15 * time.Minute
+	redisMu          sync.RWMutex
+	redisClient      *redis.Client
+	revokedTTL       = 15 * time.Minute
 	redisCallTimeout = 2 * time.Second
 )
 

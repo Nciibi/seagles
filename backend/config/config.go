@@ -20,8 +20,8 @@ type Config struct {
 	JWTPrivateKeyFile     string
 	// JWTPreviousSecret / JWTPreviousKeyFile hold the retired signing key
 	// during a rotation window. Tokens signed with it stay valid until expiry.
-	JWTPreviousSecret     string
-	JWTPreviousKeyFile    string
+	JWTPreviousSecret  string
+	JWTPreviousKeyFile string
 	// RequireSharedJWTKey makes the process refuse to start when no signing key
 	// is configured. Set it for any deployment running more than one instance:
 	// an auto-generated key is per-process, so tokens issued by one replica are
@@ -67,7 +67,7 @@ type Config struct {
 	// RequireHTTPS rejects plaintext API requests. TrustForwardedProto lets a
 	// TLS-terminating proxy satisfy that check; leave false unless the app is
 	// only reachable through a proxy that overwrites the header.
-	RequireHTTPS       bool
+	RequireHTTPS        bool
 	TrustForwardedProto bool
 
 	// Pprof exposes runtime profiles on a separate loopback-only listener.

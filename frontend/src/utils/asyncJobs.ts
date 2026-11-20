@@ -18,23 +18,30 @@ export async function pollUntil<T>(
 ): Promise<T> {
   const intervalMs = options.intervalMs ?? 2000
   const deadline = Date.now() + (options.timeoutMs ?? 120_000)
+  const signal = options.signal
+
+  const throwIfAborted = () => {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+  }
 
   for (;;) {
-    if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+    throwIfAborted()
     const value = await fetcher()
     if (done(value)) return value
     if (Date.now() >= deadline) throw new Error('Operation did not finish before the timeout')
 
+    // Remove the abort listener when the wait completes normally; leaving one
+    // listener per iteration accumulates on long-running polls.
     await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(resolve, intervalMs)
-      options.signal?.addEventListener(
-        'abort',
-        () => {
-          clearTimeout(timer)
-          reject(new DOMException('Aborted', 'AbortError'))
-        },
-        { once: true },
-      )
+      const onAbort = () => {
+        clearTimeout(timer)
+        reject(new DOMException('Aborted', 'AbortError'))
+      }
+      const timer = setTimeout(() => {
+        signal?.removeEventListener('abort', onAbort)
+        resolve()
+      }, intervalMs)
+      signal?.addEventListener('abort', onAbort, { once: true })
     })
   }
 }

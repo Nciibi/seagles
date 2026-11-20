@@ -63,9 +63,9 @@ func EnforceHTTPSMiddlewareWithMinVersion(requireHTTPS, trustForwardedProto bool
 			return
 		}
 
-		if directTLS && c.Request.TLS.Version < tls.VersionTLS12 {
+		if directTLS && c.Request.TLS.Version < minVersion {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
-				"data": nil, "error": "TLS 1.2 or higher required",
+				"data": nil, "error": "TLS " + tlsVersionLabel(minVersion) + " or higher required",
 			})
 			return
 		}

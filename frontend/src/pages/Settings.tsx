@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import SessionsTab from '../components/SessionsTab'
+import MfaTab from '../components/MfaTab'
 import {
   getSafelists, createSafelist, deleteSafelist,
   getWebhooks, createWebhook, deleteWebhook,

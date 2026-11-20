@@ -31,21 +31,21 @@ type Config struct {
 	// TOTPEncryptionKey is a base64-encoded 32-byte AES key used to seal TOTP
 	// secrets at rest. When empty, MFA endpoints refuse to enrol users.
 	TOTPEncryptionKey string
-	SlackWebhookURL     string
-	TeamsWebhookURL     string
-	S3Endpoint          string
-	S3Bucket            string
-	S3AccessKey         string
-	S3SecretKey         string
-	RedisURL            string
-	RateLimitPerMin     int
-	ScanMaxConcurrent   int
-	LogLevel            string
-	LogFormat           string
-	DBMaxOpenConns      int
-	DBMaxIdleConns      int
-	DBConnMaxLifetime   time.Duration
-	AllowedOrigins      []string
+	SlackWebhookURL   string
+	TeamsWebhookURL   string
+	S3Endpoint        string
+	S3Bucket          string
+	S3AccessKey       string
+	S3SecretKey       string
+	RedisURL          string
+	RateLimitPerMin   int
+	ScanMaxConcurrent int
+	LogLevel          string
+	LogFormat         string
+	DBMaxOpenConns    int
+	DBMaxIdleConns    int
+	DBConnMaxLifetime time.Duration
+	AllowedOrigins    []string
 
 	// Data retention (days, 0 = disabled)
 	RetentionScansDays        int

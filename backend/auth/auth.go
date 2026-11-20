@@ -69,9 +69,9 @@ type MFACodeRequest struct {
 }
 
 type MFASetupResponse struct {
-	Secret    string `json:"secret"`
+	Secret     string `json:"secret"`
 	OTPAuthURI string `json:"otpauth_uri"`
-	Enabled   bool   `json:"enabled"`
+	Enabled    bool   `json:"enabled"`
 }
 
 type RegisterRequest struct {

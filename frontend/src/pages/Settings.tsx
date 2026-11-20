@@ -44,7 +44,8 @@ export default function Settings() {
              t === 'webhooks' ? '🔔 Webhooks' :
              t === 'profiles' ? '📋 Scan Profiles' :
              t === 'scopes' ? '🌐 Scan Scopes' :
-             t === 'sessions' ? '🔐 Sessions' : '👥 Users'}
+             t === 'sessions' ? '🔐 Sessions' :
+             t === 'mfa' ? '🔑 MFA' : '👥 Users'}
           </div>
         ))}
       </div>

@@ -26,9 +26,9 @@ const (
 	AlertCriticalUnresolved = "critical_vuln_unresolved"
 	AlertFirmwareReview     = "firmware_review_due"
 
-	// DefaultTenantID matches auth.DefaultTenantID. Kept local to avoid an
-	// alerts -> auth dependency; alert callers should set TenantID explicitly.
-	DefaultTenantID = "00000000-0000-0000-0000-000000000001"
+	// DefaultTenantID is aliased from meta so alert callers can avoid an
+	// alerts -> auth dependency. Callers should still set TenantID explicitly.
+	DefaultTenantID = meta.DefaultTenantID
 )
 
 type AlertRequest struct {

@@ -16,7 +16,7 @@ export default function RiskScore({ score, size = 'md' }: RiskScoreProps) {
   const radius = (config.width - config.stroke) / 2
   const circumference = 2 * Math.PI * radius
   const progress = (score / 10) * circumference
-  const color = scoreColor(score)
+  const color = riskColor(score)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>

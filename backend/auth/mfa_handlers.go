@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/Nciibi/seagles/cache"
 	"github.com/Nciibi/seagles/slog"
 )
 

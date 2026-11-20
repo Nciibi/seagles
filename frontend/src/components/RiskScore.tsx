@@ -24,10 +24,10 @@ export default function RiskScore({ score, size = 'md' }: RiskScoreProps) {
         width={config.width}
         height={config.width}
         role="img"
-        aria-label={`Risk score ${score.toFixed(1)} out of 10 (${scoreLabel(score)})`}
+        aria-label={`Risk score ${score.toFixed(1)} out of 10 (${riskLabel(score)})`}
         style={{ transform: 'rotate(-90deg)' }}
       >
-        <title>{`Risk score ${score.toFixed(1)} out of 10 — ${scoreLabel(score)}`}</title>
+        <title>{`Risk score ${score.toFixed(1)} out of 10 — ${riskLabel(score)}`}</title>
         {/* Background ring */}
         <circle
           cx={config.width / 2}
@@ -65,7 +65,7 @@ export default function RiskScore({ score, size = 'md' }: RiskScoreProps) {
         </text>
       </svg>
       <span style={{ fontSize: config.labelSize, color: color, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-        {scoreLabel(score)}
+        {riskLabel(score)}
       </span>
     </div>
   )

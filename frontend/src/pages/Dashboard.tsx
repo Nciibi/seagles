@@ -171,17 +171,12 @@ export default function Dashboard() {
         <div className="card" style={{ padding: '20px' }}>
           <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px' }}>📊 Risk Distribution</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '20px' }}>
-            {[
-              { label: 'Critical (8-10)', color: '#e03131', count: stats?.critical_vulns ?? 0 },
-              { label: 'High (6-7.9)', color: '#f08c00', count: stats?.high_vulns ?? 0 },
-              { label: 'Medium (3-5.9)', color: '#1c7ed6', count: stats?.medium_vulns ?? 0 },
-              { label: 'Low (0-2.9)', color: '#2f9e44', count: stats?.low_vulns ?? 0 },
-            ].map((item) => (
+            {distribution.map((item) => (
               <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{ width: '100px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.label}</div>
                 <div style={{ flex: 1, height: '24px', background: 'var(--bg-elevated)', borderRadius: '4px', overflow: 'hidden' }}>
                   <div style={{
-                    width: `${Math.min((item.count / Math.max((stats?.critical_vulns ?? 0) + (stats?.high_vulns ?? 0) + (stats?.medium_vulns ?? 0), 1)) * 100, 100)}%`,
+                    width: `${percentOf(item.count, distributionCounts)}%`,
                     height: '100%',
                     background: item.color,
                     borderRadius: '4px',

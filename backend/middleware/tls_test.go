@@ -108,6 +108,40 @@ func TestEnforceHTTPSMiddleware(t *testing.T) {
 	}
 }
 
+func TestMinTLSVersion(t *testing.T) {
+	if got := MinTLSVersion("1.3"); got != tls.VersionTLS13 {
+		t.Fatalf("MinTLSVersion(1.3) = %d, want %d", got, tls.VersionTLS13)
+	}
+	for _, value := range []string{"1.2", "", "garbage"} {
+		if got := MinTLSVersion(value); got != tls.VersionTLS12 {
+			t.Errorf("MinTLSVersion(%q) = %d, want %d", value, got, tls.VersionTLS12)
+		}
+	}
+}
+
+func TestEnforceHTTPSMiddlewareWithMinVersion(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(EnforceHTTPSMiddlewareWithMinVersion(false, false, tls.VersionTLS13))
+	r.GET("/test", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"ok": true}) })
+
+	for _, tc := range []struct {
+		version uint16
+		want    int
+	}{
+		{tls.VersionTLS12, http.StatusForbidden},
+		{tls.VersionTLS13, http.StatusOK},
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.TLS = &tls.ConnectionState{Version: tc.version}
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != tc.want {
+			t.Errorf("TLS version %d: got %d, want %d", tc.version, w.Code, tc.want)
+		}
+	}
+}
+
 func TestLoadPinnedKeys(t *testing.T) {
 	dir := t.TempDir()
 	pinsFile := filepath.Join(dir, "pins.txt")

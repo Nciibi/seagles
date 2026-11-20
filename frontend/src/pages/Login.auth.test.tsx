@@ -49,6 +49,24 @@ describe('Login routing', () => {
     expect(localStorage.getItem('seagles_token')).toBe('access-token')
   })
 
+  it('prompts for a TOTP code and completes login after verification', async () => {
+    const mfaUser = { id: '3', username: 'admin', email: 'a@b.c', role: 'admin', totp_enabled: true }
+    login.mockResolvedValue({
+      data: { mfa_required: true, mfa_token: 'challenge-token', user: mfaUser },
+    })
+    verifyMfa.mockResolvedValue({
+      data: { token: 'final-token', user: mfaUser },
+    })
+    renderLogin()
+    submitCredentials()
+    expect(await screen.findByText(/two-factor authentication/i)).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByRole('button', { name: /verify/i }))
+    await waitFor(() => expect(verifyMfa).toHaveBeenCalledWith('challenge-token', '123456'))
+    expect(await screen.findByText('Dashboard screen')).toBeInTheDocument()
+    expect(localStorage.getItem('seagles_token')).toBe('final-token')
+  })
+
   it('sends normal accounts to the dashboard', async () => {
     login.mockResolvedValue({
       data: {

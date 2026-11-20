@@ -52,6 +52,7 @@ export default function Settings() {
       {tab === 'webhooks' && <WebhooksTab isAdmin={isAdmin} />}
       {tab === 'profiles' && <ProfilesTab isAdmin={isAdmin} />}
       {tab === 'scopes' && <ScopesTab isAdmin={isAdmin} />}
+      {tab === 'sessions' && <SessionsTab />}
       {tab === 'users' && <UsersTab isAdmin={isAdmin} />}
     </div>
   )

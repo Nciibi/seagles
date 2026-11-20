@@ -156,12 +156,17 @@ api.interceptors.response.use(
   }
 )
 
-function clearSession() {
+/** Clear every local credential without navigating (callers choose the route). */
+export function clearSessionStorage() {
   localStorage.removeItem('seagles_token')
   localStorage.removeItem('seagles_refresh')
   localStorage.removeItem('seagles_user')
   try { sessionStorage.removeItem(CSRF_STORAGE_KEY) } catch { /* ignore */ }
   csrfToken = null
+}
+
+function clearSession() {
+  clearSessionStorage()
   if (!window.location.pathname.includes('/login')) {
     window.location.href = '/login'
   }

@@ -252,6 +252,74 @@
         }
       }
     },
+    "/auth/mfa/verify": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Complete MFA login with a TOTP code",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MFAVerifyRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Login successful", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginResponse" } } } },
+          "401": { "description": "Invalid challenge or code" }
+        }
+      }
+    },
+    "/auth/mfa/status": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Get MFA enrolment status",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "MFA status" },
+          "401": { "description": "Not authenticated" }
+        }
+      }
+    },
+    "/auth/mfa/setup": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Begin TOTP enrolment (returns a secret, does not enable MFA)",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Enrolment secret", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MFASetupResponse" } } } },
+          "409": { "description": "MFA already enabled" },
+          "503": { "description": "MFA encryption key not configured" }
+        }
+      }
+    },
+    "/auth/mfa/enable": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Enable MFA after verifying a code from the authenticator",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MFACodeRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "MFA enabled" },
+          "403": { "description": "Invalid code" }
+        }
+      }
+    },
+    "/auth/mfa/disable": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Disable MFA after verifying a current code",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MFACodeRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "MFA disabled" },
+          "403": { "description": "Invalid code" }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": ["System"],

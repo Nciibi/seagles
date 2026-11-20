@@ -40,7 +40,7 @@ describe('MfaTab', () => {
     expect(await screen.findByText(setupResponse.otpauth_uri)).toBeInTheDocument()
     expect(screen.getByText(setupResponse.secret)).toBeInTheDocument()
 
-    fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '123456' } })
+    fireEvent.change(screen.getByLabelText('Verification Code'), { target: { value: '123456' } })
     fireEvent.click(screen.getByRole('button', { name: /enable mfa/i }))
     await waitFor(() => expect(enableMfa).toHaveBeenCalledWith('123456'))
     expect(await screen.findByText('Enabled')).toBeInTheDocument()
@@ -54,7 +54,7 @@ describe('MfaTab', () => {
 
     render(<MfaTab />)
     expect(await screen.findByText('Enabled')).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '654321' } })
+    fireEvent.change(screen.getByLabelText('Verification Code'), { target: { value: '654321' } })
     fireEvent.click(screen.getByRole('button', { name: 'Disable' }))
     await waitFor(() => expect(disableMfa).toHaveBeenCalledWith('654321'))
     expect(await screen.findByText('Disabled')).toBeInTheDocument()

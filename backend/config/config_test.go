@@ -26,6 +26,9 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.LogLevel != "info" {
 		t.Fatalf("expected default LogLevel info, got %s", cfg.LogLevel)
 	}
+	if cfg.TLSMinVersion != "1.2" {
+		t.Fatalf("expected default TLSMinVersion 1.2, got %s", cfg.TLSMinVersion)
+	}
 	if cfg.DBMaxOpenConns != 25 {
 		t.Fatalf("expected default DBMaxOpenConns 25, got %d", cfg.DBMaxOpenConns)
 	}

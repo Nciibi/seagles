@@ -39,9 +39,9 @@ const (
 	// window. Tokens signed with it remain verifiable until the overlap ends.
 	PreviousTokenKid = "seagles-previous"
 
-	// DefaultTenantID is the tenant every existing row was backfilled to by
-	// migration 015. Single-tenant deployments continue to use it.
-	DefaultTenantID = "00000000-0000-0000-0000-000000000001"
+	// DefaultTenantID is kept as an alias for existing callers; its value has a
+	// single source of truth in meta.DefaultTenantID.
+	DefaultTenantID = meta.DefaultTenantID
 )
 
 type KeyPair struct {

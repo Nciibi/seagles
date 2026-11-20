@@ -52,7 +52,7 @@ describe('Dashboard page', () => {
         kev_vulns: 0, open_alerts: 0, suspicious_firmware: 0,
       },
     })
-    retry.click()
+    fireEvent.click(retry)
     await waitFor(() => expect(screen.queryByText(/failed to load/i)).not.toBeInTheDocument())
   })
 })

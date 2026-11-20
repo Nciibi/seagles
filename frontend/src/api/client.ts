@@ -340,6 +340,8 @@ export interface LoginResponse {
   token: string
   refresh_token?: string
   user: AuthUser
+  mfa_required?: boolean
+  mfa_token?: string
 }
 
 export interface UploadFirmwareResponse {

@@ -41,6 +41,13 @@ func MinTLSVersion(value string) uint16 {
 	return tls.VersionTLS12
 }
 
+func tlsVersionLabel(version uint16) string {
+	if version >= tls.VersionTLS13 {
+		return "1.3"
+	}
+	return "1.2"
+}
+
 // EnforceHTTPSMiddleware uses the default minimum (TLS 1.2).
 func EnforceHTTPSMiddleware(requireHTTPS, trustForwardedProto bool) gin.HandlerFunc {
 	return EnforceHTTPSMiddlewareWithMinVersion(requireHTTPS, trustForwardedProto, DefaultTLSConfig.MinVersion)

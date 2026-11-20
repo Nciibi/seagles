@@ -191,6 +191,7 @@ export default function App() {
                 <Route path="/alerts" element={<AlertsPage />} />
                 <Route path="/firmware" element={<FirmwarePage />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/change-password" element={<ChangePassword />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
               </Suspense>

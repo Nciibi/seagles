@@ -11,20 +11,6 @@ const sizeConfig = {
   lg: { width: 100, stroke: 6, fontSize: '1.8rem', labelSize: '0.75rem' },
 }
 
-const scoreColor = (score: number) => {
-  if (score >= 8) return '#e03131'
-  if (score >= 6) return '#f08c00'
-  if (score >= 3) return '#1c7ed6'
-  return '#2f9e44'
-}
-
-const scoreLabel = (score: number) => {
-  if (score >= 8) return 'Critical'
-  if (score >= 6) return 'High'
-  if (score >= 3) return 'Medium'
-  return 'Low'
-}
-
 export default function RiskScore({ score, size = 'md' }: RiskScoreProps) {
   const config = sizeConfig[size]
   const radius = (config.width - config.stroke) / 2

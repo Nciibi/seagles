@@ -83,6 +83,9 @@ func TestLoad_EnvOverrides(t *testing.T) {
 	if cfg.JWTSecret != "my-secret" {
 		t.Fatalf("expected JWT_SECRET my-secret, got %s", cfg.JWTSecret)
 	}
+	if cfg.TLSMinVersion != "1.3" {
+		t.Fatalf("expected TLS_MIN_VERSION 1.3, got %s", cfg.TLSMinVersion)
+	}
 	if cfg.NVDAPIKey != "nvd-key-123" {
 		t.Fatalf("expected NVD_API_KEY nvd-key-123, got %s", cfg.NVDAPIKey)
 	}

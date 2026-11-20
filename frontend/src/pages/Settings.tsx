@@ -347,7 +347,16 @@ function ScopesTab({ isAdmin }: { isAdmin: boolean }) {
                 <td style={{ fontFamily: 'monospace', fontWeight: 500 }}>{s.cidr}</td>
                 <td style={{ color: 'var(--text-secondary)' }}>{s.label || '—'}</td>
                 <td>{s.is_active ? <span style={{ color: '#69db7c' }}>Active</span> : <span style={{ color: 'var(--text-muted)' }}>Inactive</span>}</td>
-                {isAdmin && <td><button className="btn btn-danger" onClick={async () => { await deleteScanScope(s.id); fetch() }} style={{ padding: '2px 10px', fontSize: '0.75rem' }}>Remove</button></td>}
+                {isAdmin && <td><button className="btn btn-danger" onClick={async () => {
+                  try {
+                    await deleteScanScope(s.id)
+                    setError(null)
+                    fetch()
+                  } catch (e) {
+                    console.error('Failed to delete scan scope:', e)
+                    setError('Failed to delete scan scope')
+                  }
+                }} style={{ padding: '2px 10px', fontSize: '0.75rem' }}>Remove</button></td>}
               </tr>
             ))}
           </tbody>

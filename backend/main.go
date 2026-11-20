@@ -102,6 +102,10 @@ func main() {
 	}
 	auth.SetJWTSecret(jwtKey)
 
+	if err := auth.SetTOTPEncryptionKey(cfg.TOTPEncryptionKey); err != nil {
+		slog.Fatal("TOTP encryption key configuration error", "error", err.Error())
+	}
+
 	previousJWTKey, err := resolveKeyFrom(cfg.JWTPreviousSecret, cfg.JWTPreviousKeyFile)
 	if err != nil {
 		slog.Fatal("Previous JWT signing key configuration error", "error", err.Error())

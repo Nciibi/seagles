@@ -13,6 +13,15 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    # The API sets these headers on its own responses, but the HTML document
+    # is served here. Without them the SPA has no CSP or clickjacking defence.
+    # 'unsafe-inline' for style is required by the component style attributes;
+    # script-src stays strict, so it does not re-enable inline JavaScript.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
     # Serve React app
     location / {
         try_files $uri $uri/ /index.html;

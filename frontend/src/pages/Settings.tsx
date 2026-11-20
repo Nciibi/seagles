@@ -55,6 +55,7 @@ export default function Settings() {
       {tab === 'profiles' && <ProfilesTab isAdmin={isAdmin} />}
       {tab === 'scopes' && <ScopesTab isAdmin={isAdmin} />}
       {tab === 'sessions' && <SessionsTab />}
+      {tab === 'mfa' && <MfaTab />}
       {tab === 'users' && <UsersTab isAdmin={isAdmin} />}
     </div>
   )

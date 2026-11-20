@@ -12,6 +12,9 @@ const FirmwarePage = lazy(() => import('./pages/Firmware'))
 const AlertsPage = lazy(() => import('./pages/Alerts'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Login = lazy(() => import('./pages/Login'))
+const ChangePassword = lazy(() => import('./pages/ChangePassword'))
+
+type StoredUser = { username?: string; role?: string; must_change_password?: boolean }
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: '📊' },

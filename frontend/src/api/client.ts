@@ -277,6 +277,17 @@ export interface AuthUser {
   must_change_password?: boolean
 }
 
+export interface MFASetupResponse {
+  secret: string
+  otpauth_uri: string
+  enabled: boolean
+}
+
+export interface MFAStatusResponse {
+  enabled: boolean
+  configured: boolean
+}
+
 export interface SessionInfo {
   id: string
   user_id: string

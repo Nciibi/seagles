@@ -269,6 +269,7 @@ export interface AuthUser {
   username: string
   email: string
   role: string
+  must_change_password?: boolean
 }
 
 export interface SafelistEntry {

@@ -31,4 +31,19 @@ describe('pollUntil', () => {
       pollUntil(async () => 'running', () => false, { intervalMs: 2, timeoutMs: 20 }),
     ).rejects.toThrow('timeout')
   })
+
+  it('does not accumulate abort listeners across polls', async () => {
+    const controller = new AbortController()
+    const add = vi.spyOn(controller.signal, 'addEventListener')
+    const remove = vi.spyOn(controller.signal, 'removeEventListener')
+    let calls = 0
+    const value = await pollUntil(
+      async () => { calls++; return calls },
+      (n) => n >= 4,
+      { intervalMs: 1, timeoutMs: 1000, signal: controller.signal },
+    )
+    expect(value).toBe(4)
+    expect(add).toHaveBeenCalledTimes(3)
+    expect(remove).toHaveBeenCalledTimes(3)
+  })
 })

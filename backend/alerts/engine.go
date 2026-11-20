@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Nciibi/seagles/events"
+	"github.com/Nciibi/seagles/meta"
 	"github.com/Nciibi/seagles/slog"
 )
 

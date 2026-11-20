@@ -52,6 +52,7 @@ func TestLoad_EnvOverrides(t *testing.T) {
 	os.Setenv("ALLOWED_ORIGINS", "http://localhost:3000,https://app.example.com")
 	os.Setenv("JWT_SECRET", "my-secret")
 	os.Setenv("NVD_API_KEY", "nvd-key-123")
+	os.Setenv("TLS_MIN_VERSION", "1.3")
 
 	cfg, err := Load()
 	if err != nil {

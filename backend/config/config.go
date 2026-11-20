@@ -27,6 +27,10 @@ type Config struct {
 	// an auto-generated key is per-process, so tokens issued by one replica are
 	// rejected by the others.
 	RequireSharedJWTKey bool
+
+	// TOTPEncryptionKey is a base64-encoded 32-byte AES key used to seal TOTP
+	// secrets at rest. When empty, MFA endpoints refuse to enrol users.
+	TOTPEncryptionKey string
 	SlackWebhookURL     string
 	TeamsWebhookURL     string
 	S3Endpoint          string

@@ -150,7 +150,7 @@ export default function App() {
                 </div>
               )}
               <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                Seagles v2.1.0
+                Seagles v{__APP_VERSION__}
               </div>
             </div>
           </aside>

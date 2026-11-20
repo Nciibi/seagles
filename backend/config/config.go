@@ -98,6 +98,7 @@ func Load() (*Config, error) {
 		JWTPreviousSecret:     getEnv("JWT_PREVIOUS_SECRET", ""),
 		JWTPreviousKeyFile:    getEnv("JWT_PREVIOUS_KEY_FILE", ""),
 		RequireSharedJWTKey:   getEnv("REQUIRE_SHARED_JWT_KEY", "") == "true",
+		TOTPEncryptionKey:     getEnv("TOTP_ENCRYPTION_KEY", ""),
 		SlackWebhookURL:       getEnv("SLACK_WEBHOOK_URL", ""),
 		TeamsWebhookURL:       getEnv("TEAMS_WEBHOOK_URL", ""),
 		S3Endpoint:            getEnv("S3_ENDPOINT", ""),

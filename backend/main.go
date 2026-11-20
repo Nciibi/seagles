@@ -21,6 +21,7 @@ import (
 	"github.com/Nciibi/seagles/db"
 	"github.com/Nciibi/seagles/kev"
 	"github.com/Nciibi/seagles/meta"
+	"github.com/Nciibi/seagles/middleware"
 	"github.com/Nciibi/seagles/retention"
 	"github.com/Nciibi/seagles/scanner"
 	"github.com/Nciibi/seagles/slog"

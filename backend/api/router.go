@@ -78,6 +78,8 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 	// guessing, so give it a dedicated, much stricter budget. The key is the
 	// client IP until AuthMiddleware runs, which is exactly what we want here.
 	rl.AddRule("POST", "/api/v1/auth/login", 10, 15*time.Minute)
+	// MFA code verification shares the login brute-force budget.
+	rl.AddRule("POST", "/api/v1/auth/mfa/verify", 10, 15*time.Minute)
 
 	r.Use(func(c *gin.Context) {
 		start := time.Now()

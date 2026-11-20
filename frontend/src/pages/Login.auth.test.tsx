@@ -28,7 +28,6 @@ function submitCredentials() {
 }
 
 beforeEach(() => {
-  window.localStorage.clear()
   login.mockReset()
 })
 

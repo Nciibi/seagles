@@ -191,11 +191,15 @@ func ValidateMFAToken(tokenStr string) (*User, error) {
 	if claims.TokenType != MFAToken {
 		return nil, errors.New("invalid token type for MFA verification")
 	}
+	if cache.IsTokenBlacklisted(claims.JTI) {
+		return nil, errors.New("MFA challenge already used")
+	}
 	return &User{
 		ID:                 claims.Sub,
 		Username:           claims.Name,
 		Role:               claims.Role,
 		TenantID:           tenantIDForClaim(claims.TenantID),
 		MustChangePassword: claims.MustChangePassword,
+		ChallengeJTI:       claims.JTI,
 	}, nil
 }

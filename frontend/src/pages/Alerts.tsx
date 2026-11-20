@@ -112,7 +112,7 @@ export default function AlertsPage() {
               alignItems: 'center',
               gap: '14px',
               opacity: alert.is_acknowledged ? 0.5 : 1,
-              borderLeft: `3px solid ${alert.severity === 'critical' ? '#e03131' : alert.severity === 'high' ? '#f08c00' : alert.severity === 'medium' ? '#1c7ed6' : '#6b7280'}`,
+              borderLeft: `3px solid ${severityColorFor(alert.severity)}`,
             }}
           >
             <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>{getSeverityIcon(alert.severity)}</span>

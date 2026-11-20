@@ -1,33 +1,61 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { login } from '../api/client'
+import { login, verifyMfa, type LoginResponse } from '../api/client'
 
 export default function Login() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [mfaToken, setMfaToken] = useState<string | null>(null)
+  const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+
+  const finishLogin = (data: LoginResponse) => {
+    localStorage.setItem('seagles_token', data.token)
+    if (data.refresh_token) {
+      localStorage.setItem('seagles_refresh', data.refresh_token)
+    }
+    localStorage.setItem('seagles_user', JSON.stringify(data.user))
+    // The backend gates every endpoint until the initial password is rotated.
+    // Send forced-change accounts straight to the rotation form.
+    navigate(data.user.must_change_password ? '/change-password' : '/')
+  }
+
+  const messageFor = (err: unknown) => {
+    const axiosError = err as { response?: { data?: { error?: string } }; message?: string }
+    return axiosError.response?.data?.error || axiosError.message || 'Login failed'
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
-
     try {
       const res = await login(username, password)
       const data = res.data!
-      localStorage.setItem('seagles_token', data.token)
-      if (data.refresh_token) {
-        localStorage.setItem('seagles_refresh', data.refresh_token)
+      if (data.mfa_required && data.mfa_token) {
+        setMfaToken(data.mfa_token)
+        setCode('')
+        return
       }
-      localStorage.setItem('seagles_user', JSON.stringify(data.user))
-      // The backend gates every endpoint until the initial password is rotated.
-      // Send forced-change accounts straight to the rotation form.
-      navigate(data.user.must_change_password ? '/change-password' : '/')
+      finishLogin(data)
     } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: { error?: string } }; message?: string }
-      setError(axiosError.response?.data?.error || axiosError.message || 'Login failed')
+      setError(messageFor(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleMfaVerify = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const res = await verifyMfa(mfaToken!, code)
+      finishLogin(res.data!)
+    } catch (err: unknown) {
+      setError(messageFor(err))
     } finally {
       setLoading(false)
     }
@@ -72,7 +100,7 @@ export default function Login() {
         {/* Login Card */}
         <div className="card" style={{ padding: '32px', borderRadius: '16px' }}>
           <h2 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '24px', textAlign: 'center' }}>
-            Sign In
+            {mfaToken ? 'Two-Factor Authentication' : 'Sign In'}
           </h2>
 
           {error && (
@@ -90,54 +118,91 @@ export default function Login() {
             </div>
           )}
 
-          <form onSubmit={handleLogin}>
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Username
-              </label>
+          {mfaToken ? (
+            <form onSubmit={handleMfaVerify}>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                Enter the 6-digit code from your authenticator app.
+              </p>
               <input
                 className="input"
                 type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="admin"
-                autoComplete="username"
-                autoFocus
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                placeholder="000000"
+                aria-label="Verification code"
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                style={{ width: '100%', textAlign: 'center', letterSpacing: '0.4em', fontSize: '1.2rem', marginBottom: '16px' }}
                 required
               />
-            </div>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={loading || code.length !== 6}
+                style={{ width: '100%', padding: '12px', fontSize: '0.9rem', fontWeight: 600, justifyContent: 'center', borderRadius: '10px' }}
+              >
+                {loading ? <><span className="spinner" /> Verifying...</> : 'Verify →'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMfaToken(null); setCode(''); setError('') }}
+                style={{ width: '100%', marginTop: '12px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.8rem' }}
+              >
+                Back to sign in
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleLogin}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Username
+                </label>
+                <input
+                  className="input"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="admin"
+                  autoComplete="username"
+                  autoFocus
+                  required
+                />
+              </div>
 
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Password
-              </label>
-              <input
-                className="input"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                autoComplete="current-password"
-                required
-              />
-            </div>
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Password
+                </label>
+                <input
+                  className="input"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  required
+                />
+              </div>
 
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={loading}
-              style={{
-                width: '100%',
-                padding: '12px',
-                fontSize: '0.9rem',
-                fontWeight: 600,
-                justifyContent: 'center',
-                borderRadius: '10px',
-              }}
-            >
-              {loading ? <><span className="spinner" /> Signing in...</> : 'Sign In →'}
-            </button>
-          </form>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={loading}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
+                  justifyContent: 'center',
+                  borderRadius: '10px',
+                }}
+              >
+                {loading ? <><span className="spinner" /> Signing in...</> : 'Sign In →'}
+              </button>
+            </form>
+          )}
         </div>
 
         <p style={{ textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '24px' }}>

@@ -159,7 +159,7 @@ func HealthHandler(cfg *config.Config, probe *depProbe, dbOK func() bool) gin.Ha
 		hs := HealthStatus{
 			Status:  "ok",
 			Service: "seagles-api",
-			Version: "2.1.0",
+			Version: meta.Version,
 			DBOK:    databaseUp,
 			RedisOK: unconfiguredOrOK(cfg.RedisURL != "", deps.redis),
 			MinIOOK: unconfiguredOrOK(cfg.S3Endpoint != "", deps.minio),

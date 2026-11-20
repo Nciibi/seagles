@@ -42,7 +42,8 @@ export default function Settings() {
             {t === 'safelists' ? '🛡️ Safelists' :
              t === 'webhooks' ? '🔔 Webhooks' :
              t === 'profiles' ? '📋 Scan Profiles' :
-             t === 'scopes' ? '🌐 Scan Scopes' : '👥 Users'}
+             t === 'scopes' ? '🌐 Scan Scopes' :
+             t === 'sessions' ? '🔐 Sessions' : '👥 Users'}
           </div>
         ))}
       </div>

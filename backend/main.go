@@ -208,7 +208,7 @@ func main() {
 	}
 
 	go func() {
-		slog.Info("Seagles API v2.1.0", "port", cfg.Port, "log_format", cfg.LogFormat)
+		slog.Info("Seagles API v"+meta.Version, "port", cfg.Port, "log_format", cfg.LogFormat)
 		var serveErr error
 		if useTLS {
 			serveErr = srv.ListenAndServeTLS(cfg.TLSCertFile, cfg.TLSKeyFile)

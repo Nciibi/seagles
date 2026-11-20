@@ -13,7 +13,7 @@ vi.mock('../api/client', () => ({
 
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={['/change-password']}>
+    <MemoryRouter initialEntries={['/change-password']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         <Route path="/change-password" element={<ChangePassword />} />
         <Route path="/login" element={<div>Login screen</div>} />

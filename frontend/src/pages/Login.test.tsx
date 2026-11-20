@@ -6,7 +6,7 @@ import Login from './Login'
 describe('Login Page', () => {
   it('renders login form with username field', () => {
     render(
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Login />
       </BrowserRouter>
     )
@@ -19,7 +19,7 @@ describe('Login Page', () => {
 
   it('renders the title', () => {
     render(
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Login />
       </BrowserRouter>
     )
@@ -28,7 +28,7 @@ describe('Login Page', () => {
 
   it('renders Seagles heading', () => {
     render(
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Login />
       </BrowserRouter>
     )
@@ -38,7 +38,7 @@ describe('Login Page', () => {
 
   it('renders the IoT Security Platform subtitle', () => {
     render(
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Login />
       </BrowserRouter>
     )

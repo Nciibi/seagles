@@ -277,6 +277,16 @@ export interface AuthUser {
   must_change_password?: boolean
 }
 
+export interface SessionInfo {
+  id: string
+  user_id: string
+  username: string
+  created_at: string
+  expires_at: string
+  is_revoked: boolean
+  is_current: boolean
+}
+
 export interface SafelistEntry {
   id: string
   entry_type: string

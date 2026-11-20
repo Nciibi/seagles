@@ -36,6 +36,9 @@ type User struct {
 
 	// TOTPEnabled is true once MFA enrolment has been confirmed with a code.
 	TOTPEnabled bool `json:"totp_enabled"`
+
+	// ChallengeJTI is the JTI of a consumed MFA challenge token. Internal only.
+	ChallengeJTI string `json:"-"`
 }
 
 type LoginRequest struct {

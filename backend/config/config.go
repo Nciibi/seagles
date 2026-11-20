@@ -124,9 +124,10 @@ func Load() (*Config, error) {
 		SMTPPass:   getEnv("SMTP_PASS", ""),
 		SMTPFrom:   getEnv("SMTP_FROM", ""),
 
-		TLSEnabled:  getEnv("TLS_ENABLED", "") == "true",
-		TLSCertFile: getEnv("TLS_CERT_FILE", ""),
-		TLSKeyFile:  getEnv("TLS_KEY_FILE", ""),
+		TLSEnabled:    getEnv("TLS_ENABLED", "") == "true",
+		TLSCertFile:   getEnv("TLS_CERT_FILE", ""),
+		TLSKeyFile:    getEnv("TLS_KEY_FILE", ""),
+		TLSMinVersion: getEnv("TLS_MIN_VERSION", "1.2"),
 
 		RequireHTTPS:        getEnv("REQUIRE_HTTPS", "") == "true",
 		TrustForwardedProto: getEnv("TRUST_FORWARDED_PROTO", "") == "true",

@@ -17,6 +17,13 @@ import (
 	"github.com/Nciibi/seagles/slog"
 )
 
+// contentSecurityPolicy is kept in sync with the SPA's nginx configuration so
+// API responses and the HTML document advertise the same policy.
+const contentSecurityPolicy = "default-src 'self'; script-src 'self'; " +
+	"style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; " +
+	"connect-src 'self' ws: wss:; font-src 'self' data:; " +
+	"object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+
 func success(c *gin.Context, data interface{}) {
 	c.JSON(http.StatusOK, gin.H{"data": data, "error": nil})
 }

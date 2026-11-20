@@ -22,7 +22,9 @@ export default function Login() {
         localStorage.setItem('seagles_refresh', data.refresh_token)
       }
       localStorage.setItem('seagles_user', JSON.stringify(data.user))
-      navigate('/')
+      // The backend gates every endpoint until the initial password is rotated.
+      // Send forced-change accounts straight to the rotation form.
+      navigate(data.user.must_change_password ? '/change-password' : '/')
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { error?: string } }; message?: string }
       setError(axiosError.response?.data?.error || axiosError.message || 'Login failed')

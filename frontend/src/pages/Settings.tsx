@@ -182,7 +182,16 @@ function WebhooksTab({ isAdmin }: { isAdmin: boolean }) {
                     try { await testWebhook(w.id); setError(null) }
                     catch (e) { console.error('Webhook test failed:', e); setError('Webhook test failed') }
                   }} style={{ padding: '2px 10px', fontSize: '0.75rem' }}>Test</button>
-                  <button className="btn btn-danger" onClick={async () => { await deleteWebhook(w.id); fetch() }} style={{ padding: '2px 10px', fontSize: '0.75rem' }}>Delete</button>
+                  <button className="btn btn-danger" onClick={async () => {
+                    try {
+                      await deleteWebhook(w.id)
+                      setError(null)
+                      fetch()
+                    } catch (e) {
+                      console.error('Failed to delete webhook:', e)
+                      setError('Failed to delete webhook')
+                    }
+                  }} style={{ padding: '2px 10px', fontSize: '0.75rem' }}>Delete</button>
                 </td>}
               </tr>
             ))}

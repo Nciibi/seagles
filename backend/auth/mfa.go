@@ -14,6 +14,8 @@ import (
 	"net/url"
 	"sync"
 	"time"
+
+	"github.com/Nciibi/seagles/cache"
 )
 
 const (

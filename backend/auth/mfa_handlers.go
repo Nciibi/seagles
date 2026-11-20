@@ -209,6 +209,10 @@ func MFAVerifyHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Burn the challenge so the same password factor cannot be replayed to
+		// mint another token pair within its five-minute lifetime.
+		cache.BlacklistToken(user.ChallengeJTI)
+
 		accessToken, err := GenerateAccessToken(*user)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"data": nil, "error": "Failed to generate token"})

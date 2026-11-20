@@ -144,7 +144,9 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 		c.Next()
 	})
 
-	r.Use(middleware.EnforceHTTPSMiddleware(cfg.RequireHTTPS, cfg.TrustForwardedProto))
+	r.Use(middleware.EnforceHTTPSMiddlewareWithMinVersion(
+		cfg.RequireHTTPS, cfg.TrustForwardedProto, middleware.MinTLSVersion(cfg.TLSMinVersion),
+	))
 
 	r.Use(middleware.CSRFMiddleware())
 

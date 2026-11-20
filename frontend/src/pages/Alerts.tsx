@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getAlerts, ackAlert, type Alert } from '../api/client'
-import { timeAgo, getSeverityIcon } from '../utils/helpers'
+import { timeAgo, getSeverityIcon, severityColorFor } from '../utils/helpers'
 import { LoadingCard } from '../components/Loading'
 import ErrorBanner from '../components/ErrorBanner'
 

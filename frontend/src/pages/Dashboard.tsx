@@ -91,6 +91,14 @@ export default function Dashboard() {
     )
   }
 
+  const distribution = [
+    { label: 'Critical (8-10)', color: RISK_COLORS.critical, count: stats?.critical_vulns ?? 0 },
+    { label: 'High (6-7.9)', color: RISK_COLORS.high, count: stats?.high_vulns ?? 0 },
+    { label: 'Medium (3-5.9)', color: RISK_COLORS.medium, count: stats?.medium_vulns ?? 0 },
+    { label: 'Low (0-2.9)', color: RISK_COLORS.low, count: stats?.low_vulns ?? 0 },
+  ]
+  const distributionCounts = distribution.map((item) => item.count)
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>

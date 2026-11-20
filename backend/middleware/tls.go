@@ -32,11 +32,25 @@ func TLSEnforcementMiddleware() gin.HandlerFunc {
 	return EnforceHTTPSMiddleware(false, false)
 }
 
-// EnforceHTTPSMiddleware rejects plaintext requests when requireHTTPS is set.
+// MinTLSVersion maps the configured "1.2"/"1.3" string to a tls version.
+// Anything other than "1.3" falls back to the safe 1.2 default.
+func MinTLSVersion(value string) uint16 {
+	if value == "1.3" {
+		return tls.VersionTLS13
+	}
+	return tls.VersionTLS12
+}
+
+// EnforceHTTPSMiddleware uses the default minimum (TLS 1.2).
+func EnforceHTTPSMiddleware(requireHTTPS, trustForwardedProto bool) gin.HandlerFunc {
+	return EnforceHTTPSMiddlewareWithMinVersion(requireHTTPS, trustForwardedProto, DefaultTLSConfig.MinVersion)
+}
+
+// EnforceHTTPSMiddlewareWithMinVersion rejects plaintext requests when
+// requireHTTPS is set and rejects direct TLS connections below minVersion.
 // X-Forwarded-Proto is only trusted when trustForwardedProto is explicitly
 // enabled — otherwise a client could spoof the header and bypass the check.
-// Regardless of configuration, a direct TLS connection below 1.2 is rejected.
-func EnforceHTTPSMiddleware(requireHTTPS, trustForwardedProto bool) gin.HandlerFunc {
+func EnforceHTTPSMiddlewareWithMinVersion(requireHTTPS, trustForwardedProto bool, minVersion uint16) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		directTLS := c.Request.TLS != nil
 		proxiedTLS := trustForwardedProto &&

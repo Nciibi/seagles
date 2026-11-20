@@ -100,6 +100,12 @@ func TestMFAToken(t *testing.T) {
 		t.Fatalf("unexpected user from challenge: %+v", got)
 	}
 
+	// A consumed challenge must not be reusable.
+	cache.BlacklistToken(challenge.Claims.JTI)
+	if _, err := ValidateMFAToken(challenge.Token); err == nil {
+		t.Fatal("replayed MFA challenge accepted")
+	}
+
 	access, err := GenerateAccessToken(user)
 	if err != nil {
 		t.Fatal(err)

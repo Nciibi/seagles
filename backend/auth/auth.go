@@ -59,6 +59,21 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
+type MFAVerifyRequest struct {
+	MFAToken string `json:"mfa_token" binding:"required"`
+	Code     string `json:"code" binding:"required,len=6"`
+}
+
+type MFACodeRequest struct {
+	Code string `json:"code" binding:"required,len=6"`
+}
+
+type MFASetupResponse struct {
+	Secret    string `json:"secret"`
+	OTPAuthURI string `json:"otpauth_uri"`
+	Enabled   bool   `json:"enabled"`
+}
+
 type RegisterRequest struct {
 	Username string `json:"username" binding:"required,min=3,max=50,alphanum"`
 	Email    string `json:"email" binding:"required,email,max=255"`

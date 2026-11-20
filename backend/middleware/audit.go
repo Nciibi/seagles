@@ -7,12 +7,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/Nciibi/seagles/meta"
 	"github.com/Nciibi/seagles/slog"
 )
 
-// DefaultTenantID matches auth.DefaultTenantID for requests that have not
-// gone through authentication (health probes, login failures).
-const DefaultTenantID = "00000000-0000-0000-0000-000000000001"
+// DefaultTenantID is used for requests that have not gone through
+// authentication (health probes, login failures).
+const DefaultTenantID = meta.DefaultTenantID
 
 type AuditEntry struct {
 	UserID    string

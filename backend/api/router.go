@@ -181,6 +181,7 @@ func NewRouter(db *sql.DB, cfg *config.Config, kevCatalog *kev.KEVCatalog) *gin.
 	{
 		v1.POST("/auth/login", auth.LoginHandler(db))
 		v1.POST("/auth/refresh", auth.RefreshTokenHandler(db))
+		v1.POST("/auth/mfa/verify", auth.MFAVerifyHandler(db))
 		v1.GET("/auth/jwks.json", auth.JWKSHandler())
 		v1.GET("/auth/public-key.pem", auth.PublicKeyPEMHandler())
 

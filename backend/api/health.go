@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/Nciibi/seagles/config"
+	"github.com/Nciibi/seagles/meta"
 	"github.com/Nciibi/seagles/middleware"
 )
 

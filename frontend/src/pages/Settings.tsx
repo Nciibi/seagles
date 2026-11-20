@@ -308,6 +308,7 @@ function ProfilesTab({ isAdmin }: { isAdmin: boolean }) {
 
 function ScopesTab({ isAdmin }: { isAdmin: boolean }) {
   const [scopes, setScopes] = useState<ScanScope[]>([])
+  const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState({ cidr: '', label: '' })
 
   const fetch = async () => { try { const r = await getScanScopes(); setScopes(r.data ?? []) } catch (e) { console.error('Failed to fetch scan scopes:', e) } }
